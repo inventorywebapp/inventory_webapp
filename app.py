@@ -3,7 +3,7 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, SKU, CountingSession, CountRecord, AuditLog, get_ph_time
-from utils import check_recount_needed
+from utils import check_recount_needed, sync_data_from_drive
 from config import Config
 import pandas as pd
 from io import BytesIO
@@ -385,6 +385,24 @@ def api_cleanup():
     db.session.commit()
     
     return jsonify({'message': f'Deleted {old_counts} counts, {old_sessions} sessions, {old_audits} audit logs', 'success': True})
+
+@app.route('/sync_data', methods=['POST'])
+@login_required
+def sync_data():
+    """Manually sync data from Google Drive"""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        from utils import sync_data_from_drive
+        success = sync_data_from_drive()
+        
+        if success:
+            return jsonify({'success': True, 'message': 'Data synced successfully from Google Drive!'})
+        else:
+            return jsonify({'success': False, 'message': 'Sync failed. Check server logs for details.'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
 # Health check endpoint for Render
 @app.route('/health')
