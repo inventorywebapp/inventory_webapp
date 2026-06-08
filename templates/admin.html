@@ -16,6 +16,9 @@
     <li class="nav-item">
         <a class="nav-link" data-bs-toggle="tab" href="#export">Export Data</a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#sync">Google Drive Sync</a>
+    </li>
 </ul>
 
 <div class="tab-content">
@@ -127,22 +130,70 @@
             </div>
         </div>
     </div>
-</div>
 
-<div class="row mt-3">
-    <div class="col-md-12">
-        <div class="alert alert-info">
-            <strong>Note:</strong> To sync data from Google Drive, you need to:
-            <ol class="mt-2">
-                <li>Create a Google Cloud Project</li>
-                <li>Enable Drive API and Sheets API</li>
-                <li>Create a Service Account and download credentials.json</li>
-                <li>Share the Google Drive folder with the service account email</li>
-            </ol>
-            <button class="btn btn-sm btn-primary" onclick="alert('Google Drive sync requires API setup. Please check documentation.')">
-                Sync Now
-            </button>
+    <div class="tab-pane fade" id="sync">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5>Google Drive Sync</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <strong>How it works:</strong>
+                    <ul class="mt-2 mb-0">
+                        <li>Click the button below to import the latest SKU data from your Google Drive folder</li>
+                        <li>The system automatically finds the newest Excel file in your folder</li>
+                        <li>All SKUs, Categories, and Inventory data will be updated</li>
+                        <li>This will NOT delete your existing count records</li>
+                    </ul>
+                </div>
+                
+                <div class="text-center">
+                    <button onclick="syncFromDrive()" class="btn btn-success btn-lg">
+                        <i class="bi bi-cloud-download"></i> Sync Data from Google Drive
+                    </button>
+                </div>
+                
+                <div id="syncResult" class="mt-3"></div>
+                
+                <hr>
+                <h6>Your Google Drive Folder:</h6>
+                <p><a href="https://drive.google.com/drive/folders/1UFxPbXn6onHczoLYUwsCYSsKsYxMg6Cw" target="_blank">
+                    CheckStockTempFile Folder
+                </a></p>
+                <p class="text-muted small">Make sure your Excel file is in this folder and shared with the service account.</p>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+function syncFromDrive() {
+    if(confirm('Sync SKU data from Google Drive? This will update your inventory with the latest Excel file.')) {
+        $('#syncResult').html('<div class="alert alert-info">Syncing... Please wait up to 30 seconds.</div>');
+        
+        $.ajax({
+            url: '/sync_data',
+            method: 'POST',
+            contentType: 'application/json',
+            success: function(response) {
+                if(response.success) {
+                    $('#syncResult').html('<div class="alert alert-success">✓ ' + response.message + '</div>');
+                    setTimeout(function() { location.reload(); }, 2000);
+                } else {
+                    $('#syncResult').html('<div class="alert alert-danger">✗ ' + response.message + '</div>');
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = 'Sync failed. ';
+                if(xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg += xhr.responseJSON.message;
+                } else {
+                    errorMsg += 'Check server logs for details.';
+                }
+                $('#syncResult').html('<div class="alert alert-danger">✗ ' + errorMsg + '</div>');
+            }
+        });
+    }
+}
+</script>
 {% endblock %}
