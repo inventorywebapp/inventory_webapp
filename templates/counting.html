@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Inventory Counting</h2>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <label>Select Warehouse</label>
+                <select id="warehouse" class="form-control">
+                    <option value="">Select Warehouse</option>
+                    {% for warehouse in warehouses %}
+                    <option value="{{ warehouse }}">{{ warehouse }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label>Day Category</label>
+                <select id="dayCategory" class="form-control">
+                    <option value="All">All</option>
+                    {% for cat in day_categories %}
+                    <option value="{{ cat }}">{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label>Item Category</label>
+                <select id="itemCategory" class="form-control">
+                    <option value="All">All</option>
+                    {% for cat in item_categories %}
+                    <option value="{{ cat }}">{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label>Search SKU</label>
+                <input type="text" id="searchSku" class="form-control" placeholder="Type to search...">
+                <div id="suggestions" class="list-group mt-1" style="position: absolute; z-index: 1000; width: auto;"></div>
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-md-12">
+                <button id="applyFilters" class="btn btn-primary">Apply Filters</button>
+                <button id="saveCounts" class="btn btn-success">Save All Counts</button>
+                <button id="completeCounting" class="btn btn-danger">Complete Counting Session</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="skusList" class="row">
+    <!-- SKUs will be loaded here -->
+</div>
+
+<div id="recountModal" class="modal fade" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Recount Required Items</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="recountItems"></div>
+                <button id="saveRecount" class="btn btn-primary mt-3">Save Recounts</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentSessionId = null;
+let currentSkus = [];
+
+$(document).ready(function() {
+    $('#applyFilters').click(loadSkus);
+    $('#searchSku').on('input', function() {
+        let term = $(this).val();
+        if (term.length >= 2) {
+            $.get('/search_suggestions', {term: term}, function(data) {
+                let suggestions = $('#suggestions');
+                suggestions.empty();
+                data.forEach(function(item) {
+                    suggestions.append(`
+                        <a href="#" class="list-group-item list-group-item-action" data-sku-id="${item.id}">
+                            ${item.sku} - ${item.description}
+                        </a>
+                    `);
+                });
+                $('.list-group-item-action').click(function(e) {
+                    e.preventDefault();
+                    let skuId = $(this).data('sku-id');
+                    $('#searchSku').val($(this).text());
+                    $('#suggestions').empty();
+                    highlightSku(skuId);
+                });
+            });
+        } else {
+            $('#suggestions').empty();
+        }
+    });
+
+    $('#saveCounts').click(saveAllCounts);
+    $('#completeCounting').click(completeCounting);
+});
+
+function loadSkus() {
+    let warehouse = $('#warehouse').val();
+    let dayCategory = $('#dayCategory').val();
+    let itemCategory = $('#itemCategory').val();
+    let search = $('#searchSku').val();
+
+    $.get('/get_skus', {
+        warehouse: warehouse,
+        day_category: dayCategory,
+        item_category: itemCategory,
+        search: search
+    }, function(data) {
+        currentSkus = data;
+        displaySkus(data);
+    });
+}
+
+function displaySkus(skus) {
+    let html = '<div class="col-12"><div class="table-responsive"><table class="table table-bordered table-hover">';
+    html += '<thead class="table-dark"><tr>';
+    html += '<th>SKU</th><th>Description</th><th>Last Count Date</th><th>Last Count</th>';
+    html += '<th>Container Qty Received</th><th>Container Details</th>';
+    html += '<th>Final Expected</th><th>Kenneth\'s Inv</th><th>Initial Count</th><th>Status</th>';
+    html += '</tr></thead><tbody>';
+
+    skus.forEach(function(sku) {
+        let statusBadge = '';
+        if (sku.bypass_recount) {
+            statusBadge = '<span class="badge bg-warning">Bypass Recount</span>';
+        } else if (sku.stock_status) {
+            statusBadge = `<span class="badge bg-info">${sku.stock_status}</span>`;
+        }
+
+        html += `<tr id="sku-row-${sku.id}">`;
+        html += `<td><strong>${sku.sku}</strong></td>`;
+        html += `<td>${sku.description || '-'}</td>`;
+        html += `<td>${sku.last_count_date || '-'}</td>`;
+        html += `<td>${sku.last_count || 0}</td>`;
+        html += `<td>${sku.total_container_qty || 0}</td>`;
+        html += `<td><small>${sku.container_details || '-'}</small></td>`;
+        html += `<td class="fw-bold">${sku.final_expected_count || 0}</td>`;
+        html += `<td class="fw-bold">${sku.kenneth_inventory || 0}</td>`;
+        html += `<td><input type="number" class="form-control initial-count" data-sku-id="${sku.id}" value="0" step="0.01"></td>`;
+        html += `<td>${statusBadge}</td>`;
+        html += `</tr>`;
+    });
+
+    html += '</tbody></table></div></div>';
+    $('#skusList').html(html);
+}
+
+function saveAllCounts() {
+    let counts = {};
+    $('.initial-count').each(function() {
+        let skuId = $(this).data('sku-id');
+        let count = $(this).val();
+        counts[skuId] = {initial_count: count};
+    });
+
+    $.ajax({
+        url: '/counting',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            session_id: currentSessionId,
+            warehouse: $('#warehouse').val(),
+            counts: counts
+        }),
+        success: function(data) {
+            if (data.success) {
+                currentSessionId = data.session_id;
+                alert('Counts saved successfully!');
+                checkForRecounts();
+            }
+        }
+    });
+}
+
+function checkForRecounts() {
+    if (!currentSessionId) return;
+
+    $.get('/get_recount_list', {session_id: currentSessionId}, function(data) {
+        if (data.length > 0) {
+            showRecountModal(data);
+        } else {
+            alert('No items need recount. You can complete the counting session.');
+        }
+    });
+}
+
+function showRecountModal(recountItems) {
+    let html = '<div class="table-responsive"><table class="table table-bordered">';
+    html += '<thead><tr><th>SKU</th><th>Description</th><th>Initial Count</th>';
+    html += '<th>Final Expected</th><th>Kenneth\'s Inv</th><th>Recount Count</th><th>Remarks</th></tr></thead><tbody>';
+
+    recountItems.forEach(function(item) {
+        html += `<tr id="recount-row-${item.id}">`;
+        html += `<td>${item.sku}</td>`;
+        html += `<td>${item.description}</td>`;
+        html += `<td class="bg-warning">${item.initial_count}</td>`;
+        html += `<td class="bg-info">${item.final_expected_count || 0}</td>`;
+        html += `<td class="bg-info">${item.kenneth_inventory || 0}</td>`;
+        html += `<td><input type="number" class="form-control recount-count" data-record-id="${item.id}" step="0.01"></td>`;
+        html += `<td><textarea class="form-control recount-remarks" data-record-id="${item.id}" rows="2"></textarea></td>`;
+        html += `</tr>`;
+    });
+
+    html += '</tbody></table></div>';
+    $('#recountItems').html(html);
+    $('#recountModal').modal('show');
+}
+
+function completeCounting() {
+    if (!currentSessionId) {
+        alert('Please save counts first');
+        return;
+    }
+
+    if (confirm('Are you sure you want to complete this counting session?')) {
+        $.ajax({
+            url: '/complete_counting',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({session_id: currentSessionId}),
+            success: function(data) {
+                if (data.success) {
+                    alert('Counting session completed!');
+                    window.location.href = '/dashboard';
+                }
+            }
+        });
+    }
+}
+
+function highlightSku(skuId) {
+    $('html, body').animate({
+        scrollTop: $(`#sku-row-${skuId}`).offset().top - 100
+    }, 500);
+    $(`#sku-row-${skuId}`).css('background-color', '#ffff99');
+    setTimeout(() => {
+        $(`#sku-row-${skuId}`).css('background-color', '');
+    }, 3000);
+}
+</script>
+{% endblock %}

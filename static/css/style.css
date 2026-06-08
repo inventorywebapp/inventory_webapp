@@ -1,0 +1,95 @@
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    .table-responsive {
+        font-size: 12px;
+    }
+
+    .btn {
+        margin-bottom: 5px;
+        width: 100%;
+    }
+
+    .form-control, .form-select {
+        font-size: 16px; /* Prevents zoom on mobile */
+    }
+
+    .card-body {
+        padding: 10px;
+    }
+
+    input[type="number"] {
+        min-width: 80px;
+    }
+}
+
+/* General Styles */
+body {
+    background-color: #f8f9fa;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.table th {
+    background-color: #343a40;
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.badge {
+    font-size: 0.8em;
+    padding: 5px 10px;
+}
+
+/* Loading indicator */
+.loading {
+    text-align: center;
+    padding: 20px;
+}
+
+/* Highlight for recount items */
+.bg-warning {
+    background-color: #fff3cd !important;
+}
+
+.bg-info {
+    background-color: #d1ecf1 !important;
+}
+
+/* Scrollable table for mobile */
+.table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Better touch targets on mobile */
+.btn, .list-group-item {
+    min-height: 44px;
+}
+
+/* Suggestions dropdown */
+#suggestions {
+    max-height: 300px;
+    overflow-y: auto;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Modal adjustments for mobile */
+.modal-dialog {
+    margin: 10px;
+}
+
+@media (max-width: 768px) {
+    .modal-dialog {
+        max-width: 95%;
+    }
+}

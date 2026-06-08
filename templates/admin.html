@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Admin Dashboard</h2>
+
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <a class="nav-link active" data-bs-toggle="tab" href="#users">User Management</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#sessions">Counting Sessions</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#audit">Audit Logs</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#export">Export Data</a>
+    </li>
+</ul>
+
+<div class="tab-content">
+    <div class="tab-pane fade show active" id="users">
+        <div class="card">
+            <div class="card-header">
+                <h5>System Users</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr><th>Username</th><th>Full Name</th><th>Role</th><th>Status</th><th>Created</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>{{ user.username }}</td>
+                                <td>{{ user.full_name }}</td>
+                                <td>{{ user.role }}</td>
+                                <td>{% if user.is_active %}Active{% else %}Inactive{% endif %}</td>
+                                <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="sessions">
+        <div class="card">
+            <div class="card-header">
+                <h5>Recent Counting Sessions</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr><th>ID</th><th>User</th><th>Warehouse</th><th>Date</th><th>Status</th><th>Items Counted</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for session in sessions %}
+                            <tr>
+                                <td>{{ session.id }}</td>
+                                <td>{{ session.user.full_name if session.user }}</td>
+                                <td>{{ session.warehouse }}</td>
+                                <td>{{ session.session_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>{% if session.is_completed %}Completed{% else %}In Progress{% endif %}</td>
+                                <td>{{ session.count_records|length }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="audit">
+        <div class="card">
+            <div class="card-header">
+                <h5>Audit Trail</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm">
+                        <thead>
+                            <tr><th>Timestamp (PHT)</th><th>User</th><th>Action</th><th>Details</th><th>IP Address</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for log in audit_logs %}
+                            <tr>
+                                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                <td>{{ log.user.full_name if log.user }}</td>
+                                <td>{{ log.action }}</td>
+                                <td>{{ log.details }}</td>
+                                <td>{{ log.ip_address }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="export">
+        <div class="card">
+            <div class="card-header">
+                <h5>Export Count Data</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('export_counts') }}" method="POST">
+                    <div class="mb-3">
+                        <label>Select Date to Export</label>
+                        <input type="date" name="filter_date" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Export to Excel</button>
+                </form>
+                <hr>
+                <h6>Instructions:</h6>
+                <ul>
+                    <li>Select a date to export all counting sessions from that day</li>
+                    <li>The export will be organized by Day Category in separate sheets</li>
+                    <li>Each sheet contains detailed count information</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-md-12">
+        <div class="alert alert-info">
+            <strong>Note:</strong> To sync data from Google Drive, you need to:
+            <ol class="mt-2">
+                <li>Create a Google Cloud Project</li>
+                <li>Enable Drive API and Sheets API</li>
+                <li>Create a Service Account and download credentials.json</li>
+                <li>Share the Google Drive folder with the service account email</li>
+            </ol>
+            <button class="btn btn-sm btn-primary" onclick="alert('Google Drive sync requires API setup. Please check documentation.')">
+                Sync Now
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}

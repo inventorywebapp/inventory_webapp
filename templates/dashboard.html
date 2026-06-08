@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Dashboard</h2>
+
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card text-white bg-primary mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Total SKUs</h5>
+                <p class="card-text display-4">{{ total_skus }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-success mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Active Counting Sessions</h5>
+                <p class="card-text display-4">{{ active_sessions }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-info mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Quick Actions</h5>
+                <a href="{{ url_for('counting') }}" class="btn btn-light">Start Counting</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Available Warehouses</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for warehouse in warehouses %}
+                    <li class="list-group-item">{{ warehouse }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Categories</h5>
+            </div>
+            <div class="card-body">
+                <h6>Day Categories</h6>
+                <ul class="list-group mb-3">
+                    {% for cat in day_categories[:5] %}
+                    <li class="list-group-item">{{ cat }}</li>
+                    {% endfor %}
+                </ul>
+                <h6>Item Categories</h6>
+                <ul class="list-group">
+                    {% for cat in item_categories[:5] %}
+                    <li class="list-group-item">{{ cat }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
