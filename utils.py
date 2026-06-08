@@ -1,23 +1,17 @@
-import sys
 import re
 import os
 import json
 import io
-import requests
+import sys
 from datetime import datetime
 import pytz
 import pandas as pd
 from models import db, SKU
 
-# Try to import Google libraries, but don't fail if they're not installed
-try:
-    from google.oauth2 import service_account
-    from googleapiclient.discovery import build
-    from googleapiclient.http import MediaIoBaseDownload
-    GOOGLE_AVAILABLE = True
-except ImportError:
-    GOOGLE_AVAILABLE = False
-    print("Google API libraries not available", file=sys.stderr)
+# Google API imports
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
 
 def get_ph_time():
     """Get current Philippines time"""
@@ -55,20 +49,17 @@ def parse_container_details(container_details_str):
 
 def sync_data_from_drive():
     """Sync data from Google Drive using service account"""
-    import sys
-    
-    if not GOOGLE_AVAILABLE:
-        error_msg = "Google API libraries not installed. Please add google-api-python-client to requirements.txt"
-        print(error_msg, file=sys.stderr)
-        return False
-    
     try:
+        print("Starting sync process...", file=sys.stderr)
+        
         # Get credentials from environment variable
         creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
         if not creds_json:
             error_msg = "GOOGLE_CREDENTIALS_JSON environment variable not set"
             print(error_msg, file=sys.stderr)
             return False
+        
+        print("Credentials found, parsing JSON...", file=sys.stderr)
         
         # Parse credentials
         try:
@@ -78,24 +69,18 @@ def sync_data_from_drive():
             print(error_msg, file=sys.stderr)
             return False
         
+        print("Creating credentials object...", file=sys.stderr)
+        
         # Create credentials object
-        try:
-            credentials = service_account.Credentials.from_service_account_info(
-                creds_dict, 
-                scopes=['https://www.googleapis.com/auth/drive.readonly']
-            )
-        except Exception as e:
-            error_msg = f"Failed to create credentials: {e}"
-            print(error_msg, file=sys.stderr)
-            return False
+        credentials = service_account.Credentials.from_service_account_info(
+            creds_dict, 
+            scopes=['https://www.googleapis.com/auth/drive.readonly']
+        )
+        
+        print("Building Drive service...", file=sys.stderr)
         
         # Build Drive service
-        try:
-            drive_service = build('drive', 'v3', credentials=credentials)
-        except Exception as e:
-            error_msg = f"Failed to build Drive service: {e}"
-            print(error_msg, file=sys.stderr)
-            return False
+        drive_service = build('drive', 'v3', credentials=credentials)
         
         # Get folder ID from environment
         folder_id = os.environ.get('GOOGLE_DRIVE_FOLDER_ID')
@@ -104,17 +89,14 @@ def sync_data_from_drive():
             print(error_msg, file=sys.stderr)
             return False
         
+        print(f"Searching folder: {folder_id}", file=sys.stderr)
+        
         # Find Excel files in folder
-        try:
-            results = drive_service.files().list(
-                q=f"'{folder_id}' in parents and (mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType='application/vnd.ms-excel')",
-                fields="files(id, name, createdTime)",
-                orderBy="createdTime desc"
-            ).execute()
-        except Exception as e:
-            error_msg = f"Failed to list files: {e}"
-            print(error_msg, file=sys.stderr)
-            return False
+        results = drive_service.files().list(
+            q=f"'{folder_id}' in parents and (mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType='application/vnd.ms-excel')",
+            fields="files(id, name, createdTime)",
+            orderBy="createdTime desc"
+        ).execute()
         
         files = results.get('files', [])
         if not files:
@@ -129,26 +111,20 @@ def sync_data_from_drive():
         print(f"Found latest file: {file_name}", file=sys.stderr)
         
         # Download the file
-        try:
-            request = drive_service.files().get_media(fileId=file_id)
-            file_stream = io.BytesIO()
-            downloader = MediaIoBaseDownload(file_stream, request)
-            done = False
-            while not done:
-                status, done = downloader.next_chunk()
-            file_stream.seek(0)
-        except Exception as e:
-            error_msg = f"Failed to download file: {e}"
-            print(error_msg, file=sys.stderr)
-            return False
+        request = drive_service.files().get_media(fileId=file_id)
+        file_stream = io.BytesIO()
+        downloader = MediaIoBaseDownload(file_stream, request)
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+        file_stream.seek(0)
+        
+        print("File downloaded, reading Excel...", file=sys.stderr)
         
         # Read Excel file
-        try:
-            df = pd.read_excel(file_stream)
-        except Exception as e:
-            error_msg = f"Failed to read Excel file: {e}"
-            print(error_msg, file=sys.stderr)
-            return False
+        df = pd.read_excel(file_stream)
+        
+        print(f"Excel has {len(df)} rows", file=sys.stderr)
         
         # Import data
         count_new = 0
