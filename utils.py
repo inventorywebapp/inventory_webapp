@@ -1,9 +1,14 @@
 import re
+import os
+import json
+import io
 import requests
 from datetime import datetime
 import pytz
 import pandas as pd
-from io import BytesIO
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
 from models import db, SKU
 
 def get_ph_time():
@@ -40,37 +45,68 @@ def parse_container_details(container_details_str):
     matches = re.findall(pattern, container_details_str)
     return [{'qty': int(qty), 'date': date} for qty, date in matches]
 
-def download_excel_from_google_drive(file_id):
-    """Download Excel file from Google Drive using direct link"""
+def sync_data_from_drive():
+    """Sync data from Google Drive using service account"""
     try:
-        # Direct download URL for Google Drive files
-        download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
-        
-        response = requests.get(download_url, timeout=30)
-        response.raise_for_status()
-        
-        # Read Excel file from bytes
-        excel_data = BytesIO(response.content)
-        df = pd.read_excel(excel_data)
-        return df
-    except Exception as e:
-        print(f"Error downloading from Google Drive: {e}")
-        return None
-
-def import_excel_data_from_drive(file_id):
-    """Import SKU data directly from Google Drive Excel file"""
-    try:
-        df = download_excel_from_google_drive(file_id)
-        if df is None:
+        # Get credentials from environment variable
+        creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
+        if not creds_json:
+            print("Error: GOOGLE_CREDENTIALS_JSON environment variable not set")
             return False
         
-        # Clear existing SKUs (optional - comment out if you want to keep old data)
-        # SKU.query.delete()
+        # Load credentials
+        creds_dict = json.loads(creds_json)
+        credentials = service_account.Credentials.from_service_account_info(
+            creds_dict, 
+            scopes=['https://www.googleapis.com/auth/drive.readonly']
+        )
         
+        # Build Drive service
+        drive_service = build('drive', 'v3', credentials=credentials)
+        
+        # Get folder ID from environment
+        folder_id = os.environ.get('GOOGLE_DRIVE_FOLDER_ID')
+        if not folder_id:
+            print("Error: GOOGLE_DRIVE_FOLDER_ID environment variable not set")
+            return False
+        
+        # Find Excel files in folder
+        results = drive_service.files().list(
+            q=f"'{folder_id}' in parents and (mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType='application/vnd.ms-excel')",
+            fields="files(id, name, createdTime)",
+            orderBy="createdTime desc"
+        ).execute()
+        
+        files = results.get('files', [])
+        if not files:
+            print("No Excel files found in the folder")
+            return False
+        
+        # Get the newest file
+        latest_file = files[0]
+        file_id = latest_file['id']
+        file_name = latest_file['name']
+        print(f"Found latest file: {file_name}")
+        
+        # Download the file
+        request = drive_service.files().get_media(fileId=file_id)
+        file_stream = io.BytesIO()
+        downloader = MediaIoBaseDownload(file_stream, request)
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+        
+        # Read Excel file
+        file_stream.seek(0)
+        df = pd.read_excel(file_stream)
+        
+        # Import data
+        count = 0
         for _, row in df.iterrows():
             sku = SKU.query.filter_by(sku=str(row['SKU'])).first()
             if not sku:
                 sku = SKU()
+                count += 1
             
             sku.sku = str(row['SKU'])
             sku.description = str(row.get('Description', ''))
@@ -95,16 +131,11 @@ def import_excel_data_from_drive(file_id):
             db.session.add(sku)
         
         db.session.commit()
+        print(f"Successfully imported/updated {count} SKUs")
         return True
+        
     except Exception as e:
-        print(f"Error importing data: {e}")
+        print(f"Sync failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return False
-
-def sync_data_from_drive():
-    """Sync data from Google Drive using file ID"""
-    # YOU NEED TO SET YOUR FILE ID HERE
-    # Example: https://drive.google.com/file/d/1ABC123xyz/view
-    # The FILE_ID is "1ABC123xyz"
-    FILE_ID = "YOUR_FILE_ID_HERE"  # <--- PUT YOUR FILE ID HERE
-    
-    return import_excel_data_from_drive(FILE_ID)
