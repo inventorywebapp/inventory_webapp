@@ -434,6 +434,106 @@ def test_env():
     </html>
     """
 
+# Debug endpoint to see Excel column names
+@app.route('/debug_columns')
+@login_required
+def debug_columns():
+    """Debug: Show Excel column names and sample data"""
+    if current_user.role != 'admin':
+        return "Unauthorized", 403
+    
+    try:
+        import json
+        import io
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+        from googleapiclient.http import MediaIoBaseDownload
+        
+        # Get credentials
+        creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
+        creds_dict = json.loads(creds_json)
+        credentials = service_account.Credentials.from_service_account_info(
+            creds_dict, 
+            scopes=['https://www.googleapis.com/auth/drive.readonly']
+        )
+        
+        # Build Drive service
+        drive_service = build('drive', 'v3', credentials=credentials)
+        
+        # Get folder ID
+        folder_id = os.environ.get('GOOGLE_DRIVE_FOLDER_ID')
+        
+        # Find Excel files
+        results = drive_service.files().list(
+            q=f"'{folder_id}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'",
+            fields="files(id, name)",
+            orderBy="createdTime desc"
+        ).execute()
+        
+        files = results.get('files', [])
+        if not files:
+            return "No Excel files found"
+        
+        # Download the file
+        file_id = files[0]['id']
+        request = drive_service.files().get_media(fileId=file_id)
+        file_stream = io.BytesIO()
+        downloader = MediaIoBaseDownload(file_stream, request)
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+        
+        file_stream.seek(0)
+        df = pd.read_excel(file_stream)
+        
+        # Get column names
+        columns = list(df.columns)
+        
+        # Get first 3 rows as sample
+        sample = df.head(3).to_dict('records')
+        
+        result = f"""
+        <html>
+        <head><title>Excel Debug Info</title></head>
+        <body>
+        <h2>Excel File: {files[0]['name']}</h2>
+        
+        <h3>Column Names ({len(columns)} columns):</h3>
+        <ul>
+        """
+        for col in columns:
+            result += f"<li><strong>'{col}'</strong></li>"
+        
+        result += "</ul>"
+        
+        result += "<h3>First 3 Rows (Sample Data):</h3>"
+        result += '<table border="1" cellpadding="5">'
+        result += "服务"
+        for col in columns[:10]:  # Show first 10 columns
+            result += f"<th>{col}</th>"
+        result += "</tr>"
+        
+        for row in sample:
+            result += "服务"
+            for col in columns[:10]:
+                val = row.get(col, '')
+                if pd.isna(val):
+                    val = 'NULL'
+                result += f"<td>{str(val)[:50]}</td>"
+            result += "</tr>"
+        
+        result += """
+        </table>
+        <p><a href="/admin">Back to Admin</a></p>
+        </body>
+        </html>
+        """
+        
+        return result
+        
+    except Exception as e:
+        return f"Error: {str(e)}"
+
 # Health check endpoint for Render
 @app.route('/health')
 def health_check():
