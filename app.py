@@ -66,8 +66,23 @@ def create_default_users():
         else:
             print(f"Database already has {User.query.count()} users", file=sys.stderr)
 
-# Call the function
+def auto_sync_if_empty():
+    """Automatically sync if database is empty"""
+    with app.app_context():
+        if SKU.query.count() == 0:
+            print("Database empty, auto-syncing from Google Drive...", file=sys.stderr)
+            try:
+                success = sync_data_from_drive()
+                if success:
+                    print("Auto-sync completed successfully!", file=sys.stderr)
+                else:
+                    print("Auto-sync failed. Please sync manually.", file=sys.stderr)
+            except Exception as e:
+                print(f"Auto-sync error: {e}", file=sys.stderr)
+
+# Call the functions
 create_default_users()
+auto_sync_if_empty()
 
 @app.teardown_appcontext
 def shutdown_session(exception=None):
@@ -542,7 +557,7 @@ def debug_columns():
         result += "服务"
         for col in columns[:10]:  # Show first 10 columns
             result += f"<th>{col}</th>"
-        result += "</tr>"
+        result += "<tr>"
         
         for row in sample:
             result += "服务"
