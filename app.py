@@ -244,18 +244,23 @@ def counting():
         data = request.json
         session_id = data.get('session_id')
         counts = data.get('counts', {})
+        warehouse = data.get('warehouse')
         
+        # Get or create session
         session_obj = CountingSession.query.get(session_id)
         if not session_obj:
-            session_obj = CountingSession(user_id=current_user.id, warehouse=data.get('warehouse'))
+            session_obj = CountingSession(user_id=current_user.id, warehouse=warehouse)
             db.session.add(session_obj)
             db.session.commit()
+            session_id = session_obj.id
         
+        # Process each SKU count
+        recount_needed_skus = []
         for sku_id, count_data in counts.items():
             sku = SKU.query.get(int(sku_id))
             initial_count = float(count_data.get('initial_count', 0))
             
-            # Get existing record to track changes for audit
+            # Get existing record to track changes
             existing_record = CountRecord.query.filter_by(
                 session_id=session_obj.id, 
                 sku_id=int(sku_id)
@@ -263,11 +268,10 @@ def counting():
             
             old_value = existing_record.initial_count if existing_record else None
             
-            recount_needed = False
-            if not sku.bypass_recount:
-                recount_needed = check_recount_needed(initial_count, sku.final_expected_count, sku.kenneth_inventory)
+            # Check if recount needed using the fixed function
+            recount_needed = check_recount_needed(initial_count, sku.final_expected_count, sku.kenneth_inventory)
             
-            # UPDATE existing record or CREATE new one
+            # Update or create record
             if not existing_record:
                 existing_record = CountRecord(session_id=session_obj.id, sku_id=int(sku_id))
                 db.session.add(existing_record)
@@ -276,7 +280,10 @@ def counting():
             existing_record.is_recount_needed = recount_needed
             existing_record.count_time = get_ph_time()
             
-            # Log the change in Audit Log if value changed
+            if recount_needed:
+                recount_needed_skus.append(sku.sku)
+            
+            # Log changes in AuditLog
             if old_value is not None and old_value != initial_count:
                 audit = AuditLog(
                     user_id=current_user.id,
@@ -288,17 +295,22 @@ def counting():
         
         db.session.commit()
         
-        # Log the save action (without flooding with individual SKU changes)
+        # Log the save action
         audit = AuditLog(
             user_id=current_user.id,
-            action='Initial Count',
-            details=f'Saved counts for {len(counts)} SKUs in session {session_obj.id}',
+            action='Initial Count Saved',
+            details=f'Saved counts for {len(counts)} SKUs in session {session_obj.id}. Recount needed for {len(recount_needed_skus)} SKUs: {", ".join(recount_needed_skus[:5])}',
             ip_address=request.remote_addr
         )
         db.session.add(audit)
         db.session.commit()
         
-        return jsonify({'success': True, 'session_id': session_obj.id})
+        return jsonify({
+            'success': True, 
+            'session_id': session_obj.id,
+            'recount_needed_count': len(recount_needed_skus),
+            'recount_needed_skus': recount_needed_skus[:10]
+        })
     
     # GET request - show counting page
     warehouses = ['Main Warehouse', '5th Floor Warehouse']
@@ -321,7 +333,12 @@ def get_recount_list():
     if not session_id:
         return jsonify([])
     
-    records = CountRecord.query.filter_by(session_id=session_id, is_recount_needed=True, recount_completed=False).all()
+    records = CountRecord.query.filter_by(
+        session_id=session_id, 
+        is_recount_needed=True, 
+        recount_completed=False
+    ).all()
+    
     result = [{
         'id': r.id, 
         'sku_id': r.sku.id, 
@@ -349,14 +366,13 @@ def save_recount():
             record.recount_completed = True
             
             # Log recount change
-            if old_value != record.recount_count:
-                audit = AuditLog(
-                    user_id=current_user.id,
-                    action='Recount',
-                    details=f'SKU {record.sku.sku}: recount changed from {old_value} to {record.recount_count}, reason: {record.remarks}',
-                    ip_address=request.remote_addr
-                )
-                db.session.add(audit)
+            audit = AuditLog(
+                user_id=current_user.id,
+                action='Recount Completed',
+                details=f'SKU {record.sku.sku}: recount count = {record.recount_count}, reason: {record.remarks}',
+                ip_address=request.remote_addr
+            )
+            db.session.add(audit)
     
     db.session.commit()
     return jsonify({'success': True})
@@ -412,7 +428,7 @@ def admin_dashboard():
 @app.route('/export_counts', methods=['POST'])
 @login_required
 def export_counts():
-    """Export count data with multiple filters"""
+    """Export count data with multiple filters - INCLUDES INCOMPLETE SESSIONS"""
     if current_user.role not in ['admin', 'audit']:
         flash('Access denied', 'error')
         return redirect(url_for('index'))
@@ -423,8 +439,8 @@ def export_counts():
     filter_day_category = request.form.get('filter_day_category')
     filter_item_category = request.form.get('filter_item_category')
     
-    # Start with completed sessions
-    query = CountingSession.query.filter_by(is_completed=True)
+    # Get ALL sessions (both completed AND in progress)
+    query = CountingSession.query
     
     # Apply date filter
     if filter_date:
@@ -438,6 +454,10 @@ def export_counts():
         query = query.filter(CountingSession.warehouse == filter_warehouse)
     
     sessions = query.all()
+    
+    if not sessions:
+        flash('No counting sessions found for the selected filters', 'warning')
+        return redirect(url_for('admin_dashboard'))
     
     # Group by day category from SKU
     sheets_data = {}
@@ -469,6 +489,7 @@ def export_counts():
                 'Date/Time Counted': record.count_time.strftime('%Y-%m-%d %H:%M:%S') if record.count_time else '',
                 'Counter': session_obj.user.full_name if session_obj.user else 'Unknown',
                 'Warehouse': session_obj.warehouse,
+                'Session Status': 'Completed' if session_obj.is_completed else 'In Progress',
                 'Last Count Reference': sku.last_count,
                 'Last Count Date': sku.last_count_date,
                 'Final Expected Count': sku.final_expected_count,
@@ -542,6 +563,10 @@ def export_audit_log():
     
     # Order by timestamp
     logs = query.order_by(AuditLog.timestamp.desc()).all()
+    
+    if not logs:
+        flash('No audit log data found for the selected filters', 'warning')
+        return redirect(url_for('admin_dashboard'))
     
     # Prepare data for export
     audit_data = []
