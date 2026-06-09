@@ -534,6 +534,50 @@ def debug_columns():
     except Exception as e:
         return f"Error: {str(e)}"
 
+@app.route('/check_db_categories')
+@login_required
+def check_db_categories():
+    """Check what categories are in the database"""
+    if current_user.role != 'admin':
+        return "Unauthorized", 403
+    
+    day_cats = db.session.query(SKU.category).distinct().all()
+    item_cats = db.session.query(SKU.description).distinct().all()
+    total = SKU.query.count()
+    
+    result = f"""
+    <html>
+    <head><title>Database Categories</title></head>
+    <body>
+    <h2>Database Statistics</h2>
+    <p>Total SKUs: {total}</p>
+    
+    <h3>Day Categories (from Category column):</h3>
+    <ul>
+    """
+    for cat in day_cats:
+        if cat[0]:
+            result += f"<li>'{cat[0]}'</li>"
+        else:
+            result += f"<li>NULL/Empty</li>"
+    
+    result += "</ul>"
+    
+    result += "<h3>Item Categories (from Description column):</h3>"
+    result += "<ul>"
+    for cat in item_cats[:50]:  # Show first 50
+        if cat[0]:
+            result += f"<li>'{cat[0]}'</li>"
+    
+    result += """
+    </ul>
+    <p><a href="/admin">Back to Admin</a></p>
+    </body>
+    </html>
+    """
+    
+    return result
+
 # Health check endpoint for Render
 @app.route('/health')
 def health_check():
