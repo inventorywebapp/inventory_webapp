@@ -9,27 +9,22 @@
             <div class="col-md-3">
                 <label>Select Warehouse</label>
                 <select id="warehouse" class="form-control">
+                    <option value="All">-- All Warehouses --</option>
                     <option value="Main">Main Warehouse</option>
                     <option value="5thFloor">5th Floor Warehouse</option>
                 </select>
-                <small class="text-muted">Filters the Item Categories below</small>
+                <small class="text-muted">Filters SKUs by warehouse</small>
             </div>
             <div class="col-md-3">
                 <label>Day Category</label>
                 <select id="dayCategory" class="form-control">
                     <option value="All">-- All Day Categories --</option>
-                    {% for cat in day_categories %}
-                    <option value="{{ cat }}">{{ cat }}</option>
-                    {% endfor %}
                 </select>
             </div>
             <div class="col-md-3">
                 <label>Item Category</label>
                 <select id="itemCategory" class="form-control">
                     <option value="All">-- All Item Categories --</option>
-                    {% for cat in item_categories %}
-                    <option value="{{ cat }}">{{ cat }}</option>
-                    {% endfor %}
                 </select>
             </div>
             <div class="col-md-3">
@@ -39,7 +34,6 @@
         </div>
         <div class="row mt-2">
             <div class="col-md-12">
-                <button id="loadAllBtn" class="btn btn-info" onclick="loadAllSkus()">Load All SKUs</button>
                 <button id="applyFilters" class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
                 <button id="saveCounts" class="btn btn-success" onclick="saveAllCounts()">Save All Counts</button>
                 <button id="completeCounting" class="btn btn-danger" onclick="completeCounting()">Complete Counting Session</button>
@@ -58,8 +52,16 @@
 <div id="skusList" class="row">
     <div class="col-12">
         <div class="alert alert-info text-center">
-            Select a warehouse and click "Load All SKUs" to see products, or use filters to narrow down.
+            Select filters and click "Apply Filters" to load SKUs
         </div>
+    </div>
+</div>
+
+<div id="paginationControls" class="row mt-3" style="display: none;">
+    <div class="col-12 text-center">
+        <button class="btn btn-secondary" onclick="previousPage()">Previous</button>
+        <span id="pageInfo" class="mx-3">Page 1</span>
+        <button class="btn btn-secondary" onclick="nextPage()">Next</button>
     </div>
 </div>
 
@@ -78,9 +80,13 @@ const FIFTH_FLOOR_CATEGORIES = [
     'Trunk Tray'
 ];
 
-// Store all item categories from server
+// Store all data from server
 let allItemCategories = {{ item_categories|tojson }};
-
+let allDayCategories = {{ day_categories|tojson }};
+let allSkus = [];
+let filteredSkus = [];
+let currentPage = 1;
+let itemsPerPage = 50;
 let currentSessionId = null;
 
 // Function to filter item categories based on warehouse selection
@@ -97,9 +103,12 @@ function filterItemCategoriesByWarehouse() {
     if (warehouse === '5thFloor') {
         // Only show 5th Floor categories
         filteredCategories = allItemCategories.filter(cat => FIFTH_FLOOR_CATEGORIES.includes(cat));
-    } else {
+    } else if (warehouse === 'Main') {
         // Show Main Warehouse categories (all except 5th Floor)
         filteredCategories = allItemCategories.filter(cat => !FIFTH_FLOOR_CATEGORIES.includes(cat));
+    } else {
+        // Show all categories for "All Warehouses"
+        filteredCategories = [...allItemCategories];
     }
     
     // Sort alphabetically
@@ -117,29 +126,72 @@ function filterItemCategoriesByWarehouse() {
     if (currentValue !== 'All' && filteredCategories.includes(currentValue)) {
         itemCategorySelect.value = currentValue;
     }
+    
+    // Also update day categories based on selected item category
+    updateDayCategories();
 }
 
-function loadAllSkus() {
-    let dayCategory = document.getElementById('dayCategory').value;
-    let itemCategory = document.getElementById('itemCategory').value;
-    let search = document.getElementById('searchSku').value;
-    loadSkus(dayCategory, itemCategory, search);
+// Function to update day categories based on selected item category
+function updateDayCategories() {
+    let selectedItemCategory = document.getElementById('itemCategory').value;
+    let dayCategorySelect = document.getElementById('dayCategory');
+    let currentValue = dayCategorySelect.value;
+    
+    // Clear existing options
+    dayCategorySelect.innerHTML = '<option value="All">-- All Day Categories --</option>';
+    
+    let filteredDayCategories = [];
+    
+    if (selectedItemCategory !== 'All' && allSkus.length > 0) {
+        // Get unique day categories for the selected item category
+        let daySet = new Set();
+        for (let i = 0; i < allSkus.length; i++) {
+            if (allSkus[i].description === selectedItemCategory && allSkus[i].category) {
+                daySet.add(allSkus[i].category);
+            }
+        }
+        filteredDayCategories = Array.from(daySet);
+    } else {
+        // Show all day categories
+        filteredDayCategories = [...allDayCategories];
+    }
+    
+    // Sort alphabetically
+    filteredDayCategories.sort();
+    
+    // Add filtered day categories to dropdown
+    for (let i = 0; i < filteredDayCategories.length; i++) {
+        if (filteredDayCategories[i]) {
+            let option = document.createElement('option');
+            option.value = filteredDayCategories[i];
+            option.textContent = filteredDayCategories[i];
+            dayCategorySelect.appendChild(option);
+        }
+    }
+    
+    // Try to restore previous selection if still valid
+    if (currentValue !== 'All' && filteredDayCategories.includes(currentValue)) {
+        dayCategorySelect.value = currentValue;
+    }
 }
 
 function applyFilters() {
+    let warehouse = document.getElementById('warehouse').value;
     let dayCategory = document.getElementById('dayCategory').value;
     let itemCategory = document.getElementById('itemCategory').value;
     let search = document.getElementById('searchSku').value;
-    loadSkus(dayCategory, itemCategory, search);
+    
+    loadSkus(warehouse, dayCategory, itemCategory, search);
 }
 
-function loadSkus(dayCategory, itemCategory, search) {
+function loadSkus(warehouse, dayCategory, itemCategory, search) {
     let loadingDiv = document.getElementById('loadingIndicator');
     let skusListDiv = document.getElementById('skusList');
     
     loadingDiv.style.display = 'block';
     skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-info text-center">Loading SKUs...</div></div>';
     
+    // First, load all SKUs from server (without warehouse filter - we'll filter on client side)
     let url = '/get_skus?day_category=' + encodeURIComponent(dayCategory) + 
               '&item_category=' + encodeURIComponent(itemCategory) + 
               '&search=' + encodeURIComponent(search);
@@ -149,15 +201,56 @@ function loadSkus(dayCategory, itemCategory, search) {
     fetch(url)
         .then(response => response.json())
         .then(data => {
-            console.log('Received:', data.length, 'SKUs');
-            displaySkus(data);
+            console.log('Received:', data.length, 'SKUs from server');
+            
+            // Apply warehouse filter on client side
+            let warehouseFiltered = [];
+            for (let i = 0; i < data.length; i++) {
+                let sku = data[i];
+                let belongsTo5thFloor = FIFTH_FLOOR_CATEGORIES.includes(sku.description);
+                
+                if (warehouse === '5thFloor' && belongsTo5thFloor) {
+                    warehouseFiltered.push(sku);
+                } else if (warehouse === 'Main' && !belongsTo5thFloor) {
+                    warehouseFiltered.push(sku);
+                } else if (warehouse === 'All') {
+                    warehouseFiltered.push(sku);
+                }
+            }
+            
+            console.log('After warehouse filter:', warehouseFiltered.length, 'SKUs');
+            
+            filteredSkus = warehouseFiltered;
+            currentPage = 1;
+            displaySkusWithPagination();
             loadingDiv.style.display = 'none';
+            
+            // Update day categories based on selected item category
+            updateDayCategories();
         })
         .catch(error => {
             console.error('Error:', error);
             skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-danger text-center">Error loading SKUs: ' + error + '</div></div>';
             loadingDiv.style.display = 'none';
         });
+}
+
+function displaySkusWithPagination() {
+    let startIndex = (currentPage - 1) * itemsPerPage;
+    let endIndex = startIndex + itemsPerPage;
+    let pageSkus = filteredSkus.slice(startIndex, endIndex);
+    
+    displaySkus(pageSkus);
+    
+    // Show/hide pagination controls
+    let paginationDiv = document.getElementById('paginationControls');
+    if (filteredSkus.length > itemsPerPage) {
+        paginationDiv.style.display = 'block';
+        let totalPages = Math.ceil(filteredSkus.length / itemsPerPage);
+        document.getElementById('pageInfo').textContent = 'Page ' + currentPage + ' of ' + totalPages + ' (' + filteredSkus.length + ' total SKUs)';
+    } else {
+        paginationDiv.style.display = 'none';
+    }
 }
 
 function displaySkus(skus) {
@@ -176,6 +269,7 @@ function displaySkus(skus) {
     html += '<th>Day Category</th>';
     html += '<th>Last Count</th>';
     html += '<th>Container Qty</th>';
+    html += '<th>Container Details</th>';
     html += '<th>Final Expected</th>';
     html += '<th>Kenneth\'s Inv</th>';
     html += '<th>Initial Count</th>';
@@ -190,12 +284,19 @@ function displaySkus(skus) {
             statusBadge = '<span class="badge bg-warning">Bypass</span>';
         }
         
+        // Truncate container details for better display
+        let containerDetails = sku.container_details || '-';
+        if (containerDetails.length > 50) {
+            containerDetails = containerDetails.substring(0, 50) + '...';
+        }
+        
         html += '<tr id="sku-row-' + sku.id + '">';
         html += '<td><strong>' + escapeHtml(sku.sku) + '</strong></td>';
         html += '<td>' + escapeHtml(sku.description || '-') + '</td>';
         html += '<td>' + escapeHtml(sku.category || '-') + '</td>';
         html += '<td class="fw-bold">' + (sku.last_count || 0) + '</td>';
         html += '<td>' + (sku.total_container_qty || 0) + '</td>';
+        html += '<td><small>' + escapeHtml(containerDetails) + '</small></td>';
         html += '<td class="fw-bold text-primary">' + (sku.final_expected_count || 0) + '</td>';
         html += '<td class="fw-bold text-success">' + (sku.kenneth_inventory || 0) + '</td>';
         html += '<td><input type="number" class="form-control initial-count" data-sku-id="' + sku.id + '" value="0" step="0.01" style="min-width: 100px; width: 100px;"></td>';
@@ -203,8 +304,27 @@ function displaySkus(skus) {
         html += '</tr>';
     }
     
-    html += '</tbody></table></div></div>';
+    html += '</tbody><table></div></div>';
     skusListDiv.innerHTML = html;
+}
+
+function previousPage() {
+    if (currentPage > 1) {
+        currentPage--;
+        displaySkusWithPagination();
+        // Scroll to top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+}
+
+function nextPage() {
+    let totalPages = Math.ceil(filteredSkus.length / itemsPerPage);
+    if (currentPage < totalPages) {
+        currentPage++;
+        displaySkusWithPagination();
+        // Scroll to top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
 }
 
 function escapeHtml(text) {
@@ -219,7 +339,7 @@ function escapeHtml(text) {
 
 function saveAllCounts() {
     let warehouse = document.getElementById('warehouse').value;
-    let warehouseDisplay = warehouse === '5thFloor' ? '5th Floor Warehouse' : 'Main Warehouse';
+    let warehouseDisplay = warehouse === '5thFloor' ? '5th Floor Warehouse' : (warehouse === 'Main' ? 'Main Warehouse' : 'All Warehouses');
     let counts = {};
     
     let countInputs = document.querySelectorAll('.initial-count');
@@ -312,7 +432,6 @@ function showRecountModal(recountItems) {
     html += '</tbody></table></div>';
     html += '<button class="btn btn-primary mt-3" onclick="saveRecounts()">Save Recounts</button>';
     
-    // Create modal dynamically
     let modalHtml = `
         <div class="modal fade" id="recountModal" tabindex="-1">
             <div class="modal-dialog modal-lg">
@@ -329,7 +448,6 @@ function showRecountModal(recountItems) {
         </div>
     `;
     
-    // Remove existing modal if any
     let existingModal = document.getElementById('recountModal');
     if (existingModal) {
         existingModal.remove();
@@ -405,18 +523,22 @@ function completeCounting() {
     }
 }
 
-// Event listener for warehouse dropdown change
+// Event listeners
 document.getElementById('warehouse').addEventListener('change', function() {
     filterItemCategoriesByWarehouse();
-    // Auto-load SKUs when warehouse changes
-    loadAllSkus();
+    applyFilters();
 });
 
-// Auto-load SKUs on page load and setup category filter
+document.getElementById('itemCategory').addEventListener('change', function() {
+    updateDayCategories();
+    applyFilters();
+});
+
+// Auto-load on page load
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Page loaded, setting up warehouse filter...');
+    console.log('Page loaded, setting up...');
     filterItemCategoriesByWarehouse();
-    loadAllSkus();
+    applyFilters();
 });
 </script>
 {% endblock %}
