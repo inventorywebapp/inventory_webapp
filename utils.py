@@ -48,7 +48,7 @@ def parse_container_details(container_details_str):
     return [{'qty': int(qty), 'date': date} for qty, date in matches]
 
 def sync_data_from_drive():
-    """Sync data from Google Drive using service account - with exact column mapping"""
+    """Sync data from Google Drive using service account"""
     try:
         print("=== STARTING SYNC PROCESS ===", file=sys.stderr)
         
@@ -124,93 +124,65 @@ def sync_data_from_drive():
         total_rows = len(df)
         print(f"Excel has {total_rows} rows", file=sys.stderr)
         
-        # Exact column mapping based on your Excel file
-        sku_col = 'SKU'
-        desc_col = 'Description'      # This is the Item Category
-        cat_col = 'Category'           # This is the Day Category (Mon, Tue, etc.)
+        # Clear existing SKUs to avoid duplicates
+        print("Clearing existing SKUs...", file=sys.stderr)
+        SKU.query.delete()
+        db.session.commit()
+        print("Existing SKUs cleared", file=sys.stderr)
         
-        print(f"Using columns - SKU: {sku_col}, Description: {desc_col}, Category: {cat_col}", file=sys.stderr)
-        
-        # Count non-empty categories for debugging
-        non_empty_cats = df[cat_col].dropna().unique() if cat_col in df.columns else []
-        print(f"Unique Day Categories found: {list(non_empty_cats)}", file=sys.stderr)
-        
-        non_empty_desc = df[desc_col].dropna().unique() if desc_col in df.columns else []
-        print(f"Unique Item Categories found: {list(non_empty_desc)[:20]}", file=sys.stderr)  # First 20 only
-        
-        # Load existing SKUs
-        print("Loading existing SKUs...", file=sys.stderr)
-        existing_skus = {sku.sku: sku for sku in SKU.query.all()}
-        print(f"Found {len(existing_skus)} existing SKUs", file=sys.stderr)
-        
-        # Process rows
-        count_new = 0
-        count_updated = 0
+        # Process rows and add to database
+        count = 0
         batch_size = 500
         
         for index, row in df.iterrows():
-            sku_code = str(row[sku_col])
-            
-            # Check if SKU exists
-            if sku_code in existing_skus:
-                sku = existing_skus[sku_code]
-                count_updated += 1
-            else:
+            try:
                 sku = SKU()
-                existing_skus[sku_code] = sku
-                count_new += 1
-            
-            # Update SKU fields with exact column names
-            sku.sku = sku_code
-            
-            # Description (Item Category)
-            if desc_col in df.columns:
-                val = row.get(desc_col, '')
-                sku.description = str(val) if pd.notna(val) else ''
-            else:
-                sku.description = ''
-            
-            # Category (Day Category)
-            if cat_col in df.columns:
-                val = row.get(cat_col, '')
-                sku.category = str(val) if pd.notna(val) else ''
-            else:
-                sku.category = ''
-            
-            # Other columns with exact names from your Excel
-            sku.last_count_date = str(row.get('LastCountDate', '')) if pd.notna(row.get('LastCountDate')) else ''
-            sku.last_count = float(row.get('LastCount', 0)) if pd.notna(row.get('LastCount')) else 0
-            sku.total_container_qty = float(row.get('TotalContainerQty', 0)) if pd.notna(row.get('TotalContainerQty')) else 0
-            sku.container_details = str(row.get('ContainerDetails', '')) if pd.notna(row.get('ContainerDetails')) else ''
-            sku.total_orders = float(row.get('TotalOrders', 0)) if pd.notna(row.get('TotalOrders')) else 0
-            sku.final_expected_count = float(row.get('Final Expected Count', 0)) if pd.notna(row.get('Final Expected Count')) else 0
-            sku.kenneth_inventory = float(row.get("Kenneth's Inventory", 0)) if pd.notna(row.get("Kenneth's Inventory")) else 0
-            sku.buffer_qty = float(row.get('BufferQty', 0)) if pd.notna(row.get('BufferQty')) else 0
-            sku.stock_status = str(row.get('StockStatus', '')) if pd.notna(row.get('StockStatus')) else ''
-            sku.inventory_remark = str(row.get('InventoryRemark', '')) if pd.notna(row.get('InventoryRemark')) else ''
-            sku.sku_status = str(row.get('SKUStatus', '')) if pd.notna(row.get('SKUStatus')) else ''
-            
-            # Set bypass recount for specific Item Categories (Description column)
-            if sku.description in ['Console/Armrest', 'Armrest', 'Wiper', 'Armrest category', 'Wiper category']:
-                sku.bypass_recount = True
-            
-            db.session.add(sku)
-            
-            # Commit in batches
-            if (index + 1) % batch_size == 0:
-                db.session.commit()
-                print(f"Committed {index + 1}/{total_rows} rows ({count_new} new, {count_updated} updated)", file=sys.stderr)
+                
+                # Required field - SKU
+                sku.sku = str(row['SKU']) if pd.notna(row['SKU']) else ''
+                
+                # Description (Item Category)
+                sku.description = str(row.get('Description', '')) if pd.notna(row.get('Description')) else ''
+                
+                # Category (Day Category) - This is what you filter by
+                sku.category = str(row.get('Category', '')) if pd.notna(row.get('Category')) else ''
+                
+                # Other fields
+                sku.last_count_date = str(row.get('LastCountDate', '')) if pd.notna(row.get('LastCountDate')) else ''
+                sku.last_count = float(row.get('LastCount', 0)) if pd.notna(row.get('LastCount')) else 0
+                sku.total_container_qty = float(row.get('TotalContainerQty', 0)) if pd.notna(row.get('TotalContainerQty')) else 0
+                sku.container_details = str(row.get('ContainerDetails', '')) if pd.notna(row.get('ContainerDetails')) else ''
+                sku.total_orders = float(row.get('TotalOrders', 0)) if pd.notna(row.get('TotalOrders')) else 0
+                sku.final_expected_count = float(row.get('Final Expected Count', 0)) if pd.notna(row.get('Final Expected Count')) else 0
+                sku.kenneth_inventory = float(row.get("Kenneth's Inventory", 0)) if pd.notna(row.get("Kenneth's Inventory")) else 0
+                sku.buffer_qty = float(row.get('BufferQty', 0)) if pd.notna(row.get('BufferQty')) else 0
+                sku.stock_status = str(row.get('StockStatus', '')) if pd.notna(row.get('StockStatus')) else ''
+                sku.inventory_remark = str(row.get('InventoryRemark', '')) if pd.notna(row.get('InventoryRemark')) else ''
+                sku.sku_status = str(row.get('SKUStatus', '')) if pd.notna(row.get('SKUStatus')) else ''
+                
+                # Set bypass recount for specific Item Categories
+                if sku.description in ['Console/Armrest', 'Armrest', 'Wiper', 'Armrest category', 'Wiper category']:
+                    sku.bypass_recount = True
+                
+                db.session.add(sku)
+                count += 1
+                
+                # Commit in batches
+                if count % batch_size == 0:
+                    db.session.commit()
+                    print(f"Committed {count}/{total_rows} rows", file=sys.stderr)
+                    
+            except Exception as row_error:
+                print(f"Error processing row {index}: {row_error}", file=sys.stderr)
+                continue
         
         # Final commit
         db.session.commit()
-        print(f"=== SYNC COMPLETE: {count_new} new SKUs, {count_updated} updated SKUs ===", file=sys.stderr)
+        print(f"=== SYNC COMPLETE: {count} SKUs imported ===", file=sys.stderr)
         
-        # Print summary of categories in database
-        print("=== DATABASE SUMMARY ===", file=sys.stderr)
-        day_cats = db.session.query(SKU.category).distinct().all()
-        item_cats = db.session.query(SKU.description).distinct().all()
-        print(f"Day Categories in DB: {[c[0] for c in day_cats if c[0]][:20]}", file=sys.stderr)
-        print(f"Item Categories in DB: {[c[0] for c in item_cats if c[0]][:20]}", file=sys.stderr)
+        # Verify data was saved
+        db_count = SKU.query.count()
+        print(f"Verified: {db_count} SKUs in database", file=sys.stderr)
         
         return True
         
