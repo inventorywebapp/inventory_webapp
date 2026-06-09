@@ -162,19 +162,24 @@ def dashboard():
 @app.route('/get_skus')
 @login_required
 def get_skus():
-    """Get SKUs with filters - FIXED VERSION"""
+    """Get SKUs with filters - SMART LIMIT LOGIC"""
     day_category = request.args.get('day_category')
     item_category = request.args.get('item_category')
     search = request.args.get('search', '')
     
     query = SKU.query
     
+    # Track if any filters are applied
+    is_filtered = False
+    
     # Apply filters only if not "All" or empty
     if day_category and day_category != 'All' and day_category != '-- All Day Categories --':
         query = query.filter(SKU.category == day_category)
+        is_filtered = True
     
     if item_category and item_category != 'All' and item_category != '-- All Item Categories --':
         query = query.filter(SKU.description == item_category)
+        is_filtered = True
     
     if search and search.strip():
         query = query.filter(
@@ -183,9 +188,17 @@ def get_skus():
                 SKU.description.contains(search)
             )
         )
+        is_filtered = True
     
-    # Limit to 1000 for performance
-    skus = query.limit(1000).all()
+    # SMART LIMIT:
+    # - If filters are applied, show ALL matching SKUs (user wants specific results)
+    # - If no filters, limit to 1000 for performance (user is just browsing)
+    if is_filtered:
+        skus = query.all()
+        print(f"Filtered query returned {len(skus)} SKUs", file=sys.stderr)
+    else:
+        skus = query.limit(1000).all()
+        print(f"Unfiltered query (limited to 1000) returned {len(skus)} SKUs", file=sys.stderr)
     
     result = [{
         'id': s.id, 
