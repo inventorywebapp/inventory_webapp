@@ -394,7 +394,6 @@ def sync_data():
         return jsonify({'error': 'Unauthorized'}), 403
     
     try:
-        from utils import sync_data_from_drive
         success = sync_data_from_drive()
         
         if success:
@@ -403,6 +402,37 @@ def sync_data():
             return jsonify({'success': False, 'message': 'Sync failed. Check server logs for details.'}), 500
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+
+# Test endpoint to check environment variables
+@app.route('/test_env')
+@login_required
+def test_env():
+    """Test endpoint to verify environment variables are set"""
+    if current_user.role != 'admin':
+        return "Unauthorized", 403
+    
+    creds = os.environ.get('GOOGLE_CREDENTIALS_JSON')
+    folder = os.environ.get('GOOGLE_DRIVE_FOLDER_ID')
+    
+    creds_status = 'SET' if creds else 'NOT SET'
+    creds_length = len(creds) if creds else 0
+    
+    folder_status = folder if folder else 'NOT SET'
+    
+    return f"""
+    <html>
+    <head><title>Environment Test</title></head>
+    <body>
+    <h2>Environment Variables Status</h2>
+    <ul>
+        <li><strong>GOOGLE_CREDENTIALS_JSON:</strong> {creds_status} (length: {creds_length} characters)</li>
+        <li><strong>GOOGLE_DRIVE_FOLDER_ID:</strong> {folder_status}</li>
+    </ul>
+    <hr>
+    <p><a href="/admin">Back to Admin</a></p>
+    </body>
+    </html>
+    """
 
 # Health check endpoint for Render
 @app.route('/health')
