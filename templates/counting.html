@@ -187,7 +187,7 @@ function updateDayCategories() {
     }
 }
 
-// FIXED: Smart search that shows suggestions instantly without Apply Filters
+// Smart search that shows suggestions instantly without Apply Filters
 function setupSmartSearch() {
     let searchInput = document.getElementById('searchSku');
     let suggestionsDiv = document.getElementById('suggestions');
@@ -200,19 +200,14 @@ function setupSmartSearch() {
             return;
         }
         
-        // Clear previous timeout
         if (searchTimeout) clearTimeout(searchTimeout);
         
-        // Debounce search for better performance
         searchTimeout = setTimeout(function() {
-            // Get unique SKU suggestions from all SKUs (not filtered)
             let suggestions = [];
             let seen = new Set();
             
-            // Search through all SKUs in the current view (allSkus already has warehouse filter applied)
             for (let i = 0; i < allSkus.length && suggestions.length < 15; i++) {
                 let sku = allSkus[i];
-                // Search in SKU code (case insensitive)
                 if (sku.sku.toLowerCase().includes(term.toLowerCase())) {
                     if (!seen.has(sku.sku)) {
                         seen.add(sku.sku);
@@ -240,7 +235,6 @@ function setupSmartSearch() {
                         return function() {
                             searchInput.value = skuValue;
                             suggestionsDiv.style.display = 'none';
-                            // Auto-apply filters when suggestion is clicked
                             applyFilters();
                         };
                     })(item.sku);
@@ -253,14 +247,12 @@ function setupSmartSearch() {
         }, 300);
     });
     
-    // Hide suggestions when clicking outside
     document.addEventListener('click', function(e) {
         if (e.target !== searchInput && !suggestionsDiv.contains(e.target)) {
             suggestionsDiv.style.display = 'none';
         }
     });
     
-    // Also handle Enter key to apply filters
     searchInput.addEventListener('keypress', function(e) {
         if (e.which === 13) {
             suggestionsDiv.style.display = 'none';
@@ -296,10 +288,8 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
         .then(data => {
             console.log('Received:', data.length, 'SKUs from server');
             
-            // Store all SKUs for smart search
             allSkus = data;
             
-            // Apply warehouse filter on client side
             let warehouseFiltered = [];
             for (let i = 0; i < data.length; i++) {
                 let sku = data[i];
@@ -361,6 +351,7 @@ function displaySkus(skus) {
     html += '<th>SKU</th>';
     html += '<th>Description (Item Category)</th>';
     html += '<th>Day Category</th>';
+    html += '<th>Last Count Date</th>';
     html += '<th>Last Count</th>';
     html += '<th>Container Qty</th>';
     html += '<th>Container Details</th>';
@@ -383,10 +374,18 @@ function displaySkus(skus) {
             containerDetails = containerDetails.substring(0, 50) + '...';
         }
         
+        // Format the last count date nicely
+        let lastCountDate = sku.last_count_date || '-';
+        if (lastCountDate !== '-' && lastCountDate.length > 10) {
+            // If it's a full datetime string, extract just the date part
+            lastCountDate = lastCountDate.split(' ')[0];
+        }
+        
         html += '<tr id="sku-row-' + sku.id + '">';
         html += '<td><strong>' + escapeHtml(sku.sku) + '</strong></td>';
         html += '<td>' + escapeHtml(sku.description || '-') + '</td>';
         html += '<td>' + escapeHtml(sku.category || '-') + '</td>';
+        html += '<td class="text-nowrap">' + escapeHtml(lastCountDate) + '</td>';
         html += '<td class="fw-bold">' + (sku.last_count || 0) + '</td>';
         html += '<td>' + (sku.total_container_qty || 0) + '</td>';
         html += '<td><small>' + escapeHtml(containerDetails) + '</small></td>';
@@ -499,7 +498,7 @@ function checkForRecounts() {
 
 function showRecountModal(recountItems) {
     let html = '<div class="table-responsive"><table class="table table-bordered">';
-    html += '<thead><tr>';
+    html += '<thead></tr>';
     html += '<th>SKU</th>';
     html += '<th>Initial Count</th>';
     html += '<th>Final Expected</th>';
