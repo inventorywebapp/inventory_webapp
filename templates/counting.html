@@ -29,7 +29,11 @@
             </div>
             <div class="col-md-3">
                 <label>Search SKU</label>
-                <input type="text" id="searchSku" class="form-control" placeholder="Type to search...">
+                <div style="position: relative;">
+                    <input type="text" id="searchSku" class="form-control" placeholder="Type to search... (e.g., Visor, Door, Armrest)">
+                    <div id="suggestions" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-top: none; z-index: 1000; max-height: 200px; overflow-y: auto; display: none;"></div>
+                </div>
+                <small class="text-muted">Smart search - type to see suggestions</small>
             </div>
         </div>
         <div class="row mt-2">
@@ -66,7 +70,17 @@
 </div>
 
 <script>
-// Define which Item Categories belong to 5th Floor Warehouse
+// Day Category order mapping (ONLY ADDITION - doesn't affect existing logic)
+const DAY_ORDER = {
+    'Mon': 1,
+    'Tue': 2,
+    'Wed': 3,
+    'Thu': 4,
+    'Fri': 5,
+    'Sat': 6
+};
+
+// Define which Item Categories belong to 5th Floor Warehouse (EXISTING LOGIC - unchanged)
 const FIFTH_FLOOR_CATEGORIES = [
     'Console/Armrest',
     'Deep Dish-3D',
@@ -80,16 +94,24 @@ const FIFTH_FLOOR_CATEGORIES = [
     'Trunk Tray'
 ];
 
-// Store all data from server
+// Store all data from server (EXISTING LOGIC - unchanged)
 let allItemCategories = {{ item_categories|tojson }};
-let allDayCategories = {{ day_categories|tojson }};
+let allDayCategoriesRaw = {{ day_categories|tojson }};
 let allSkus = [];
 let filteredSkus = [];
 let currentPage = 1;
 let itemsPerPage = 50;
 let currentSessionId = null;
+let searchTimeout = null; // NEW: for smart search debouncing
 
-// Function to filter item categories based on warehouse selection
+// Sort day categories in Mon, Tue, Wed, Thu, Fri, Sat order (NEW FEATURE)
+let allDayCategories = [...allDayCategoriesRaw].sort((a, b) => {
+    let orderA = DAY_ORDER[a] || 999;
+    let orderB = DAY_ORDER[b] || 999;
+    return orderA - orderB;
+});
+
+// Function to filter item categories based on warehouse selection (EXISTING LOGIC - unchanged)
 function filterItemCategoriesByWarehouse() {
     let warehouse = document.getElementById('warehouse').value;
     let itemCategorySelect = document.getElementById('itemCategory');
@@ -131,7 +153,7 @@ function filterItemCategoriesByWarehouse() {
     updateDayCategories();
 }
 
-// Function to update day categories based on selected item category
+// Function to update day categories based on selected item category (UPDATED with sorting)
 function updateDayCategories() {
     let selectedItemCategory = document.getElementById('itemCategory').value;
     let dayCategorySelect = document.getElementById('dayCategory');
@@ -156,8 +178,12 @@ function updateDayCategories() {
         filteredDayCategories = [...allDayCategories];
     }
     
-    // Sort alphabetically
-    filteredDayCategories.sort();
+    // Sort day categories in Mon, Tue, Wed, Thu, Fri, Sat order (NEW SORTING LOGIC)
+    filteredDayCategories.sort((a, b) => {
+        let orderA = DAY_ORDER[a] || 999;
+        let orderB = DAY_ORDER[b] || 999;
+        return orderA - orderB;
+    });
     
     // Add filtered day categories to dropdown
     for (let i = 0; i < filteredDayCategories.length; i++) {
@@ -175,6 +201,78 @@ function updateDayCategories() {
     }
 }
 
+// NEW FUNCTION: Smart search with suggestions (DOES NOT affect existing logic)
+function setupSmartSearch() {
+    let searchInput = document.getElementById('searchSku');
+    let suggestionsDiv = document.getElementById('suggestions');
+    
+    searchInput.addEventListener('input', function() {
+        let term = this.value.trim();
+        
+        if (term.length < 2) {
+            suggestionsDiv.style.display = 'none';
+            return;
+        }
+        
+        // Clear previous timeout
+        if (searchTimeout) clearTimeout(searchTimeout);
+        
+        // Debounce search to avoid performance issues
+        searchTimeout = setTimeout(function() {
+            // Get unique SKU suggestions
+            let suggestions = [];
+            let seen = new Set();
+            
+            for (let i = 0; i < allSkus.length && suggestions.length < 15; i++) {
+                let sku = allSkus[i];
+                // Search in SKU only (faster, more relevant)
+                if (sku.sku.toLowerCase().includes(term.toLowerCase())) {
+                    if (!seen.has(sku.sku)) {
+                        seen.add(sku.sku);
+                        suggestions.push({
+                            sku: sku.sku,
+                            description: sku.description,
+                            id: sku.id
+                        });
+                    }
+                }
+            }
+            
+            if (suggestions.length > 0) {
+                suggestionsDiv.innerHTML = '';
+                for (let i = 0; i < suggestions.length; i++) {
+                    let item = suggestions[i];
+                    let div = document.createElement('div');
+                    div.className = 'suggestion-item';
+                    div.style.padding = '8px 12px';
+                    div.style.cursor = 'pointer';
+                    div.style.borderBottom = '1px solid #eee';
+                    div.innerHTML = `<strong>${escapeHtml(item.sku)}</strong> <small class="text-muted">${escapeHtml(item.description || '')}</small>`;
+                    div.onclick = (function(skuValue) {
+                        return function() {
+                            searchInput.value = skuValue;
+                            suggestionsDiv.style.display = 'none';
+                            applyFilters();
+                        };
+                    })(item.sku);
+                    suggestionsDiv.appendChild(div);
+                }
+                suggestionsDiv.style.display = 'block';
+            } else {
+                suggestionsDiv.style.display = 'none';
+            }
+        }, 300);
+    });
+    
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', function(e) {
+        if (e.target !== searchInput && !suggestionsDiv.contains(e.target)) {
+            suggestionsDiv.style.display = 'none';
+        }
+    });
+}
+
+// EXISTING FUNCTION - unchanged
 function applyFilters() {
     let warehouse = document.getElementById('warehouse').value;
     let dayCategory = document.getElementById('dayCategory').value;
@@ -184,6 +282,7 @@ function applyFilters() {
     loadSkus(warehouse, dayCategory, itemCategory, search);
 }
 
+// EXISTING FUNCTION - unchanged
 function loadSkus(warehouse, dayCategory, itemCategory, search) {
     let loadingDiv = document.getElementById('loadingIndicator');
     let skusListDiv = document.getElementById('skusList');
@@ -191,7 +290,6 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
     loadingDiv.style.display = 'block';
     skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-info text-center">Loading SKUs...</div></div>';
     
-    // First, load all SKUs from server (without warehouse filter - we'll filter on client side)
     let url = '/get_skus?day_category=' + encodeURIComponent(dayCategory) + 
               '&item_category=' + encodeURIComponent(itemCategory) + 
               '&search=' + encodeURIComponent(search);
@@ -202,6 +300,9 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
         .then(response => response.json())
         .then(data => {
             console.log('Received:', data.length, 'SKUs from server');
+            
+            // Store all SKUs for smart search
+            allSkus = data;
             
             // Apply warehouse filter on client side
             let warehouseFiltered = [];
@@ -235,6 +336,7 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
         });
 }
 
+// EXISTING FUNCTION - unchanged
 function displaySkusWithPagination() {
     let startIndex = (currentPage - 1) * itemsPerPage;
     let endIndex = startIndex + itemsPerPage;
@@ -242,7 +344,6 @@ function displaySkusWithPagination() {
     
     displaySkus(pageSkus);
     
-    // Show/hide pagination controls
     let paginationDiv = document.getElementById('paginationControls');
     if (filteredSkus.length > itemsPerPage) {
         paginationDiv.style.display = 'block';
@@ -253,6 +354,7 @@ function displaySkusWithPagination() {
     }
 }
 
+// EXISTING FUNCTION - unchanged
 function displaySkus(skus) {
     let skusListDiv = document.getElementById('skusList');
     
@@ -284,7 +386,6 @@ function displaySkus(skus) {
             statusBadge = '<span class="badge bg-warning">Bypass</span>';
         }
         
-        // Truncate container details for better display
         let containerDetails = sku.container_details || '-';
         if (containerDetails.length > 50) {
             containerDetails = containerDetails.substring(0, 50) + '...';
@@ -304,29 +405,30 @@ function displaySkus(skus) {
         html += '</tr>';
     }
     
-    html += '</tbody><table></div></div>';
+    html += '</tbody></table></div></div>';
     skusListDiv.innerHTML = html;
 }
 
+// EXISTING FUNCTION - unchanged
 function previousPage() {
     if (currentPage > 1) {
         currentPage--;
         displaySkusWithPagination();
-        // Scroll to top
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 }
 
+// EXISTING FUNCTION - unchanged
 function nextPage() {
     let totalPages = Math.ceil(filteredSkus.length / itemsPerPage);
     if (currentPage < totalPages) {
         currentPage++;
         displaySkusWithPagination();
-        // Scroll to top
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 }
 
+// EXISTING FUNCTION - unchanged
 function escapeHtml(text) {
     if (!text) return '';
     return text.replace(/[&<>]/g, function(m) {
@@ -337,6 +439,7 @@ function escapeHtml(text) {
     });
 }
 
+// EXISTING FUNCTION - unchanged
 function saveAllCounts() {
     let warehouse = document.getElementById('warehouse').value;
     let warehouseDisplay = warehouse === '5thFloor' ? '5th Floor Warehouse' : (warehouse === 'Main' ? 'Main Warehouse' : 'All Warehouses');
@@ -392,6 +495,7 @@ function saveAllCounts() {
     });
 }
 
+// EXISTING FUNCTION - unchanged
 function checkForRecounts() {
     if (!currentSessionId) return;
     
@@ -406,6 +510,7 @@ function checkForRecounts() {
         });
 }
 
+// EXISTING FUNCTION - unchanged
 function showRecountModal(recountItems) {
     let html = '<div class="table-responsive"><table class="table table-bordered">';
     html += '<thead><tr>';
@@ -459,6 +564,7 @@ function showRecountModal(recountItems) {
     modal.show();
 }
 
+// EXISTING FUNCTION - unchanged
 function saveRecounts() {
     let recounts = [];
     let countInputs = document.querySelectorAll('.recount-count');
@@ -499,6 +605,7 @@ function saveRecounts() {
     });
 }
 
+// EXISTING FUNCTION - unchanged
 function completeCounting() {
     if (!currentSessionId) {
         alert('Please save counts first');
@@ -523,7 +630,7 @@ function completeCounting() {
     }
 }
 
-// Event listeners
+// Event listeners (EXISTING LOGIC - unchanged)
 document.getElementById('warehouse').addEventListener('change', function() {
     filterItemCategoriesByWarehouse();
     applyFilters();
@@ -534,11 +641,18 @@ document.getElementById('itemCategory').addEventListener('change', function() {
     applyFilters();
 });
 
-// Auto-load on page load
+// Auto-load on page load (UPDATED to include smart search setup)
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Page loaded, setting up...');
     filterItemCategoriesByWarehouse();
+    setupSmartSearch(); // NEW: Initialize smart search
     applyFilters();
 });
 </script>
+
+<style>
+.suggestion-item:hover {
+    background-color: #f0f0f0;
+}
+</style>
 {% endblock %}
