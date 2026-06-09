@@ -110,22 +110,102 @@
     <div class="tab-pane fade" id="export">
         <div class="card">
             <div class="card-header">
-                <h5>Export Count Data</h5>
+                <h5>Export Data</h5>
             </div>
             <div class="card-body">
+                
+                <!-- SECTION 1: Export Current Counts -->
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-file-excel"></i> Export Current Counts</h6>
+                    <p>Export the final counted quantities for each SKU. Organized by Day Category.</p>
+                </div>
                 <form action="{{ url_for('export_counts') }}" method="POST">
-                    <div class="mb-3">
-                        <label>Select Date to Export</label>
-                        <input type="date" name="filter_date" class="form-control" required>
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label>Filter by Date</label>
+                            <input type="date" name="filter_date" class="form-control">
+                            <small class="text-muted">Leave empty for all dates</small>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label>Filter by Warehouse</label>
+                            <select name="filter_warehouse" class="form-control">
+                                <option value="All">-- All Warehouses --</option>
+                                {% for warehouse in warehouses %}
+                                <option value="{{ warehouse }}">{{ warehouse }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label>Filter by Day Category</label>
+                            <select name="filter_day_category" class="form-control">
+                                <option value="All">-- All Day Categories --</option>
+                                {% for cat in day_categories %}
+                                <option value="{{ cat }}">{{ cat }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label>Filter by Item Category</label>
+                            <select name="filter_item_category" class="form-control">
+                                <option value="All">-- All Item Categories --</option>
+                                {% for cat in item_categories %}
+                                <option value="{{ cat }}">{{ cat }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                     </div>
-                    <button type="submit" class="btn btn-primary">Export to Excel</button>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-file-excel"></i> Export Current Counts
+                            </button>
+                        </div>
+                    </div>
                 </form>
+                
+                <hr class="my-4">
+                
+                <!-- SECTION 2: Export Audit Log -->
+                <div class="alert alert-warning">
+                    <h6><i class="bi bi-clock-history"></i> Export Audit Log</h6>
+                    <p>Export complete history of all changes (who changed what, when, and from/to values).</p>
+                </div>
+                <form action="{{ url_for('export_audit_log') }}" method="POST">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label>Start Date</label>
+                            <input type="date" name="start_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label>End Date</label>
+                            <input type="date" name="end_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label>Filter by User</label>
+                            <select name="filter_user" class="form-control">
+                                <option value="All">-- All Users --</option>
+                                {% for user in users %}
+                                <option value="{{ user.id }}">{{ user.full_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <button type="submit" class="btn btn-warning">
+                                <i class="bi bi-clock-history"></i> Export Audit Log
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                
                 <hr>
                 <h6>Instructions:</h6>
                 <ul>
-                    <li>Select a date to export all counting sessions from that day</li>
-                    <li>The export will be organized by Day Category in separate sheets</li>
-                    <li>Each sheet contains detailed count information</li>
+                    <li><strong>Current Counts:</strong> Shows the final counted quantities. Use filters to narrow down.</li>
+                    <li><strong>Audit Log:</strong> Shows complete history of all changes for compliance and investigation.</li>
+                    <li><strong>Current Counts</strong> are organized by Day Category sheets.</li>
+                    <li><strong>Audit Log</strong> is exported as a single sheet with all change history.</li>
                 </ul>
             </div>
         </div>
