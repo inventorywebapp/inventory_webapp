@@ -48,6 +48,10 @@
     </div>
 </div>
 
+<div id="debugInfo" class="alert alert-info" style="display: none;">
+    <strong>Debug Info:</strong> <span id="debugText"></span>
+</div>
+
 <div id="loadingIndicator" style="display: none; text-align: center; padding: 20px;">
     <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Loading...</span>
@@ -137,7 +141,7 @@ $(document).ready(function() {
         }
     });
     
-    // Load SKUs on page load
+    // Auto-load SKUs on page load
     loadSkus();
 });
 
@@ -145,9 +149,11 @@ function loadSkus() {
     let dayCategory = $('#dayCategory').val();
     let itemCategory = $('#itemCategory').val();
     let search = $('#searchSku').val();
+    let warehouse = $('#warehouse').val();
     
     $('#loadingIndicator').show();
-    $('#skusList').html('<div class="col-12"><div class="alert alert-info text-center">Loading SKUs...</div></div>');
+    $('#debugInfo').hide();
+    $('#debugText').text('Loading...');
     
     console.log("Loading SKUs with filters:", {dayCategory, itemCategory, search});
     
@@ -158,18 +164,26 @@ function loadSkus() {
     }, function(data) {
         console.log("Received SKUs:", data.length);
         currentSkus = data;
+        
+        if (data.length === 0) {
+            $('#debugInfo').show();
+            $('#debugText').text('No SKUs found! Check if database has data. Total SKUs in DB: ' + data.length);
+        }
+        
         displaySkus(data);
         $('#loadingIndicator').hide();
     }).fail(function(xhr, status, error) {
         console.error("Error loading SKUs:", error);
         $('#loadingIndicator').hide();
+        $('#debugInfo').show();
+        $('#debugText').text('Error: ' + error);
         $('#skusList').html('<div class="col-12"><div class="alert alert-danger text-center">Error loading SKUs: ' + error + '</div></div>');
     });
 }
 
 function displaySkus(skus) {
     if (!skus || skus.length === 0) {
-        $('#skusList').html('<div class="col-12"><div class="alert alert-warning text-center">No SKUs found. Try changing your filters.</div></div>');
+        $('#skusList').html('<div class="col-12"><div class="alert alert-warning text-center">No SKUs found. Try changing your filters or check if data was imported.</div></div>');
         return;
     }
     
@@ -182,7 +196,6 @@ function displaySkus(skus) {
     html += '<th>Last Count Date</th>';
     html += '<th>Last Count</th>';
     html += '<th>Container Qty</th>';
-    html += '<th>Container Details</th>';
     html += '<th>Final Expected</th>';
     html += '<th>Kenneth\'s Inv</th>';
     html += '<th>Initial Count</th>';
@@ -198,12 +211,6 @@ function displaySkus(skus) {
             statusBadge = `<span class="badge bg-info">${sku.stock_status}</span>`;
         }
         
-        // Truncate container details for better display
-        let containerDetails = sku.container_details || '-';
-        if (containerDetails.length > 50) {
-            containerDetails = containerDetails.substring(0, 50) + '...';
-        }
-        
         html += `<tr id="sku-row-${sku.id}">`;
         html += `<td><strong>${sku.sku}</strong></td>`;
         html += `<td>${sku.description || '-'}</td>`;
@@ -211,7 +218,6 @@ function displaySkus(skus) {
         html += `<td>${sku.last_count_date || '-'}</td>`;
         html += `<td class="fw-bold">${sku.last_count || 0}</td>`;
         html += `<td>${sku.total_container_qty || 0}</td>`;
-        html += `<td><small>${containerDetails}</small></td>`;
         html += `<td class="fw-bold text-primary">${sku.final_expected_count || 0}</td>`;
         html += `<td class="fw-bold text-success">${sku.kenneth_inventory || 0}</td>`;
         html += `<td><input type="number" class="form-control initial-count" data-sku-id="${sku.id}" value="0" step="0.01" style="min-width: 100px;"></td>`;
@@ -230,13 +236,16 @@ function saveAllCounts() {
     $('.initial-count').each(function() {
         let skuId = $(this).data('sku-id');
         let count = $(this).val();
-        counts[skuId] = {initial_count: count};
+        if (parseFloat(count) !== 0) {
+            counts[skuId] = {initial_count: count};
+        }
     });
     
     let totalCounted = Object.keys(counts).length;
     if (totalCounted === 0) {
-        alert('No SKUs to save');
-        return;
+        if (!confirm('No counts entered. Save anyway?')) {
+            return;
+        }
     }
     
     if (!confirm(`Save counts for ${totalCounted} SKUs to ${warehouse}?`)) {
@@ -318,7 +327,7 @@ function showRecountModal(recountItems) {
             let recordId = $(this).data('record-id');
             let recountCount = $(this).val();
             let remarks = $(`.recount-remarks[data-record-id="${recordId}"]`).val();
-            if (recountCount) {
+            if (recountCount && parseFloat(recountCount) !== 0) {
                 recounts.push({
                     record_id: recordId,
                     recount_count: recountCount,
