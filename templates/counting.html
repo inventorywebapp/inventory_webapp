@@ -36,7 +36,7 @@
             <div class="col-md-3">
                 <label>Search SKU</label>
                 <input type="text" id="searchSku" class="form-control" placeholder="Type to search...">
-                <div id="suggestions" class="list-group mt-1" style="position: absolute; z-index: 1000; width: auto;"></div>
+                <div id="suggestions" class="list-group mt-1" style="position: absolute; z-index: 1000; width: auto; display: none;"></div>
             </div>
         </div>
         <div class="row mt-2">
@@ -49,8 +49,19 @@
     </div>
 </div>
 
+<div id="loadingIndicator" style="display: none; text-align: center; padding: 20px;">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    <p>Loading SKUs...</p>
+</div>
+
 <div id="skusList" class="row">
-    <!-- SKUs will be loaded here -->
+    <div class="col-12">
+        <div class="alert alert-info text-center">
+            Select a warehouse and click "Apply Filters" to load SKUs
+        </div>
+    </div>
 </div>
 
 <div id="recountModal" class="modal fade" tabindex="-1">
@@ -73,16 +84,34 @@ let currentSessionId = null;
 let currentSkus = [];
 
 $(document).ready(function() {
-    $('#applyFilters').click(loadSkus);
+    console.log("Page loaded, initializing...");
+    
+    // Apply filters button
+    $('#applyFilters').click(function() {
+        loadSkus();
+    });
+    
+    // Save counts button
+    $('#saveCounts').click(function() {
+        saveAllCounts();
+    });
+    
+    // Complete counting button
+    $('#completeCounting').click(function() {
+        completeCounting();
+    });
+    
+    // Search suggestions
     $('#searchSku').on('input', function() {
         let term = $(this).val();
         if (term.length >= 2) {
             $.get('/search_suggestions', {term: term}, function(data) {
                 let suggestions = $('#suggestions');
                 suggestions.empty();
+                suggestions.show();
                 data.forEach(function(item) {
                     suggestions.append(`
-                        <a href="#" class="list-group-item list-group-item-action" data-sku-id="${item.id}">
+                        <a href="#" class="list-group-item list-group-item-action" data-sku-id="${item.id}" data-sku-code="${item.sku}">
                             ${item.sku} - ${item.description}
                         </a>
                     `);
@@ -90,18 +119,23 @@ $(document).ready(function() {
                 $('.list-group-item-action').click(function(e) {
                     e.preventDefault();
                     let skuId = $(this).data('sku-id');
-                    $('#searchSku').val($(this).text());
-                    $('#suggestions').empty();
+                    let skuCode = $(this).data('sku-code');
+                    $('#searchSku').val(skuCode);
+                    $('#suggestions').hide();
                     highlightSku(skuId);
                 });
             });
         } else {
-            $('#suggestions').empty();
+            $('#suggestions').hide();
         }
     });
-
-    $('#saveCounts').click(saveAllCounts);
-    $('#completeCounting').click(completeCounting);
+    
+    // Hide suggestions when clicking outside
+    $(document).click(function(e) {
+        if (!$(e.target).closest('#searchSku').length) {
+            $('#suggestions').hide();
+        }
+    });
 });
 
 function loadSkus() {
@@ -109,26 +143,55 @@ function loadSkus() {
     let dayCategory = $('#dayCategory').val();
     let itemCategory = $('#itemCategory').val();
     let search = $('#searchSku').val();
-
+    
+    if (!warehouse) {
+        alert('Please select a warehouse first');
+        return;
+    }
+    
+    $('#loadingIndicator').show();
+    $('#skusList').html('<div class="col-12"><div class="alert alert-info text-center">Loading SKUs...</div></div>');
+    
+    console.log("Loading SKUs with filters:", {warehouse, dayCategory, itemCategory, search});
+    
     $.get('/get_skus', {
         warehouse: warehouse,
         day_category: dayCategory,
         item_category: itemCategory,
         search: search
     }, function(data) {
+        console.log("Received SKUs:", data.length);
         currentSkus = data;
         displaySkus(data);
+        $('#loadingIndicator').hide();
+    }).fail(function(xhr, status, error) {
+        console.error("Error loading SKUs:", error);
+        $('#loadingIndicator').hide();
+        $('#skusList').html('<div class="col-12"><div class="alert alert-danger text-center">Error loading SKUs: ' + error + '</div></div>');
     });
 }
 
 function displaySkus(skus) {
-    let html = '<div class="col-12"><div class="table-responsive"><table class="table table-bordered table-hover">';
-    html += '<thead class="table-dark"><tr>';
-    html += '<th>SKU</th><th>Description</th><th>Last Count Date</th><th>Last Count</th>';
-    html += '<th>Container Qty Received</th><th>Container Details</th>';
-    html += '<th>Final Expected</th><th>Kenneth\'s Inv</th><th>Initial Count</th><th>Status</th>';
-    html += '</tr></thead><tbody>';
-
+    if (!skus || skus.length === 0) {
+        $('#skusList').html('<div class="col-12"><div class="alert alert-warning text-center">No SKUs found. Try changing your filters or select a different warehouse.</div></div>');
+        return;
+    }
+    
+    let html = '<div class="col-12"><div class="table-responsive"><table class="table table-bordered table-hover table-striped">';
+    html += '<thead class="table-dark">';
+    html += '<tr>';
+    html += '<th>SKU</th>';
+    html += '<th>Description</th>';
+    html += '<th>Last Count Date</th>';
+    html += '<th>Last Count</th>';
+    html += '<th>Container Qty</th>';
+    html += '<th>Final Expected</th>';
+    html += '<th>Kenneth\'s Inv</th>';
+    html += '<th>Initial Count</th>';
+    html += '<th>Status</th>';
+    html += '</tr>';
+    html += '</thead><tbody>';
+    
     skus.forEach(function(sku) {
         let statusBadge = '';
         if (sku.bypass_recount) {
@@ -136,40 +199,53 @@ function displaySkus(skus) {
         } else if (sku.stock_status) {
             statusBadge = `<span class="badge bg-info">${sku.stock_status}</span>`;
         }
-
+        
         html += `<tr id="sku-row-${sku.id}">`;
         html += `<td><strong>${sku.sku}</strong></td>`;
         html += `<td>${sku.description || '-'}</td>`;
         html += `<td>${sku.last_count_date || '-'}</td>`;
-        html += `<td>${sku.last_count || 0}</td>`;
+        html += `<td class="fw-bold">${sku.last_count || 0}</td>`;
         html += `<td>${sku.total_container_qty || 0}</td>`;
-        html += `<td><small>${sku.container_details || '-'}</small></td>`;
-        html += `<td class="fw-bold">${sku.final_expected_count || 0}</td>`;
-        html += `<td class="fw-bold">${sku.kenneth_inventory || 0}</td>`;
-        html += `<td><input type="number" class="form-control initial-count" data-sku-id="${sku.id}" value="0" step="0.01"></td>`;
+        html += `<td class="fw-bold text-primary">${sku.final_expected_count || 0}</td>`;
+        html += `<td class="fw-bold text-success">${sku.kenneth_inventory || 0}</td>`;
+        html += `<td><input type="number" class="form-control initial-count" data-sku-id="${sku.id}" value="0" step="0.01" style="min-width: 100px;"></td>`;
         html += `<td>${statusBadge}</td>`;
         html += `</tr>`;
     });
-
+    
     html += '</tbody></table></div></div>';
     $('#skusList').html(html);
 }
 
 function saveAllCounts() {
+    let warehouse = $('#warehouse').val();
     let counts = {};
+    
     $('.initial-count').each(function() {
         let skuId = $(this).data('sku-id');
         let count = $(this).val();
         counts[skuId] = {initial_count: count};
     });
-
+    
+    let totalCounted = Object.keys(counts).length;
+    if (totalCounted === 0) {
+        alert('No SKUs to save');
+        return;
+    }
+    
+    if (!confirm(`Save counts for ${totalCounted} SKUs?`)) {
+        return;
+    }
+    
+    $('#saveCounts').prop('disabled', true).text('Saving...');
+    
     $.ajax({
         url: '/counting',
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({
             session_id: currentSessionId,
-            warehouse: $('#warehouse').val(),
+            warehouse: warehouse,
             counts: counts
         }),
         success: function(data) {
@@ -178,13 +254,19 @@ function saveAllCounts() {
                 alert('Counts saved successfully!');
                 checkForRecounts();
             }
+        },
+        error: function(xhr) {
+            alert('Error saving counts: ' + xhr.statusText);
+        },
+        complete: function() {
+            $('#saveCounts').prop('disabled', false).text('Save All Counts');
         }
     });
 }
 
 function checkForRecounts() {
     if (!currentSessionId) return;
-
+    
     $.get('/get_recount_list', {session_id: currentSessionId}, function(data) {
         if (data.length > 0) {
             showRecountModal(data);
@@ -196,9 +278,16 @@ function checkForRecounts() {
 
 function showRecountModal(recountItems) {
     let html = '<div class="table-responsive"><table class="table table-bordered">';
-    html += '<thead><tr><th>SKU</th><th>Description</th><th>Initial Count</th>';
-    html += '<th>Final Expected</th><th>Kenneth\'s Inv</th><th>Recount Count</th><th>Remarks</th></tr></thead><tbody>';
-
+    html += '<thead><tr>';
+    html += '<th>SKU</th>';
+    html += '<th>Description</th>';
+    html += '<th>Initial Count</th>';
+    html += '<th>Final Expected</th>';
+    html += '<th>Kenneth\'s Inv</th>';
+    html += '<th>Recount Count</th>';
+    html += '<th>Remarks</th>';
+    html += '</tr></thead><tbody>';
+    
     recountItems.forEach(function(item) {
         html += `<tr id="recount-row-${item.id}">`;
         html += `<td>${item.sku}</td>`;
@@ -207,13 +296,40 @@ function showRecountModal(recountItems) {
         html += `<td class="bg-info">${item.final_expected_count || 0}</td>`;
         html += `<td class="bg-info">${item.kenneth_inventory || 0}</td>`;
         html += `<td><input type="number" class="form-control recount-count" data-record-id="${item.id}" step="0.01"></td>`;
-        html += `<td><textarea class="form-control recount-remarks" data-record-id="${item.id}" rows="2"></textarea></td>`;
+        html += `<td><textarea class="form-control recount-remarks" data-record-id="${item.id}" rows="2" placeholder="e.g., 9 were damaged"></textarea></td>`;
         html += `</tr>`;
     });
-
+    
     html += '</tbody></table></div>';
     $('#recountItems').html(html);
     $('#recountModal').modal('show');
+    
+    $('#saveRecount').off('click').on('click', function() {
+        let recounts = [];
+        $('.recount-count').each(function() {
+            let recordId = $(this).data('record-id');
+            let recountCount = $(this).val();
+            let remarks = $(`.recount-remarks[data-record-id="${recordId}"]`).val();
+            recounts.push({
+                record_id: recordId,
+                recount_count: recountCount,
+                remarks: remarks
+            });
+        });
+        
+        $.ajax({
+            url: '/save_recount',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({recounts: recounts}),
+            success: function(data) {
+                if (data.success) {
+                    alert('Recounts saved successfully!');
+                    $('#recountModal').modal('hide');
+                }
+            }
+        });
+    });
 }
 
 function completeCounting() {
@@ -221,7 +337,7 @@ function completeCounting() {
         alert('Please save counts first');
         return;
     }
-
+    
     if (confirm('Are you sure you want to complete this counting session?')) {
         $.ajax({
             url: '/complete_counting',
