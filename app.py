@@ -10,6 +10,7 @@ from io import BytesIO
 from datetime import datetime, timedelta
 import os
 import sys
+from sqlalchemy import or_
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -139,33 +140,50 @@ def dashboard():
     return render_template('dashboard.html',
                          total_skus=total_skus,
                          active_sessions=active_sessions,
-                         day_categories=[c[0] for c in day_categories if c[0]],
-                         item_categories=[c[0] for c in item_categories if c[0]],
+                         day_categories=[c[0] for c in day_categories if c[0] and c[0] != ''],
+                         item_categories=[c[0] for c in item_categories if c[0] and c[0] != ''],
                          warehouses=warehouses)
 
 @app.route('/get_skus')
 @login_required
 def get_skus():
+    """Get SKUs with filters - FIXED VERSION"""
     day_category = request.args.get('day_category')
     item_category = request.args.get('item_category')
     search = request.args.get('search', '')
     
     query = SKU.query
     
-    if day_category and day_category != 'All':
+    # Apply filters only if not "All" or empty
+    if day_category and day_category != 'All' and day_category != '-- All Day Categories --':
         query = query.filter(SKU.category == day_category)
-    if item_category and item_category != 'All':
-        query = query.filter(SKU.description == item_category)
-    if search:
-        query = query.filter(SKU.sku.contains(search) | SKU.description.contains(search))
     
-    skus = query.all()
+    if item_category and item_category != 'All' and item_category != '-- All Item Categories --':
+        query = query.filter(SKU.description == item_category)
+    
+    if search and search.strip():
+        query = query.filter(
+            or_(
+                SKU.sku.contains(search), 
+                SKU.description.contains(search)
+            )
+        )
+    
+    # Limit to 1000 for performance
+    skus = query.limit(1000).all()
+    
     result = [{
-        'id': s.id, 'sku': s.sku, 'description': s.description,
-        'category': s.category, 'last_count_date': s.last_count_date,
-        'last_count': s.last_count, 'total_container_qty': s.total_container_qty,
-        'container_details': s.container_details, 'final_expected_count': s.final_expected_count,
-        'kenneth_inventory': s.kenneth_inventory, 'stock_status': s.stock_status,
+        'id': s.id, 
+        'sku': s.sku, 
+        'description': s.description,
+        'category': s.category, 
+        'last_count_date': s.last_count_date,
+        'last_count': s.last_count, 
+        'total_container_qty': s.total_container_qty,
+        'container_details': s.container_details, 
+        'final_expected_count': s.final_expected_count,
+        'kenneth_inventory': s.kenneth_inventory, 
+        'stock_status': s.stock_status,
         'bypass_recount': s.bypass_recount
     } for s in skus]
     
@@ -179,7 +197,10 @@ def search_suggestions():
         return jsonify([])
     
     skus = SKU.query.filter(
-        SKU.sku.contains(search_term) | SKU.description.contains(search_term)
+        or_(
+            SKU.sku.contains(search_term), 
+            SKU.description.contains(search_term)
+        )
     ).limit(10).all()
     
     return jsonify([{'sku': s.sku, 'description': s.description, 'id': s.id} for s in skus])
@@ -228,14 +249,19 @@ def counting():
         
         return jsonify({'success': True, 'session_id': session_obj.id})
     
+    # GET request - show counting page
     warehouses = ['Main Warehouse', '5th Floor Warehouse']
     day_categories = db.session.query(SKU.category).distinct().all()
     item_categories = db.session.query(SKU.description).distinct().all()
     
+    # Filter out None/Empty values
+    day_categories = [c[0] for c in day_categories if c[0] and c[0] != '']
+    item_categories = [c[0] for c in item_categories if c[0] and c[0] != '']
+    
     return render_template('counting.html',
                          warehouses=warehouses,
-                         day_categories=[c[0] for c in day_categories if c[0]],
-                         item_categories=[c[0] for c in item_categories if c[0]])
+                         day_categories=day_categories,
+                         item_categories=item_categories)
 
 @app.route('/get_recount_list')
 @login_required
@@ -246,9 +272,14 @@ def get_recount_list():
     
     records = CountRecord.query.filter_by(session_id=session_id, is_recount_needed=True, recount_completed=False).all()
     result = [{
-        'id': r.id, 'sku_id': r.sku.id, 'sku': r.sku.sku, 'description': r.sku.description,
-        'initial_count': r.initial_count, 'final_expected_count': r.sku.final_expected_count,
-        'kenneth_inventory': r.sku.kenneth_inventory, 'remarks': r.remarks
+        'id': r.id, 
+        'sku_id': r.sku.id, 
+        'sku': r.sku.sku, 
+        'description': r.sku.description,
+        'initial_count': r.initial_count, 
+        'final_expected_count': r.sku.final_expected_count,
+        'kenneth_inventory': r.sku.kenneth_inventory, 
+        'remarks': r.remarks
     } for r in records]
     
     return jsonify(result)
@@ -628,8 +659,7 @@ def check_data():
         </script>
         '''
     
-    result += '<p><a href="/admin">Back to Admin</a> | <a href="/sync_data" onclick="sync(); return false;">Run Sync</a></p>'
-    result += '<script>function sync(){fetch("/sync_data",{method:"POST"}).then(r=>r.json()).then(d=>alert(d.message||d.error)).catch(e=>alert("Error: "+e))}</script>'
+    result += '<p><a href="/admin">Back to Admin</a></p>'
     result += '</body></html>'
     
     return result
