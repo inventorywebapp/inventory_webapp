@@ -236,4 +236,38 @@ def sync_data_from_drive():
         traceback.print_exc(file=sys.stderr)
         return False
 
-def import_excel_data(file_path
+def import_excel_data(file_path):
+    """Import data from Excel file to database"""
+    try:
+        df = pd.read_excel(file_path)
+        
+        for _, row in df.iterrows():
+            sku = SKU.query.filter_by(sku=str(row['SKU'])).first()
+            if not sku:
+                sku = SKU()
+            
+            sku.sku = str(row['SKU'])
+            sku.description = str(row.get('Description', ''))
+            sku.category = str(row.get('Category', ''))
+            sku.last_count_date = str(row.get('LastCountDate', ''))
+            sku.last_count = float(row.get('LastCount', 0)) if pd.notna(row.get('LastCount')) else 0
+            sku.total_container_qty = float(row.get('TotalContainerQty', 0)) if pd.notna(row.get('TotalContainerQty')) else 0
+            sku.container_details = str(row.get('ContainerDetails', ''))
+            sku.total_orders = float(row.get('TotalOrders', 0)) if pd.notna(row.get('TotalOrders')) else 0
+            sku.final_expected_count = float(row.get('Final Expected Count', 0)) if pd.notna(row.get('Final Expected Count')) else 0
+            sku.kenneth_inventory = float(row.get("Kenneth's Inventory", 0)) if pd.notna(row.get("Kenneth's Inventory")) else 0
+            sku.buffer_qty = float(row.get('BufferQty', 0)) if pd.notna(row.get('BufferQty')) else 0
+            sku.stock_status = str(row.get('StockStatus', ''))
+            sku.inventory_remark = str(row.get('InventoryRemark', ''))
+            sku.sku_status = str(row.get('SKUStatus', ''))
+            
+            if sku.description in ['Console/Armrest', 'Armrest', 'Wiper', 'Armrest category', 'Wiper category']:
+                sku.bypass_recount = True
+            
+            db.session.add(sku)
+        
+        db.session.commit()
+        return True
+    except Exception as e:
+        print(f"Error importing data: {e}")
+        return False
