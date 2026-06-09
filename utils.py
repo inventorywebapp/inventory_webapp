@@ -48,7 +48,7 @@ def parse_container_details(container_details_str):
     return [{'qty': int(qty), 'date': date} for qty, date in matches]
 
 def sync_data_from_drive():
-    """Sync data from Google Drive using service account"""
+    """Sync data from Google Drive using service account - OPTIMIZED VERSION"""
     try:
         print("=== STARTING SYNC PROCESS ===", file=sys.stderr)
         
@@ -102,7 +102,7 @@ def sync_data_from_drive():
         latest_file = files[0]
         file_id = latest_file['id']
         file_name = latest_file['name']
-        print(f"Latest file: {file_name} (ID: {file_id})", file=sys.stderr)
+        print(f"Latest file: {file_name}", file=sys.stderr)
         
         # Download file
         print("Downloading file...", file=sys.stderr)
@@ -112,7 +112,8 @@ def sync_data_from_drive():
         done = False
         while not done:
             status, done = downloader.next_chunk()
-            print(f"Download progress: {int(status.progress() * 100)}%", file=sys.stderr)
+            if status:
+                print(f"Download progress: {int(status.progress() * 100)}%", file=sys.stderr)
         
         file_stream.seek(0)
         print("Download complete", file=sys.stderr)
@@ -120,22 +121,32 @@ def sync_data_from_drive():
         # Read Excel
         print("Reading Excel file...", file=sys.stderr)
         df = pd.read_excel(file_stream)
-        print(f"Excel has {len(df)} rows and {len(df.columns)} columns", file=sys.stderr)
+        total_rows = len(df)
+        print(f"Excel has {total_rows} rows and {len(df.columns)} columns", file=sys.stderr)
         
-        # Clear existing SKUs (optional - comment out if you want to keep old data)
-        # SKU.query.delete()
-        # print("Cleared existing SKUs", file=sys.stderr)
+        # OPTIMIZATION: Get all existing SKUs once
+        print("Loading existing SKUs...", file=sys.stderr)
+        existing_skus = {sku.sku: sku for sku in SKU.query.all()}
+        print(f"Found {len(existing_skus)} existing SKUs", file=sys.stderr)
         
-        # Import data
-        count = 0
+        # Process rows
+        count_new = 0
+        count_updated = 0
+        batch_size = 500
+        
         for index, row in df.iterrows():
             sku_code = str(row['SKU'])
-            sku = SKU.query.filter_by(sku=sku_code).first()
             
-            if not sku:
+            # Check if SKU exists
+            if sku_code in existing_skus:
+                sku = existing_skus[sku_code]
+                count_updated += 1
+            else:
                 sku = SKU()
-                count += 1
+                existing_skus[sku_code] = sku
+                count_new += 1
             
+            # Update SKU fields
             sku.sku = sku_code
             sku.description = str(row.get('Description', '')) if pd.notna(row.get('Description')) else ''
             sku.category = str(row.get('Category', '')) if pd.notna(row.get('Category')) else ''
@@ -157,11 +168,14 @@ def sync_data_from_drive():
             
             db.session.add(sku)
             
-            if (index + 1) % 100 == 0:
-                print(f"Processed {index + 1} rows...", file=sys.stderr)
+            # Commit in batches to avoid memory issues
+            if (index + 1) % batch_size == 0:
+                db.session.commit()
+                print(f"Committed {index + 1}/{total_rows} rows ({count_new} new, {count_updated} updated)", file=sys.stderr)
         
+        # Final commit
         db.session.commit()
-        print(f"=== SYNC COMPLETE: {count} new SKUs added ===", file=sys.stderr)
+        print(f"=== SYNC COMPLETE: {count_new} new SKUs, {count_updated} updated SKUs ===", file=sys.stderr)
         return True
         
     except Exception as e:
