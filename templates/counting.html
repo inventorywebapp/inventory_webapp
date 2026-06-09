@@ -7,11 +7,12 @@
     <div class="card-body">
         <div class="row">
             <div class="col-md-3">
-                <label>Select Warehouse (for tracking only)</label>
+                <label>Select Warehouse</label>
                 <select id="warehouse" class="form-control">
-                    <option value="Main Warehouse">Main Warehouse</option>
-                    <option value="5th Floor Warehouse">5th Floor Warehouse</option>
+                    <option value="Main">Main Warehouse</option>
+                    <option value="5thFloor">5th Floor Warehouse</option>
                 </select>
+                <small class="text-muted">Filters the Item Categories below</small>
             </div>
             <div class="col-md-3">
                 <label>Day Category</label>
@@ -57,16 +58,72 @@
 <div id="skusList" class="row">
     <div class="col-12">
         <div class="alert alert-info text-center">
-            Click "Load All SKUs" to see all products, or use filters to narrow down.
+            Select a warehouse and click "Load All SKUs" to see products, or use filters to narrow down.
         </div>
     </div>
 </div>
 
 <script>
+// Define which Item Categories belong to 5th Floor Warehouse
+const FIFTH_FLOOR_CATEGORIES = [
+    'Console/Armrest',
+    'Deep Dish-3D',
+    'Deep Dish-5D',
+    'Deep Dish-5D-CF',
+    'Deep Dish-DL',
+    'Deep Dish-DM',
+    'Deep Dish-ROHS',
+    'Deep Dish-TPE-CF',
+    'Deep Dish-UN',
+    'Trunk Tray'
+];
+
+// Store all item categories from server
+let allItemCategories = {{ item_categories|tojson }};
+
 let currentSessionId = null;
 
+// Function to filter item categories based on warehouse selection
+function filterItemCategoriesByWarehouse() {
+    let warehouse = document.getElementById('warehouse').value;
+    let itemCategorySelect = document.getElementById('itemCategory');
+    let currentValue = itemCategorySelect.value;
+    
+    // Clear existing options
+    itemCategorySelect.innerHTML = '<option value="All">-- All Item Categories --</option>';
+    
+    let filteredCategories = [];
+    
+    if (warehouse === '5thFloor') {
+        // Only show 5th Floor categories
+        filteredCategories = allItemCategories.filter(cat => FIFTH_FLOOR_CATEGORIES.includes(cat));
+    } else {
+        // Show Main Warehouse categories (all except 5th Floor)
+        filteredCategories = allItemCategories.filter(cat => !FIFTH_FLOOR_CATEGORIES.includes(cat));
+    }
+    
+    // Sort alphabetically
+    filteredCategories.sort();
+    
+    // Add filtered categories to dropdown
+    for (let i = 0; i < filteredCategories.length; i++) {
+        let option = document.createElement('option');
+        option.value = filteredCategories[i];
+        option.textContent = filteredCategories[i];
+        itemCategorySelect.appendChild(option);
+    }
+    
+    // Try to restore previous selection if still valid
+    if (currentValue !== 'All' && filteredCategories.includes(currentValue)) {
+        itemCategorySelect.value = currentValue;
+    }
+}
+
 function loadAllSkus() {
-    loadSkus('All', 'All', '');
+    let dayCategory = document.getElementById('dayCategory').value;
+    let itemCategory = document.getElementById('itemCategory').value;
+    let search = document.getElementById('searchSku').value;
+    loadSkus(dayCategory, itemCategory, search);
 }
 
 function applyFilters() {
@@ -162,6 +219,7 @@ function escapeHtml(text) {
 
 function saveAllCounts() {
     let warehouse = document.getElementById('warehouse').value;
+    let warehouseDisplay = warehouse === '5thFloor' ? '5th Floor Warehouse' : 'Main Warehouse';
     let counts = {};
     
     let countInputs = document.querySelectorAll('.initial-count');
@@ -176,7 +234,7 @@ function saveAllCounts() {
     
     let totalCounted = Object.keys(counts).length;
     
-    if (!confirm('Save counts for ' + totalCounted + ' SKUs to ' + warehouse + '?')) {
+    if (!confirm('Save counts for ' + totalCounted + ' SKUs to ' + warehouseDisplay + '?')) {
         return;
     }
     
@@ -191,7 +249,7 @@ function saveAllCounts() {
         },
         body: JSON.stringify({
             session_id: currentSessionId,
-            warehouse: warehouse,
+            warehouse: warehouseDisplay,
             counts: counts
         })
     })
@@ -252,7 +310,7 @@ function showRecountModal(recountItems) {
     }
     
     html += '</tbody></table></div>';
-    html += '<button class="btn btn-primary" onclick="saveRecounts()">Save Recounts</button>';
+    html += '<button class="btn btn-primary mt-3" onclick="saveRecounts()">Save Recounts</button>';
     
     // Create modal dynamically
     let modalHtml = `
@@ -347,9 +405,17 @@ function completeCounting() {
     }
 }
 
-// Auto-load SKUs on page load
+// Event listener for warehouse dropdown change
+document.getElementById('warehouse').addEventListener('change', function() {
+    filterItemCategoriesByWarehouse();
+    // Auto-load SKUs when warehouse changes
+    loadAllSkus();
+});
+
+// Auto-load SKUs on page load and setup category filter
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Page loaded, loading SKUs...');
+    console.log('Page loaded, setting up warehouse filter...');
+    filterItemCategoriesByWarehouse();
     loadAllSkus();
 });
 </script>
