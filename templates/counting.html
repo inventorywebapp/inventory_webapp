@@ -7,13 +7,12 @@
     <div class="card-body">
         <div class="row">
             <div class="col-md-3">
-                <label>Select Warehouse</label>
+                <label>Select Warehouse (for tracking only)</label>
                 <select id="warehouse" class="form-control">
-                    <option value="">Select Warehouse</option>
-                    {% for warehouse in warehouses %}
-                    <option value="{{ warehouse }}">{{ warehouse }}</option>
-                    {% endfor %}
+                    <option value="Main Warehouse">Main Warehouse</option>
+                    <option value="5th Floor Warehouse">5th Floor Warehouse</option>
                 </select>
+                <small class="text-muted">Warehouse selection does not filter SKUs</small>
             </div>
             <div class="col-md-3">
                 <label>Day Category</label>
@@ -59,7 +58,7 @@
 <div id="skusList" class="row">
     <div class="col-12">
         <div class="alert alert-info text-center">
-            Select a warehouse and click "Apply Filters" to load SKUs
+            Click "Apply Filters" to load SKUs
         </div>
     </div>
 </div>
@@ -123,6 +122,7 @@ $(document).ready(function() {
                     $('#searchSku').val(skuCode);
                     $('#suggestions').hide();
                     highlightSku(skuId);
+                    loadSkus();
                 });
             });
         } else {
@@ -136,26 +136,22 @@ $(document).ready(function() {
             $('#suggestions').hide();
         }
     });
+    
+    // Load SKUs on page load
+    loadSkus();
 });
 
 function loadSkus() {
-    let warehouse = $('#warehouse').val();
     let dayCategory = $('#dayCategory').val();
     let itemCategory = $('#itemCategory').val();
     let search = $('#searchSku').val();
     
-    if (!warehouse) {
-        alert('Please select a warehouse first');
-        return;
-    }
-    
     $('#loadingIndicator').show();
     $('#skusList').html('<div class="col-12"><div class="alert alert-info text-center">Loading SKUs...</div></div>');
     
-    console.log("Loading SKUs with filters:", {warehouse, dayCategory, itemCategory, search});
+    console.log("Loading SKUs with filters:", {dayCategory, itemCategory, search});
     
     $.get('/get_skus', {
-        warehouse: warehouse,
         day_category: dayCategory,
         item_category: itemCategory,
         search: search
@@ -173,7 +169,7 @@ function loadSkus() {
 
 function displaySkus(skus) {
     if (!skus || skus.length === 0) {
-        $('#skusList').html('<div class="col-12"><div class="alert alert-warning text-center">No SKUs found. Try changing your filters or select a different warehouse.</div></div>');
+        $('#skusList').html('<div class="col-12"><div class="alert alert-warning text-center">No SKUs found. Try changing your filters.</div></div>');
         return;
     }
     
@@ -181,10 +177,12 @@ function displaySkus(skus) {
     html += '<thead class="table-dark">';
     html += '<tr>';
     html += '<th>SKU</th>';
-    html += '<th>Description</th>';
+    html += '<th>Description (Item Category)</th>';
+    html += '<th>Day Category</th>';
     html += '<th>Last Count Date</th>';
     html += '<th>Last Count</th>';
     html += '<th>Container Qty</th>';
+    html += '<th>Container Details</th>';
     html += '<th>Final Expected</th>';
     html += '<th>Kenneth\'s Inv</th>';
     html += '<th>Initial Count</th>';
@@ -200,12 +198,20 @@ function displaySkus(skus) {
             statusBadge = `<span class="badge bg-info">${sku.stock_status}</span>`;
         }
         
+        // Truncate container details for better display
+        let containerDetails = sku.container_details || '-';
+        if (containerDetails.length > 50) {
+            containerDetails = containerDetails.substring(0, 50) + '...';
+        }
+        
         html += `<tr id="sku-row-${sku.id}">`;
         html += `<td><strong>${sku.sku}</strong></td>`;
         html += `<td>${sku.description || '-'}</td>`;
+        html += `<td>${sku.category || '-'}</td>`;
         html += `<td>${sku.last_count_date || '-'}</td>`;
         html += `<td class="fw-bold">${sku.last_count || 0}</td>`;
         html += `<td>${sku.total_container_qty || 0}</td>`;
+        html += `<td><small>${containerDetails}</small></td>`;
         html += `<td class="fw-bold text-primary">${sku.final_expected_count || 0}</td>`;
         html += `<td class="fw-bold text-success">${sku.kenneth_inventory || 0}</td>`;
         html += `<td><input type="number" class="form-control initial-count" data-sku-id="${sku.id}" value="0" step="0.01" style="min-width: 100px;"></td>`;
@@ -233,7 +239,7 @@ function saveAllCounts() {
         return;
     }
     
-    if (!confirm(`Save counts for ${totalCounted} SKUs?`)) {
+    if (!confirm(`Save counts for ${totalCounted} SKUs to ${warehouse}?`)) {
         return;
     }
     
@@ -253,6 +259,8 @@ function saveAllCounts() {
                 currentSessionId = data.session_id;
                 alert('Counts saved successfully!');
                 checkForRecounts();
+            } else {
+                alert('Error saving counts');
             }
         },
         error: function(xhr) {
@@ -285,7 +293,7 @@ function showRecountModal(recountItems) {
     html += '<th>Final Expected</th>';
     html += '<th>Kenneth\'s Inv</th>';
     html += '<th>Recount Count</th>';
-    html += '<th>Remarks</th>';
+    html += '<th>Remarks (e.g., 9 were damaged)</th>';
     html += '</tr></thead><tbody>';
     
     recountItems.forEach(function(item) {
@@ -296,7 +304,7 @@ function showRecountModal(recountItems) {
         html += `<td class="bg-info">${item.final_expected_count || 0}</td>`;
         html += `<td class="bg-info">${item.kenneth_inventory || 0}</td>`;
         html += `<td><input type="number" class="form-control recount-count" data-record-id="${item.id}" step="0.01"></td>`;
-        html += `<td><textarea class="form-control recount-remarks" data-record-id="${item.id}" rows="2" placeholder="e.g., 9 were damaged"></textarea></td>`;
+        html += `<td><textarea class="form-control recount-remarks" data-record-id="${item.id}" rows="2" placeholder="e.g., 9 were damaged, incomplete parts"></textarea></td>`;
         html += `</tr>`;
     });
     
@@ -310,12 +318,19 @@ function showRecountModal(recountItems) {
             let recordId = $(this).data('record-id');
             let recountCount = $(this).val();
             let remarks = $(`.recount-remarks[data-record-id="${recordId}"]`).val();
-            recounts.push({
-                record_id: recordId,
-                recount_count: recountCount,
-                remarks: remarks
-            });
+            if (recountCount) {
+                recounts.push({
+                    record_id: recordId,
+                    recount_count: recountCount,
+                    remarks: remarks || ''
+                });
+            }
         });
+        
+        if (recounts.length === 0) {
+            alert('No recount counts entered');
+            return;
+        }
         
         $.ajax({
             url: '/save_recount',
@@ -326,7 +341,11 @@ function showRecountModal(recountItems) {
                 if (data.success) {
                     alert('Recounts saved successfully!');
                     $('#recountModal').modal('hide');
+                    location.reload();
                 }
+            },
+            error: function() {
+                alert('Error saving recounts');
             }
         });
     });
@@ -349,6 +368,9 @@ function completeCounting() {
                     alert('Counting session completed!');
                     window.location.href = '/dashboard';
                 }
+            },
+            error: function() {
+                alert('Error completing session');
             }
         });
     }
