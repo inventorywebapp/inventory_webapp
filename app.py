@@ -578,6 +578,62 @@ def check_db_categories():
     
     return result
 
+@app.route('/check_data')
+@login_required
+def check_data():
+    """Simple check of database contents"""
+    if current_user.role != 'admin':
+        return "Unauthorized", 403
+    
+    total = SKU.query.count()
+    sample = SKU.query.limit(10).all()
+    
+    result = f"""
+    <html>
+    <head><title>Database Data Check</title></head>
+    <body>
+    <h2>Database Check</h2>
+    <p>Total SKUs in database: <strong>{total}</strong></p>
+    """
+    
+    if total > 0:
+        result += "<h3>Sample SKUs (first 10):</h3>"
+        result += '<table border="1" cellpadding="5">'
+        result += '<tr><th>SKU</th><th>Description (Item Category)</th><th>Category (Day Category)</th><th>Last Count</th><th>Final Expected</th></tr>'
+        for sku in sample:
+            result += f"""
+            <tr>
+                <td><strong>{sku.sku}</strong></td>
+                <td>{sku.description or 'EMPTY'}</td>
+                <td>{sku.category or 'EMPTY'}</td>
+                <td>{sku.last_count}</td>
+                <td>{sku.final_expected_count}</td>
+            </tr>
+            """
+        result += "</table>"
+    else:
+        result += "<p style='color:red'>No SKUs found! You need to run sync first.</p>"
+        result += '<button onclick="runSync()">Run Sync Now</button>'
+        result += '''
+        <script>
+        function runSync() {
+            fetch('/sync_data', {method: 'POST'})
+                .then(r => r.json())
+                .then(d => {
+                    alert(d.message || d.error);
+                    if (d.success) location.reload();
+                })
+                .catch(e => alert('Error: ' + e));
+        }
+        </script>
+        '''
+    
+    result += '<p><a href="/admin">Back to Admin</a> | <a href="/sync_data" onclick="sync(); return false;">Run Sync</a></p>'
+    result += '<script>function sync(){fetch("/sync_data",{method:"POST"}).then(r=>r.json()).then(d=>alert(d.message||d.error)).catch(e=>alert("Error: "+e))}</script>'
+    result += '</body></html>'
+    
+    return result
+
 # Health check endpoint for Render
 @app.route('/health')
 def health_check():
