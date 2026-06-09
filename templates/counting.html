@@ -30,10 +30,10 @@
             <div class="col-md-3">
                 <label>Search SKU</label>
                 <div style="position: relative;">
-                    <input type="text" id="searchSku" class="form-control" placeholder="Type to search... (e.g., Visor, Door, Armrest)">
-                    <div id="suggestions" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-top: none; z-index: 1000; max-height: 200px; overflow-y: auto; display: none;"></div>
+                    <input type="text" id="searchSku" class="form-control" placeholder="Type to search... (e.g., Visor, Door, Armrest)" autocomplete="off">
+                    <div id="suggestions" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-top: none; z-index: 1000; max-height: 200px; overflow-y: auto; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
                 </div>
-                <small class="text-muted">Smart search - type to see suggestions</small>
+                <small class="text-muted">Smart search - type to see suggestions instantly</small>
             </div>
         </div>
         <div class="row mt-2">
@@ -70,7 +70,7 @@
 </div>
 
 <script>
-// Day Category order mapping (ONLY ADDITION - doesn't affect existing logic)
+// Day Category order mapping
 const DAY_ORDER = {
     'Mon': 1,
     'Tue': 2,
@@ -80,7 +80,7 @@ const DAY_ORDER = {
     'Sat': 6
 };
 
-// Define which Item Categories belong to 5th Floor Warehouse (EXISTING LOGIC - unchanged)
+// Define which Item Categories belong to 5th Floor Warehouse
 const FIFTH_FLOOR_CATEGORIES = [
     'Console/Armrest',
     'Deep Dish-3D',
@@ -94,7 +94,7 @@ const FIFTH_FLOOR_CATEGORIES = [
     'Trunk Tray'
 ];
 
-// Store all data from server (EXISTING LOGIC - unchanged)
+// Store all data from server
 let allItemCategories = {{ item_categories|tojson }};
 let allDayCategoriesRaw = {{ day_categories|tojson }};
 let allSkus = [];
@@ -102,41 +102,35 @@ let filteredSkus = [];
 let currentPage = 1;
 let itemsPerPage = 50;
 let currentSessionId = null;
-let searchTimeout = null; // NEW: for smart search debouncing
+let searchTimeout = null;
 
-// Sort day categories in Mon, Tue, Wed, Thu, Fri, Sat order (NEW FEATURE)
+// Sort day categories in Mon, Tue, Wed, Thu, Fri, Sat order
 let allDayCategories = [...allDayCategoriesRaw].sort((a, b) => {
     let orderA = DAY_ORDER[a] || 999;
     let orderB = DAY_ORDER[b] || 999;
     return orderA - orderB;
 });
 
-// Function to filter item categories based on warehouse selection (EXISTING LOGIC - unchanged)
+// Function to filter item categories based on warehouse selection
 function filterItemCategoriesByWarehouse() {
     let warehouse = document.getElementById('warehouse').value;
     let itemCategorySelect = document.getElementById('itemCategory');
     let currentValue = itemCategorySelect.value;
     
-    // Clear existing options
     itemCategorySelect.innerHTML = '<option value="All">-- All Item Categories --</option>';
     
     let filteredCategories = [];
     
     if (warehouse === '5thFloor') {
-        // Only show 5th Floor categories
         filteredCategories = allItemCategories.filter(cat => FIFTH_FLOOR_CATEGORIES.includes(cat));
     } else if (warehouse === 'Main') {
-        // Show Main Warehouse categories (all except 5th Floor)
         filteredCategories = allItemCategories.filter(cat => !FIFTH_FLOOR_CATEGORIES.includes(cat));
     } else {
-        // Show all categories for "All Warehouses"
         filteredCategories = [...allItemCategories];
     }
     
-    // Sort alphabetically
     filteredCategories.sort();
     
-    // Add filtered categories to dropdown
     for (let i = 0; i < filteredCategories.length; i++) {
         let option = document.createElement('option');
         option.value = filteredCategories[i];
@@ -144,28 +138,24 @@ function filterItemCategoriesByWarehouse() {
         itemCategorySelect.appendChild(option);
     }
     
-    // Try to restore previous selection if still valid
     if (currentValue !== 'All' && filteredCategories.includes(currentValue)) {
         itemCategorySelect.value = currentValue;
     }
     
-    // Also update day categories based on selected item category
     updateDayCategories();
 }
 
-// Function to update day categories based on selected item category (UPDATED with sorting)
+// Function to update day categories based on selected item category
 function updateDayCategories() {
     let selectedItemCategory = document.getElementById('itemCategory').value;
     let dayCategorySelect = document.getElementById('dayCategory');
     let currentValue = dayCategorySelect.value;
     
-    // Clear existing options
     dayCategorySelect.innerHTML = '<option value="All">-- All Day Categories --</option>';
     
     let filteredDayCategories = [];
     
     if (selectedItemCategory !== 'All' && allSkus.length > 0) {
-        // Get unique day categories for the selected item category
         let daySet = new Set();
         for (let i = 0; i < allSkus.length; i++) {
             if (allSkus[i].description === selectedItemCategory && allSkus[i].category) {
@@ -174,18 +164,15 @@ function updateDayCategories() {
         }
         filteredDayCategories = Array.from(daySet);
     } else {
-        // Show all day categories
         filteredDayCategories = [...allDayCategories];
     }
     
-    // Sort day categories in Mon, Tue, Wed, Thu, Fri, Sat order (NEW SORTING LOGIC)
     filteredDayCategories.sort((a, b) => {
         let orderA = DAY_ORDER[a] || 999;
         let orderB = DAY_ORDER[b] || 999;
         return orderA - orderB;
     });
     
-    // Add filtered day categories to dropdown
     for (let i = 0; i < filteredDayCategories.length; i++) {
         if (filteredDayCategories[i]) {
             let option = document.createElement('option');
@@ -195,13 +182,12 @@ function updateDayCategories() {
         }
     }
     
-    // Try to restore previous selection if still valid
     if (currentValue !== 'All' && filteredDayCategories.includes(currentValue)) {
         dayCategorySelect.value = currentValue;
     }
 }
 
-// NEW FUNCTION: Smart search with suggestions (DOES NOT affect existing logic)
+// FIXED: Smart search that shows suggestions instantly without Apply Filters
 function setupSmartSearch() {
     let searchInput = document.getElementById('searchSku');
     let suggestionsDiv = document.getElementById('suggestions');
@@ -217,15 +203,16 @@ function setupSmartSearch() {
         // Clear previous timeout
         if (searchTimeout) clearTimeout(searchTimeout);
         
-        // Debounce search to avoid performance issues
+        // Debounce search for better performance
         searchTimeout = setTimeout(function() {
-            // Get unique SKU suggestions
+            // Get unique SKU suggestions from all SKUs (not filtered)
             let suggestions = [];
             let seen = new Set();
             
+            // Search through all SKUs in the current view (allSkus already has warehouse filter applied)
             for (let i = 0; i < allSkus.length && suggestions.length < 15; i++) {
                 let sku = allSkus[i];
-                // Search in SKU only (faster, more relevant)
+                // Search in SKU code (case insensitive)
                 if (sku.sku.toLowerCase().includes(term.toLowerCase())) {
                     if (!seen.has(sku.sku)) {
                         seen.add(sku.sku);
@@ -247,11 +234,13 @@ function setupSmartSearch() {
                     div.style.padding = '8px 12px';
                     div.style.cursor = 'pointer';
                     div.style.borderBottom = '1px solid #eee';
+                    div.style.fontSize = '14px';
                     div.innerHTML = `<strong>${escapeHtml(item.sku)}</strong> <small class="text-muted">${escapeHtml(item.description || '')}</small>`;
                     div.onclick = (function(skuValue) {
                         return function() {
                             searchInput.value = skuValue;
                             suggestionsDiv.style.display = 'none';
+                            // Auto-apply filters when suggestion is clicked
                             applyFilters();
                         };
                     })(item.sku);
@@ -270,9 +259,16 @@ function setupSmartSearch() {
             suggestionsDiv.style.display = 'none';
         }
     });
+    
+    // Also handle Enter key to apply filters
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.which === 13) {
+            suggestionsDiv.style.display = 'none';
+            applyFilters();
+        }
+    });
 }
 
-// EXISTING FUNCTION - unchanged
 function applyFilters() {
     let warehouse = document.getElementById('warehouse').value;
     let dayCategory = document.getElementById('dayCategory').value;
@@ -282,7 +278,6 @@ function applyFilters() {
     loadSkus(warehouse, dayCategory, itemCategory, search);
 }
 
-// EXISTING FUNCTION - unchanged
 function loadSkus(warehouse, dayCategory, itemCategory, search) {
     let loadingDiv = document.getElementById('loadingIndicator');
     let skusListDiv = document.getElementById('skusList');
@@ -326,7 +321,6 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
             displaySkusWithPagination();
             loadingDiv.style.display = 'none';
             
-            // Update day categories based on selected item category
             updateDayCategories();
         })
         .catch(error => {
@@ -336,7 +330,6 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
         });
 }
 
-// EXISTING FUNCTION - unchanged
 function displaySkusWithPagination() {
     let startIndex = (currentPage - 1) * itemsPerPage;
     let endIndex = startIndex + itemsPerPage;
@@ -354,7 +347,6 @@ function displaySkusWithPagination() {
     }
 }
 
-// EXISTING FUNCTION - unchanged
 function displaySkus(skus) {
     let skusListDiv = document.getElementById('skusList');
     
@@ -409,7 +401,6 @@ function displaySkus(skus) {
     skusListDiv.innerHTML = html;
 }
 
-// EXISTING FUNCTION - unchanged
 function previousPage() {
     if (currentPage > 1) {
         currentPage--;
@@ -418,7 +409,6 @@ function previousPage() {
     }
 }
 
-// EXISTING FUNCTION - unchanged
 function nextPage() {
     let totalPages = Math.ceil(filteredSkus.length / itemsPerPage);
     if (currentPage < totalPages) {
@@ -428,7 +418,6 @@ function nextPage() {
     }
 }
 
-// EXISTING FUNCTION - unchanged
 function escapeHtml(text) {
     if (!text) return '';
     return text.replace(/[&<>]/g, function(m) {
@@ -439,7 +428,6 @@ function escapeHtml(text) {
     });
 }
 
-// EXISTING FUNCTION - unchanged
 function saveAllCounts() {
     let warehouse = document.getElementById('warehouse').value;
     let warehouseDisplay = warehouse === '5thFloor' ? '5th Floor Warehouse' : (warehouse === 'Main' ? 'Main Warehouse' : 'All Warehouses');
@@ -495,7 +483,6 @@ function saveAllCounts() {
     });
 }
 
-// EXISTING FUNCTION - unchanged
 function checkForRecounts() {
     if (!currentSessionId) return;
     
@@ -510,7 +497,6 @@ function checkForRecounts() {
         });
 }
 
-// EXISTING FUNCTION - unchanged
 function showRecountModal(recountItems) {
     let html = '<div class="table-responsive"><table class="table table-bordered">';
     html += '<thead><tr>';
@@ -564,7 +550,6 @@ function showRecountModal(recountItems) {
     modal.show();
 }
 
-// EXISTING FUNCTION - unchanged
 function saveRecounts() {
     let recounts = [];
     let countInputs = document.querySelectorAll('.recount-count');
@@ -605,7 +590,6 @@ function saveRecounts() {
     });
 }
 
-// EXISTING FUNCTION - unchanged
 function completeCounting() {
     if (!currentSessionId) {
         alert('Please save counts first');
@@ -630,7 +614,7 @@ function completeCounting() {
     }
 }
 
-// Event listeners (EXISTING LOGIC - unchanged)
+// Event listeners
 document.getElementById('warehouse').addEventListener('change', function() {
     filterItemCategoriesByWarehouse();
     applyFilters();
@@ -641,11 +625,11 @@ document.getElementById('itemCategory').addEventListener('change', function() {
     applyFilters();
 });
 
-// Auto-load on page load (UPDATED to include smart search setup)
+// Auto-load on page load
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Page loaded, setting up...');
     filterItemCategoriesByWarehouse();
-    setupSmartSearch(); // NEW: Initialize smart search
+    setupSmartSearch();
     applyFilters();
 });
 </script>
