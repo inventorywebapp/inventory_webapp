@@ -19,20 +19,30 @@ def get_ph_time():
     return datetime.now(ph_tz)
 
 def check_recount_needed(initial_count, expected_count, kenneth_count):
-    """Check if recount is needed based on discrepancy > 3 or < -3"""
+    """
+    Check if recount is needed based on discrepancy > 3 or < -3
+    Negative values in expected_count or kenneth_count are treated as 0
+    """
     if initial_count is None:
         return False
     
     try:
         initial = float(initial_count)
-        expected = float(expected_count) if expected_count else 0
-        kenneth = float(kenneth_count) if kenneth_count else 0
+        
+        # Treat negative values as 0
+        expected = float(expected_count) if expected_count and float(expected_count) > 0 else 0
+        kenneth = float(kenneth_count) if kenneth_count and float(kenneth_count) > 0 else 0
+        
     except (ValueError, TypeError):
         return False
     
+    # Compare with Final Expected Count
     diff_expected = abs(initial - expected) if expected else 0
+    
+    # Compare with Kenneth's Inventory
     diff_kenneth = abs(initial - kenneth) if kenneth else 0
     
+    # If either difference is greater than 3, recount needed
     if diff_expected > 3 or diff_kenneth > 3:
         return True
     
@@ -48,7 +58,7 @@ def parse_container_details(container_details_str):
     return [{'qty': int(qty), 'date': date} for qty, date in matches]
 
 def sync_data_from_drive():
-    """Sync data from Google Drive using service account"""
+    """Sync data from Google Drive using service account - with flexible column mapping"""
     try:
         print("=== STARTING SYNC PROCESS ===", file=sys.stderr)
         
@@ -122,6 +132,40 @@ def sync_data_from_drive():
         print("Reading Excel file...", file=sys.stderr)
         df = pd.read_excel(file_stream)
         total_rows = len(df)
+        
+        # Print column names for debugging
+        print(f"Excel columns: {list(df.columns)}", file=sys.stderr)
+        
+        # Flexible column mapping - try different possible column names
+        # For SKU column
+        sku_col = None
+        for col in ['SKU', 'Sku', 'sku', 'Item Code', 'Product Code', 'Code']:
+            if col in df.columns:
+                sku_col = col
+                break
+        
+        # For Description/Item Category column
+        desc_col = None
+        for col in ['Description', 'description', 'Item Category', 'Item', 'Product Name', 'DESCRIPTION']:
+            if col in df.columns:
+                desc_col = col
+                break
+        
+        # For Category/Day Category column
+        cat_col = None
+        for col in ['Category', 'category', 'Day Category', 'Day', 'Type', 'CATEGORY']:
+            if col in df.columns:
+                cat_col = col
+                break
+        
+        print(f"Mapped columns - SKU: {sku_col}, Description: {desc_col}, Category: {cat_col}", file=sys.stderr)
+        
+        if not sku_col:
+            print("ERROR: Could not find SKU column", file=sys.stderr)
+            print(f"Available columns: {list(df.columns)}", file=sys.stderr)
+            return False
+        
+        total_rows = len(df)
         print(f"Excel has {total_rows} rows", file=sys.stderr)
         
         # Clear existing SKUs to avoid duplicates
@@ -139,13 +183,13 @@ def sync_data_from_drive():
                 sku = SKU()
                 
                 # Required field - SKU
-                sku.sku = str(row['SKU']) if pd.notna(row['SKU']) else ''
+                sku.sku = str(row[sku_col]) if pd.notna(row[sku_col]) else ''
                 
                 # Description (Item Category)
-                sku.description = str(row.get('Description', '')) if pd.notna(row.get('Description')) else ''
+                sku.description = str(row.get(desc_col, '')) if desc_col and pd.notna(row.get(desc_col)) else ''
                 
                 # Category (Day Category) - This is what you filter by
-                sku.category = str(row.get('Category', '')) if pd.notna(row.get('Category')) else ''
+                sku.category = str(row.get(cat_col, '')) if cat_col and pd.notna(row.get(cat_col)) else ''
                 
                 # Other fields
                 sku.last_count_date = str(row.get('LastCountDate', '')) if pd.notna(row.get('LastCountDate')) else ''
@@ -192,38 +236,4 @@ def sync_data_from_drive():
         traceback.print_exc(file=sys.stderr)
         return False
 
-def import_excel_data(file_path):
-    """Import data from Excel file to database"""
-    try:
-        df = pd.read_excel(file_path)
-        
-        for _, row in df.iterrows():
-            sku = SKU.query.filter_by(sku=str(row['SKU'])).first()
-            if not sku:
-                sku = SKU()
-            
-            sku.sku = str(row['SKU'])
-            sku.description = str(row.get('Description', ''))
-            sku.category = str(row.get('Category', ''))
-            sku.last_count_date = str(row.get('LastCountDate', ''))
-            sku.last_count = float(row.get('LastCount', 0)) if pd.notna(row.get('LastCount')) else 0
-            sku.total_container_qty = float(row.get('TotalContainerQty', 0)) if pd.notna(row.get('TotalContainerQty')) else 0
-            sku.container_details = str(row.get('ContainerDetails', ''))
-            sku.total_orders = float(row.get('TotalOrders', 0)) if pd.notna(row.get('TotalOrders')) else 0
-            sku.final_expected_count = float(row.get('Final Expected Count', 0)) if pd.notna(row.get('Final Expected Count')) else 0
-            sku.kenneth_inventory = float(row.get("Kenneth's Inventory", 0)) if pd.notna(row.get("Kenneth's Inventory")) else 0
-            sku.buffer_qty = float(row.get('BufferQty', 0)) if pd.notna(row.get('BufferQty')) else 0
-            sku.stock_status = str(row.get('StockStatus', ''))
-            sku.inventory_remark = str(row.get('InventoryRemark', ''))
-            sku.sku_status = str(row.get('SKUStatus', ''))
-            
-            if sku.description in ['Console/Armrest', 'Armrest', 'Wiper', 'Armrest category', 'Wiper category']:
-                sku.bypass_recount = True
-            
-            db.session.add(sku)
-        
-        db.session.commit()
-        return True
-    except Exception as e:
-        print(f"Error importing data: {e}")
-        return False
+def import_excel_data(file_path
