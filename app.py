@@ -270,20 +270,40 @@ def get_skus():
     else:
         skus = query.limit(1000).all()
     
-    result = [{
-        'id': s.id, 
-        'sku': s.sku, 
-        'description': s.description,
-        'category': s.category, 
-        'last_count_date': s.last_count_date,
-        'last_count': s.last_count, 
-        'total_container_qty': s.total_container_qty,
-        'container_details': s.container_details, 
-        'final_expected_count': s.final_expected_count,
-        'kenneth_inventory': s.kenneth_inventory, 
-        'stock_status': s.stock_status,
-        'bypass_recount': s.bypass_recount
-    } for s in skus]
+    result = []
+    for sku in skus:
+        # Get the LATEST count for this SKU (from ANY session - completed or in-progress)
+        latest_record = CountRecord.query.filter_by(
+            sku_id=sku.id
+        ).order_by(CountRecord.version.desc()).first()
+        
+        # Get the session info for this record
+        session_info = None
+        if latest_record:
+            session_info = CountingSession.query.get(latest_record.session_id)
+        
+        # Determine if SKU has a valid count
+        has_count = latest_record is not None
+        current_count = latest_record.initial_count if latest_record else None
+        count_time = latest_record.count_time.strftime('%Y-%m-%d %H:%M:%S') if latest_record and latest_record.count_time else None
+        
+        result.append({
+            'id': sku.id, 
+            'sku': sku.sku, 
+            'description': sku.description,
+            'category': sku.category, 
+            'last_count_date': sku.last_count_date,
+            'last_count': sku.last_count, 
+            'total_container_qty': sku.total_container_qty,
+            'container_details': sku.container_details, 
+            'final_expected_count': sku.final_expected_count,
+            'kenneth_inventory': sku.kenneth_inventory, 
+            'stock_status': sku.stock_status,
+            'bypass_recount': sku.bypass_recount,
+            'has_count': has_count,
+            'current_count': current_count,
+            'count_time': count_time
+        })
     
     return jsonify(result)
 
