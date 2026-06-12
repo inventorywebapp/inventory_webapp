@@ -617,7 +617,6 @@ function saveAllCounts() {
         let skuName = row ? row.cells[0].innerText : 'Unknown SKU';
         
         if (value !== '' && value !== null) {
-            // Validate the input
             if (isNaN(value) || value.includes('.') || parseFloat(value) < 0 || !Number.isInteger(parseFloat(value))) {
                 hasInvalid = true;
                 invalidSkus.push(skuName);
@@ -638,7 +637,6 @@ function saveAllCounts() {
         return;
     }
     
-    // Warning for blank SKUs
     if (blankSkus > 0) {
         let warningMsg = `⚠️ You have ${blankSkus} SKU(s) with NO count entered.\n\n`;
         warningMsg += `Total SKUs: ${totalSkus}\n`;
@@ -659,7 +657,6 @@ function saveAllCounts() {
         }
     }
     
-    // Prepare counts (only save non-blank values)
     let counts = {};
     for (let i = 0; i < countInputs.length; i++) {
         let input = countInputs[i];
@@ -752,8 +749,8 @@ function showRecountModal(recountItems) {
     html += '<th>Final Expected</th>';
     html += '<th>Kenneth\'s Inv</th>';
     html += '<th>Recount Count</th>';
-    html += '<th>Remarks (Required)</th>';
-    html += '</tr></thead><tbody>';
+    html += '<th>Remarks (Optional)</th>';
+    html += '</table></thead><tbody>';
     
     for (let i = 0; i < recountItems.length; i++) {
         let item = recountItems[i];
@@ -763,12 +760,13 @@ function showRecountModal(recountItems) {
         html += '<td class="bg-info">' + (item.final_expected_count || 0) + '</td>';
         html += '<td class="bg-info">' + (item.kenneth_inventory || 0) + '</td>';
         html += '<td><input type="text" class="form-control recount-count" data-record-id="' + item.id + '" style="width: 120px;" placeholder="Enter whole number" inputmode="numeric"></td>';
-        html += '<td><textarea class="form-control recount-remarks" data-record-id="' + item.id + '" rows="2" placeholder="Required: Reason for discrepancy"></textarea></td>';
+        html += '<td><textarea class="form-control recount-remarks" data-record-id="' + item.id + '" rows="2" placeholder="Optional: Reason for discrepancy (e.g., 9 were damaged)"></textarea></td>';
         html += '</tr>';
     }
     
     html += '</tbody></table></div>';
-    html += '<div class="mt-3 text-end">';
+    html += '<div class="mt-3 d-flex justify-content-between">';
+    html += '<button class="btn btn-secondary" onclick="closeRecountModal()">Close</button>';
     html += '<button class="btn btn-success" onclick="saveRecounts()">Save Recounts & Complete Session</button>';
     html += '</div>';
     
@@ -778,11 +776,12 @@ function showRecountModal(recountItems) {
                 <div class="modal-content">
                     <div class="modal-header bg-warning">
                         <h5 class="modal-title">⚠️ Recount Required</h5>
+                        <button type="button" class="btn-close" onclick="closeRecountModal()"></button>
                     </div>
                     <div class="modal-body">
                         <div class="alert alert-danger">
                             <strong>Important:</strong> The following SKUs have discrepancies greater than 3 units.
-                            Please recount and provide a reason for the discrepancy.
+                            Please recount and enter the correct quantity.
                         </div>
                         ${html}
                     </div>
@@ -798,7 +797,7 @@ function showRecountModal(recountItems) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
-    // Add validation to recount inputs
+    // Add validation to recount inputs (count required, remarks optional)
     document.querySelectorAll('.recount-count').forEach(input => {
         input.addEventListener('blur', function() {
             let value = this.value;
@@ -837,6 +836,15 @@ function showRecountModal(recountItems) {
     modal.show();
 }
 
+function closeRecountModal() {
+    let modal = document.getElementById('recountModal');
+    if (modal) {
+        let bsModal = bootstrap.Modal.getInstance(modal);
+        if (bsModal) bsModal.hide();
+        modal.remove();
+    }
+}
+
 function saveRecounts() {
     let recounts = [];
     let countInputs = document.querySelectorAll('.recount-count');
@@ -852,7 +860,7 @@ function saveRecounts() {
         let row = input.closest('tr');
         let skuName = row ? row.cells[0].innerText : 'Unknown';
         
-        // Validate recount count
+        // Validate recount count (REQUIRED)
         if (!recountCount || recountCount === '') {
             hasError = true;
             errorMessage += `• Please enter recount count for ${skuName}\n`;
@@ -865,16 +873,9 @@ function saveRecounts() {
             input.style.border = '';
         }
         
-        // Validate remarks
-        if (!remarks || remarks.trim() === '') {
-            hasError = true;
-            errorMessage += `• Please provide remarks/reason for ${skuName}\n`;
-            let remarksInput = document.querySelector('.recount-remarks[data-record-id="' + recordId + '"]');
-            remarksInput.style.border = '2px solid red';
-        } else {
-            let remarksInput = document.querySelector('.recount-remarks[data-record-id="' + recordId + '"]');
-            remarksInput.style.border = '';
-        }
+        // Remarks are OPTIONAL - no validation needed
+        let remarksInput = document.querySelector('.recount-remarks[data-record-id="' + recordId + '"]');
+        remarksInput.style.border = '';
         
         recounts.push({
             record_id: recordId,
