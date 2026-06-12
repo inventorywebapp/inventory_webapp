@@ -710,7 +710,7 @@ def export_counts():
 @app.route('/export_audit_log', methods=['POST'])
 @login_required
 def export_audit_log():
-    """Export audit log data - INCLUDES session and version info for full history"""
+    """Export audit log data - with integer formatting"""
     if current_user.role not in ['admin', 'audit']:
         flash('Access denied', 'error')
         return redirect(url_for('index'))
@@ -748,13 +748,20 @@ def export_audit_log():
             flash('No audit log data found for the selected filters', 'warning')
             return redirect(url_for('admin_dashboard'))
         
+        # Prepare data for export with integer formatting
         audit_data = []
         for log in logs:
+            details = log.details
+            if details:
+                # Replace .0 with empty string for whole numbers
+                import re
+                details = re.sub(r'(\d+)\.0', r'\1', details)
+            
             audit_data.append({
                 'Timestamp (PHT)': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                 'User': log.user.full_name if log.user else 'System',
                 'Action': log.action,
-                'Details': log.details,
+                'Details': details,
                 'IP Address': log.ip_address
             })
         
