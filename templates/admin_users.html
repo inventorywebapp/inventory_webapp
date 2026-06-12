@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>User Management</h2>
+
+<div class="row">
+    <div class="col-md-12 mb-3">
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createUserModal">
+            <i class="bi bi-person-plus"></i> Create New User
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5>System Users</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Username</th>
+                        <th>Full Name</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Created At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.username }}</td>
+                        <td>{{ user.full_name }}</td>
+                        <td>
+                            <span class="badge {% if user.role == 'admin' %}bg-danger{% elif user.role == 'manager' %}bg-primary{% elif user.role == 'inventory_supervisor' %}bg-info{% elif user.role == 'inventory_staff' %}bg-success{% else %}bg-secondary{% endif %}">
+                                {{ user.role|replace('_', ' ')|title }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if user.is_active %}
+                            <span class="badge bg-success">Active</span>
+                            {% else %}
+                            <span class="badge bg-danger">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-warning" onclick="editUser({{ user.id }}, '{{ user.username }}', '{{ user.full_name }}', '{{ user.role }}', {{ user.is_active|lower }})">
+                                <i class="bi bi-pencil"></i> Edit
+                            </button>
+                            <button class="btn btn-sm btn-info" onclick="resetPassword({{ user.id }}, '{{ user.username }}')">
+                                <i class="bi bi-key"></i> Reset
+                            </button>
+                            {% if user.id != current_user.id %}
+                            <button class="btn btn-sm btn-danger" onclick="deleteUser({{ user.id }}, '{{ user.username }}')">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Create User Modal -->
+<div class="modal fade" id="createUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Create New User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createUserForm">
+                    <div class="mb-3">
+                        <label>Username</label>
+                        <input type="text" name="username" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Password</label>
+                        <input type="password" name="password" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Full Name</label>
+                        <input type="text" name="full_name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Role</label>
+                        <select name="role" class="form-control" required>
+                            <option value="inventory_staff">Inventory Staff</option>
+                            <option value="inventory_supervisor">Inventory Supervisor</option>
+                            <option value="auditor">Auditor</option>
+                            <option value="manager">Manager</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitCreateUser()">Create User</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">Edit User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editUserForm">
+                    <input type="hidden" name="user_id" id="edit_user_id">
+                    <div class="mb-3">
+                        <label>Username</label>
+                        <input type="text" id="edit_username" class="form-control" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label>Full Name</label>
+                        <input type="text" name="full_name" id="edit_full_name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Role</label>
+                        <select name="role" id="edit_role" class="form-control" required>
+                            <option value="inventory_staff">Inventory Staff</option>
+                            <option value="inventory_supervisor">Inventory Supervisor</option>
+                            <option value="auditor">Auditor</option>
+                            <option value="manager">Manager</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label>Status</label>
+                        <select name="is_active" id="edit_is_active" class="form-control">
+                            <option value="true">Active</option>
+                            <option value="false">Inactive</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitEditUser()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">Reset Password</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="resetPasswordForm">
+                    <input type="hidden" name="user_id" id="reset_user_id">
+                    <div class="mb-3">
+                        <label>Username</label>
+                        <input type="text" id="reset_username" class="form-control" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label>New Password</label>
+                        <input type="password" name="new_password" class="form-control" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitResetPassword()">Reset Password</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function submitCreateUser() {
+    let form = document.getElementById('createUserForm');
+    let formData = new FormData(form);
+    
+    fetch('/admin/create_user', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+function editUser(id, username, fullName, role, isActive) {
+    document.getElementById('edit_user_id').value = id;
+    document.getElementById('edit_username').value = username;
+    document.getElementById('edit_full_name').value = fullName;
+    document.getElementById('edit_role').value = role;
+    document.getElementById('edit_is_active').value = isActive ? 'true' : 'false';
+    
+    new bootstrap.Modal(document.getElementById('editUserModal')).show();
+}
+
+function submitEditUser() {
+    let form = document.getElementById('editUserForm');
+    let formData = new FormData(form);
+    
+    fetch('/admin/edit_user', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+function resetPassword(id, username) {
+    document.getElementById('reset_user_id').value = id;
+    document.getElementById('reset_username').value = username;
+    
+    new bootstrap.Modal(document.getElementById('resetPasswordModal')).show();
+}
+
+function submitResetPassword() {
+    let form = document.getElementById('resetPasswordForm');
+    let formData = new FormData(form);
+    
+    fetch('/admin/reset_password', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+function deleteUser(id, username) {
+    if (confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
+        let formData = new FormData();
+        formData.append('user_id', id);
+        
+        fetch('/admin/delete_user', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        });
+    }
+}
+</script>
+{% endblock %}
