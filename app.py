@@ -115,6 +115,8 @@ def index():
         return redirect(url_for('admin_dashboard'))
     elif current_user.role == 'auditor':
         return redirect(url_for('audit_dashboard'))
+    elif current_user.has_permission('count'):
+        return redirect(url_for('counting'))
     else:
         return redirect(url_for('dashboard'))
 
