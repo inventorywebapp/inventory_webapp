@@ -17,7 +17,7 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
     full_name = db.Column(db.String(100), nullable=False)
-    role = db.Column(db.String(25), nullable=False, default='inventory_staff')  # admin, inventory_staff, inventory_supervisor, auditor, manager
+    role = db.Column(db.String(25), nullable=False, default='inventory_staff')
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=get_ph_time)
     
@@ -32,6 +32,17 @@ class User(UserMixin, db.Model):
             'auditor': ['export_counts', 'export_audit']
         }
         return permission in permissions.get(self.role, [])
+    
+    def get_role_display(self):
+        """Get display name for user role"""
+        role_names = {
+            'admin': 'Admin',
+            'manager': 'Manager',
+            'inventory_supervisor': 'Inventory Supervisor',
+            'inventory_staff': 'Inventory Staff',
+            'auditor': 'Auditor'
+        }
+        return role_names.get(self.role, self.role.replace('_', ' ').title())
 
 
 class SKU(db.Model):
