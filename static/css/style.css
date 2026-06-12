@@ -93,3 +93,11 @@ body {
         max-width: 95%;
     }
 }
+
+.sku-pre-counted {
+    background-color: #cfe2ff !important;
+    border-left: 3px solid #0d6efd;
+}
+.sku-pre-counted:hover {
+    background-color: #b6d4fe !important;
+}
