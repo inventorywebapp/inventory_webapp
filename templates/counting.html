@@ -225,6 +225,7 @@ let itemsPerPage = 50;
 let currentSessionId = null;
 let searchTimeout = null;
 let html5QrCode = null;
+let isScanning = false;
 
 // Sort day categories
 let allDayCategories = [...allDayCategoriesRaw].sort((a, b) => {
@@ -240,23 +241,35 @@ function getUrlParameter(name) {
 }
 
 // Barcode/QR Code Scanner Functions
-function startBarcodeScanner() {
+async function startBarcodeScanner() {
+    // If already scanning, don't start again
+    if (isScanning) {
+        console.log("Scanner already running");
+        return;
+    }
+    
     const scannerModal = new bootstrap.Modal(document.getElementById('scannerModal'));
     scannerModal.show();
     
     const resultContainer = document.getElementById('qr-reader-results');
     resultContainer.innerHTML = '<div class="alert alert-info">Initializing camera... Please wait.</div>';
     
-    // Clean up any existing scanner
+    // Clean up any existing scanner properly
     if (html5QrCode) {
         try {
-            html5QrCode.stop().catch(() => {});
-        } catch(e) {}
+            await html5QrCode.stop();
+        } catch(e) {
+            console.log("Error stopping existing scanner:", e);
+        }
         html5QrCode = null;
     }
     
+    // Small delay to ensure cleanup
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     // Create new scanner
     html5QrCode = new Html5Qrcode("qr-reader");
+    isScanning = true;
     
     const config = {
         fps: 10,
@@ -265,38 +278,50 @@ function startBarcodeScanner() {
         showTorchButtonIfSupported: true
     };
     
-    html5QrCode.start(
-        { facingMode: "environment" },
-        config,
-        (decodedText, decodedResult) => {
-            // Success callback - found a code
-            console.log(`Scanned: ${decodedText}`);
-            resultContainer.innerHTML = `<div class="alert alert-success">✓ Scanned: ${decodedText}</div>`;
-            
-            // Stop scanner after successful scan
-            stopBarcodeScanner();
-            
-            // Search for the scanned code
-            searchByBarcode(decodedText);
-        },
-        (errorMessage) => {
-            // Error callback - ignore, just keep scanning
-            // Don't show errors to user
-        }
-    ).catch((err) => {
+    try {
+        await html5QrCode.start(
+            { facingMode: "environment" },
+            config,
+            (decodedText, decodedResult) => {
+                // Success callback - found a code
+                console.log(`Scanned: "${decodedText}"`);
+                resultContainer.innerHTML = `<div class="alert alert-success">✓ Scanned: ${decodedText}</div>`;
+                
+                // Stop scanner after successful scan
+                stopBarcodeScanner();
+                
+                // Search for the scanned code
+                searchByBarcode(decodedText);
+            },
+            (errorMessage) => {
+                // Error callback - ignore scanning errors
+                console.log("Scanning...");
+            }
+        );
+    } catch (err) {
         console.error(`Error starting scanner: ${err}`);
         resultContainer.innerHTML = `<div class="alert alert-danger">Cannot access camera: ${err.message || err}. Please check camera permissions.</div>`;
-    });
+        isScanning = false;
+    }
 }
 
-function stopBarcodeScanner() {
+async function stopBarcodeScanner() {
+    isScanning = false;
+    
     if (html5QrCode) {
-        html5QrCode.stop().then(() => {
-            console.log("Scanner stopped");
-        }).catch((err) => {
+        try {
+            await html5QrCode.stop();
+            console.log("Scanner stopped successfully");
+        } catch (err) {
             console.error("Error stopping scanner:", err);
-        });
+        }
         html5QrCode = null;
+    }
+    
+    // Clear the reader element
+    const readerElement = document.getElementById('qr-reader');
+    if (readerElement) {
+        readerElement.innerHTML = '';
     }
     
     const scannerModal = bootstrap.Modal.getInstance(document.getElementById('scannerModal'));
@@ -338,24 +363,30 @@ function performBarcodeSearch(barcode) {
     let partialMatches = [];
     let exactMatches = [];
     
-    // First, look for exact match (case insensitive)
+    // Clean the search term (remove spaces, dashes, special chars)
+    let cleanSearchTerm = searchTerm.toLowerCase().replace(/[^\w]/g, '');
+    
     for (let i = 0; i < allSkus.length; i++) {
         const sku = allSkus[i];
+        const cleanSku = sku.sku.toLowerCase().replace(/[^\w]/g, '');
+        
         if (sku.sku.toLowerCase() === searchTerm.toLowerCase()) {
             exactMatches.push(sku);
+        } else if (cleanSku === cleanSearchTerm) {
+            exactMatches.push(sku);
         } else if (sku.sku.toLowerCase().includes(searchTerm.toLowerCase())) {
+            partialMatches.push(sku);
+        } else if (cleanSku.includes(cleanSearchTerm)) {
             partialMatches.push(sku);
         }
     }
     
-    // Prioritize exact match
     if (exactMatches.length === 1) {
         matchedSku = exactMatches[0];
         document.getElementById('searchSku').value = matchedSku.sku;
         applyFilters();
         showToast(`✓ Found SKU: ${matchedSku.sku}`, 'success');
         
-        // Highlight and scroll to the SKU
         setTimeout(() => {
             let row = document.getElementById(`sku-row-${matchedSku.id}`);
             if (row) {
@@ -368,8 +399,7 @@ function performBarcodeSearch(barcode) {
         }, 500);
     }
     else if (exactMatches.length > 1) {
-        // Multiple exact matches - shouldn't happen with SKU, but handle
-        let matchList = exactMatches.map(s => `• ${s.sku} - ${s.description || ''}`).join('\n');
+        let matchList = exactMatches.slice(0, 5).map(s => `• ${s.sku} - ${s.description || ''}`).join('\n');
         alert(`Multiple SKUs match "${searchTerm}":\n\n${matchList}\n\nPlease select from the search results.`);
         document.getElementById('searchSku').value = searchTerm;
         applyFilters();
@@ -400,13 +430,11 @@ function performBarcodeSearch(barcode) {
         applyFilters();
     }
     else {
-        // No match found - show helpful message
         showToast(`SKU "${searchTerm}" not found. Try scanning again or use manual search.`, 'warning');
     }
 }
 
 function showToast(message, type = 'info') {
-    // Create temporary toast notification
     let toast = document.createElement('div');
     toast.className = `alert alert-${type === 'success' ? 'success' : (type === 'warning' ? 'warning' : 'info')} alert-dismissible fade show position-fixed`;
     toast.style.bottom = '20px';
@@ -1193,7 +1221,7 @@ function showRecountModal(recountItems) {
         html += '</tr>';
     }
     
-    html += '</tbody></table></div>';
+    html += '</tbody><table></div>';
     html += '<div class="mt-3 d-flex justify-content-between">';
     html += '<button class="btn btn-secondary" onclick="closeRecountModal()">Close</button>';
     html += '<button class="btn btn-success" onclick="saveRecounts()">Save Recounts & Complete Session</button>';
