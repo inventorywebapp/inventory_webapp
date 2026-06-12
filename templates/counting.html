@@ -73,23 +73,34 @@
 .suggestion-item:hover {
     background-color: #f0f0f0;
 }
-.sku-uncounted {
-    background-color: #fff3cd !important;
-    border-left: 3px solid #ffc107;
-}
-.sku-uncounted:hover {
-    background-color: #ffe69e !important;
-}
-.sku-counted {
+/* Completed SKU (session done) - GREEN */
+.sku-completed {
     background-color: #d1e7dd !important;
     border-left: 3px solid #198754;
 }
-.sku-pre-counted {
+.sku-completed:hover {
+    background-color: #b6dbc8 !important;
+}
+/* In-progress SKU (active session) - BLUE */
+.sku-in-progress {
     background-color: #cfe2ff !important;
     border-left: 3px solid #0d6efd;
 }
-.sku-pre-counted:hover {
+.sku-in-progress:hover {
     background-color: #b6d4fe !important;
+}
+/* Never counted - YELLOW */
+.sku-needs-count {
+    background-color: #fff3cd !important;
+    border-left: 3px solid #ffc107;
+}
+.sku-needs-count:hover {
+    background-color: #ffe69e !important;
+}
+/* User typing - DARKER YELLOW */
+.sku-typing {
+    background-color: #ffe69e !important;
+    border-left: 3px solid #ffc107;
 }
 .uncounted-badge {
     display: inline-block;
@@ -110,6 +121,21 @@
     font-size: 12px;
     font-weight: bold;
     margin-left: 10px;
+}
+.inprogress-badge {
+    display: inline-block;
+    background-color: #0d6efd;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-left: 10px;
+}
+.ref-count {
+    font-size: 11px;
+    color: #6c757d;
+    display: block;
 }
 </style>
 
@@ -238,42 +264,66 @@ function updateDayCategories() {
 function highlightSkusStatus() {
     let countInputs = document.querySelectorAll('.initial-count');
     let uncountedCount = 0;
-    let countedCount = 0;
+    let completedCount = 0;
+    let inProgressCount = 0;
     
     for (let i = 0; i < countInputs.length; i++) {
         let input = countInputs[i];
         let row = input.closest('tr');
         let count = input.value;
         
+        // Check if row has data attributes
+        let isCompleted = row.getAttribute('data-completed') === 'true';
+        let hasExistingCount = row.getAttribute('data-has-count') === 'true';
+        
         if (!count || count === '') {
-            if (row) {
-                row.classList.add('sku-uncounted');
-                row.classList.remove('sku-counted');
-                row.classList.remove('sku-pre-counted');
+            if (isCompleted) {
+                // Completed SKU - GREEN (blank field, but has reference)
+                row.classList.add('sku-completed');
+                row.classList.remove('sku-in-progress', 'sku-needs-count', 'sku-typing');
+                completedCount++;
+            } else if (hasExistingCount && !isCompleted) {
+                // In-progress SKU - BLUE (has current count)
+                row.classList.add('sku-in-progress');
+                row.classList.remove('sku-completed', 'sku-needs-count', 'sku-typing');
+                inProgressCount++;
+            } else {
+                // Never counted - YELLOW
+                row.classList.add('sku-needs-count');
+                row.classList.remove('sku-completed', 'sku-in-progress', 'sku-typing');
+                uncountedCount++;
             }
-            uncountedCount++;
         } else {
-            if (row) {
-                row.classList.remove('sku-uncounted');
-                row.classList.add('sku-counted');
-            }
-            countedCount++;
+            // User is typing - DARKER YELLOW
+            row.classList.add('sku-typing');
+            row.classList.remove('sku-completed', 'sku-in-progress', 'sku-needs-count');
         }
     }
     
+    // Update badges
     let existingUncountedBadge = document.getElementById('uncountedBadge');
-    let existingCountedBadge = document.getElementById('countedBadge');
+    let existingCompletedBadge = document.getElementById('completedBadge');
+    let existingInProgressBadge = document.getElementById('inProgressBadge');
     
-    if (existingCountedBadge) existingCountedBadge.remove();
+    if (existingCompletedBadge) existingCompletedBadge.remove();
+    if (existingInProgressBadge) existingInProgressBadge.remove();
     if (existingUncountedBadge) existingUncountedBadge.remove();
     
     let title = document.querySelector('h2');
     
-    if (countedCount > 0) {
+    if (completedCount > 0) {
         let badge = document.createElement('span');
-        badge.id = 'countedBadge';
+        badge.id = 'completedBadge';
         badge.className = 'counted-badge';
-        badge.innerHTML = `${countedCount} SKU(s) counted`;
+        badge.innerHTML = `${completedCount} SKU(s) Completed (ready for new count)`;
+        title.appendChild(badge);
+    }
+    
+    if (inProgressCount > 0) {
+        let badge = document.createElement('span');
+        badge.id = 'inProgressBadge';
+        badge.className = 'inprogress-badge';
+        badge.innerHTML = `${inProgressCount} SKU(s) In Progress`;
         title.appendChild(badge);
     }
     
@@ -281,7 +331,7 @@ function highlightSkusStatus() {
         let badge = document.createElement('span');
         badge.id = 'uncountedBadge';
         badge.className = 'uncounted-badge';
-        badge.innerHTML = `${uncountedCount} SKU(s) need count`;
+        badge.innerHTML = `${uncountedCount} SKU(s) Need Count`;
         title.appendChild(badge);
     }
 }
@@ -422,6 +472,7 @@ function loadInProgressSkus() {
                     data.skus[i].has_count = true;
                     data.skus[i].current_count = data.skus[i].current_count;
                     data.skus[i].count_time = data.skus[i].count_time;
+                    data.skus[i].is_completed = false;
                 }
                 allSkus = data.skus;
                 filteredSkus = data.skus;
@@ -515,19 +566,25 @@ function loadExistingCountsForSkus() {
             for (let skuId in latestCounts) {
                 let countInput = document.querySelector(`.initial-count[data-sku-id="${skuId}"]`);
                 let lastCountedSpan = document.getElementById(`last-counted-${skuId}`);
+                let lastCountValueSpan = document.getElementById(`last-count-value-${skuId}`);
+                
                 if (countInput && latestCounts[skuId]) {
+                    // For in-progress SKUs, show the current count in the field
                     countInput.value = latestCounts[skuId].initial_count;
                     countInput.setAttribute('title', `Previously counted on: ${latestCounts[skuId].count_time}\nCount: ${latestCounts[skuId].initial_count}`);
                     
+                    // Update reference info
                     if (lastCountedSpan) {
                         lastCountedSpan.innerHTML = latestCounts[skuId].count_time;
-                        lastCountedSpan.style.color = '#0d6efd';
-                        lastCountedSpan.style.fontWeight = 'bold';
+                    }
+                    if (lastCountValueSpan) {
+                        lastCountValueSpan.innerHTML = latestCounts[skuId].initial_count;
                     }
                     
                     let row = countInput.closest('tr');
                     if (row) {
-                        row.classList.add('sku-pre-counted');
+                        row.setAttribute('data-has-count', 'true');
+                        row.setAttribute('data-completed', 'false');
                     }
                 }
             }
@@ -545,7 +602,7 @@ function displaySkus(skus) {
     
     let html = '<div class="col-12"><div class="table-responsive"><table class="table table-bordered table-hover table-striped">';
     html += '<thead class="table-dark">';
-    html += '</tr>';
+    html += '<table>';
     html += '<th>SKU</th>';
     html += '<th>Description (Item Category)</th>';
     html += '<th>Day Category</th>';
@@ -557,6 +614,7 @@ function displaySkus(skus) {
     html += '<th>Kenneth\'s Inv</th>';
     html += '<th>Current Count</th>';
     html += '<th>Last Counted Date</th>';
+    html += '<th>Previous Count</th>';
     html += '<th>Status</th>';
     html += '</tr>';
     html += '</thead><tbody>';
@@ -564,16 +622,29 @@ function displaySkus(skus) {
     for (let i = 0; i < skus.length; i++) {
         let sku = skus[i];
         let statusBadge = '';
-        let hasCurrentCount = false;
-        let currentCountValue = '';
-        let countTimeValue = '';
+        let hasExistingCount = false;
+        let existingCountValue = '';
+        let existingCountTime = '';
+        let isCompleted = false;
         let rowClass = '';
         
-        if (sku.has_count === true || (sku.current_count !== undefined && sku.current_count !== null && sku.current_count !== '')) {
-            hasCurrentCount = true;
-            currentCountValue = sku.current_count;
-            countTimeValue = sku.count_time || '';
-            rowClass = 'sku-pre-counted';
+        // Check if this SKU has an existing count from a COMPLETED session
+        if (sku.has_count === true && (!currentSessionId || sku.session_completed === true)) {
+            hasExistingCount = true;
+            existingCountValue = sku.current_count;
+            existingCountTime = sku.count_time || '';
+            isCompleted = true;
+            rowClass = 'sku-completed';
+            statusBadge = '<span class="badge bg-success">Completed (ready for recount)</span>';
+        }
+        // Check if this SKU has an existing count from current IN-PROGRESS session
+        else if (sku.has_count === true && sku.current_count !== undefined && sku.current_count !== null && sku.current_count !== '') {
+            hasExistingCount = true;
+            existingCountValue = sku.current_count;
+            existingCountTime = sku.count_time || '';
+            isCompleted = false;
+            rowClass = 'sku-in-progress';
+            statusBadge = '<span class="badge bg-primary">In Progress</span>';
         }
         
         if (sku.bypass_recount) {
@@ -590,9 +661,11 @@ function displaySkus(skus) {
             lastCountDate = lastCountDate.split(' ')[0];
         }
         
-        let inputPlaceholder = hasCurrentCount ? `Previously: ${currentCountValue}` : 'Enter count';
+        // For completed SKUs, the current count field should be BLANK
+        let inputValue = (!isCompleted && hasExistingCount) ? existingCountValue : '';
+        let inputPlaceholder = (isCompleted && hasExistingCount) ? `Previous: ${existingCountValue}` : 'Enter count';
         
-        html += '<tr id="sku-row-' + sku.id + '" class="' + rowClass + '">';
+        html += '<tr id="sku-row-' + sku.id + '" class="' + rowClass + '" data-has-count="' + hasExistingCount + '" data-completed="' + isCompleted + '">';
         html += '<td><strong>' + escapeHtml(sku.sku) + '</strong></td>';
         html += '<td>' + escapeHtml(sku.description || '-') + '</td>';
         html += '<td>' + escapeHtml(sku.category || '-') + '</td>';
@@ -604,16 +677,26 @@ function displaySkus(skus) {
         html += '<td class="fw-bold text-success">' + (sku.kenneth_inventory || 0) + '</td>';
         html += '<td>';
         html += '<input type="text" class="form-control initial-count" data-sku-id="' + sku.id + '" style="min-width: 100px; width: 100px;" placeholder="' + inputPlaceholder + '" inputmode="numeric"';
-        if (hasCurrentCount) {
-            html += ' value="' + currentCountValue + '" title="Previously counted on: ' + countTimeValue + '\\nCount: ' + currentCountValue + '"';
+        if (inputValue) {
+            html += ' value="' + inputValue + '"';
+        }
+        if (hasExistingCount) {
+            html += ' title="Previously counted on: ' + existingCountTime + '\\nCount: ' + existingCountValue + '"';
         }
         html += '>';
         html += '</td>';
         html += '<td>';
-        if (countTimeValue) {
-            html += '<small class="text-muted" style="color: #0d6efd; font-weight: bold;">' + countTimeValue + '</small>';
+        if (existingCountTime) {
+            html += '<span id="last-counted-' + sku.id + '" style="color: #0d6efd; font-weight: bold;">' + existingCountTime + '</span>';
         } else {
-            html += '-';
+            html += '<span id="last-counted-' + sku.id + '">-</span>';
+        }
+        html += '</td>';
+        html += '<td>';
+        if (existingCountValue) {
+            html += '<span id="last-count-value-' + sku.id + '" style="color: #0d6efd; font-weight: bold;">' + existingCountValue + '</span>';
+        } else {
+            html += '<span id="last-count-value-' + sku.id + '">-</span>';
         }
         html += '</td>';
         html += '<td>' + statusBadge + '</td>';
@@ -663,6 +746,11 @@ function displaySkus(skus) {
         });
         
         input.addEventListener('input', function() {
+            let row = this.closest('tr');
+            if (row) {
+                row.classList.add('sku-typing');
+                row.classList.remove('sku-completed', 'sku-in-progress', 'sku-needs-count');
+            }
             highlightSkusStatus();
         });
     });
@@ -863,10 +951,10 @@ function showRecountModal(recountItems) {
         html += '<td class="bg-info">' + (item.kenneth_inventory || 0) + '</td>';
         html += '<td><input type="text" class="form-control recount-count" data-record-id="' + item.id + '" style="width: 120px;" placeholder="Enter whole number" inputmode="numeric"></td>';
         html += '<td><textarea class="form-control recount-remarks" data-record-id="' + item.id + '" rows="2" placeholder="Optional: Reason for discrepancy (e.g., 9 were damaged)" style="width: 250px;"></textarea></td>';
-        html += '</td>';
+        html += '</tr>';
     }
     
-    html += '</tbody><table></div>';
+    html += '</tbody></table></div>';
     html += '<div class="mt-3 d-flex justify-content-between">';
     html += '<button class="btn btn-secondary" onclick="closeRecountModal()">Close</button>';
     html += '<button class="btn btn-success" onclick="saveRecounts()">Save Recounts & Complete Session</button>';
