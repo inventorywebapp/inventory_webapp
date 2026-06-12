@@ -232,8 +232,6 @@ function highlightSkusStatus() {
         let row = input.closest('tr');
         let count = input.value;
         
-        // Blank = not counted (yellow)
-        // Has value (including 0) = counted (green)
         if (!count || count === '') {
             if (row) {
                 row.classList.add('sku-uncounted');
@@ -249,7 +247,6 @@ function highlightSkusStatus() {
         }
     }
     
-    // Update badges
     let existingUncountedBadge = document.getElementById('uncountedBadge');
     let existingCountedBadge = document.getElementById('countedBadge');
     
@@ -273,6 +270,42 @@ function highlightSkusStatus() {
         badge.innerHTML = `${uncountedCount} SKU(s) need count`;
         title.appendChild(badge);
     }
+}
+
+// Validate integer input - show error, don't auto-correct
+function validateCountInput(input) {
+    let value = input.value;
+    let errorMessage = '';
+    
+    if (value === '' || value === null) {
+        return true; // Empty is allowed (not counted yet)
+    }
+    
+    // Check if it's a valid number
+    if (isNaN(value)) {
+        errorMessage = 'Please enter a valid number';
+    }
+    // Check for decimal point
+    else if (value.includes('.')) {
+        errorMessage = 'Decimal numbers are not allowed. Please enter a whole number (e.g., 5, 10, 25)';
+    }
+    // Check for negative
+    else if (parseFloat(value) < 0) {
+        errorMessage = 'Negative numbers are not allowed. Please enter 0 or a positive number';
+    }
+    // Check if it's a whole number
+    else if (!Number.isInteger(parseFloat(value))) {
+        errorMessage = 'Please enter a whole number (no decimals)';
+    }
+    
+    if (errorMessage) {
+        alert(errorMessage);
+        input.value = '';
+        input.focus();
+        return false;
+    }
+    
+    return true;
 }
 
 function setupSmartSearch() {
@@ -469,27 +502,43 @@ function displaySkus(skus) {
         html += '<td><small>' + escapeHtml(containerDetails) + '</small></td>';
         html += '<td class="fw-bold text-primary">' + (sku.final_expected_count || 0) + '</td>';
         html += '<td class="fw-bold text-success">' + (sku.kenneth_inventory || 0) + '</td>';
-        html += '<td><input type="number" class="form-control initial-count" data-sku-id="' + sku.id + '" step="0.01" style="min-width: 100px; width: 100px;" placeholder="Enter count"></td>';
+        html += '<td><input type="text" class="form-control initial-count" data-sku-id="' + sku.id + '" style="min-width: 100px; width: 100px;" placeholder="Enter count" inputmode="numeric"></td>';
         html += '<td>' + statusBadge + '</td>';
-        html += '</tr>';
+        html += '<tr>';
     }
     
-    html += '</tbody></table></div></div>';
+    html += '</tbody></tr></div></div>';
     skusListDiv.innerHTML = html;
     
     highlightSkusStatus();
     
-    // Add event listeners for real-time highlighting
+    // Add validation to all count inputs
     document.querySelectorAll('.initial-count').forEach(input => {
-        input.addEventListener('input', function() {
-            let row = this.closest('tr');
-            if (this.value && this.value !== '') {
-                row.classList.remove('sku-uncounted');
-                row.classList.add('sku-counted');
-            } else {
-                row.classList.remove('sku-counted');
-                row.classList.add('sku-uncounted');
+        input.addEventListener('blur', function() {
+            if (this.value !== '' && this.value !== null) {
+                validateCountInput(this);
             }
+            highlightSkusStatus();
+        });
+        
+        input.addEventListener('keypress', function(e) {
+            // Allow only numbers (0-9) and backspace, delete, enter, tab
+            if (e.key === 'Enter') {
+                this.blur();
+                return;
+            }
+            if (!/[\d]/.test(e.key) && 
+                e.key !== 'Backspace' && 
+                e.key !== 'Delete' && 
+                e.key !== 'Tab' && 
+                e.key !== 'ArrowLeft' && 
+                e.key !== 'ArrowRight') {
+                e.preventDefault();
+                alert('Only numbers are allowed. Please enter a whole number.');
+            }
+        });
+        
+        input.addEventListener('input', function() {
             highlightSkusStatus();
         });
     });
@@ -530,25 +579,37 @@ function saveAllCounts() {
     let totalSkus = countInputs.length;
     let countedSkus = 0;
     let blankSkus = 0;
-    let zeroSkus = 0;
+    let invalidSkus = [];
     let blankSkuNames = [];
     
-    // Count how many SKUs have values (including zeros)
+    // First validate all inputs
+    let hasInvalid = false;
     for (let i = 0; i < countInputs.length; i++) {
         let input = countInputs[i];
-        let count = input.value;
+        let value = input.value;
         let row = input.closest('tr');
         let skuName = row ? row.cells[0].innerText : 'Unknown SKU';
         
-        if (count && count !== '') {
-            countedSkus++;
-            if (parseFloat(count) === 0) {
-                zeroSkus++;
+        if (value !== '' && value !== null) {
+            // Validate the input
+            if (isNaN(value) || value.includes('.') || parseFloat(value) < 0 || !Number.isInteger(parseFloat(value))) {
+                hasInvalid = true;
+                invalidSkus.push(skuName);
+                input.style.border = '2px solid red';
+            } else {
+                input.style.border = '';
+                countedSkus++;
             }
         } else {
             blankSkus++;
             blankSkuNames.push(skuName);
+            input.style.border = '';
         }
+    }
+    
+    if (hasInvalid) {
+        alert(`Cannot save. The following SKU(s) have invalid counts (decimals or negatives):\n\n${invalidSkus.map(s => `  • ${s}`).join('\n')}\n\nPlease correct these entries.`);
+        return;
     }
     
     // Warning for blank SKUs
@@ -579,11 +640,9 @@ function saveAllCounts() {
         let skuId = input.getAttribute('data-sku-id');
         let count = input.value;
         
-        // Only save if user entered something (including zero)
         if (count && count !== '') {
-            counts[skuId] = {initial_count: count};
+            counts[skuId] = {initial_count: parseInt(count, 10)};
         }
-        // Blank SKUs are NOT saved - they remain uncounted
     }
     
     if (Object.keys(counts).length === 0) {
@@ -677,7 +736,7 @@ function showRecountModal(recountItems) {
         html += '<td class="bg-warning">' + item.initial_count + '</td>';
         html += '<td class="bg-info">' + (item.final_expected_count || 0) + '</td>';
         html += '<td class="bg-info">' + (item.kenneth_inventory || 0) + '</td>';
-        html += '<td><input type="number" class="form-control recount-count" data-record-id="' + item.id + '" step="0.01" style="width: 120px;"></td>';
+        html += '<td><input type="text" class="form-control recount-count" data-record-id="' + item.id + '" style="width: 120px;" placeholder="Enter whole number" inputmode="numeric"></td>';
         html += '<td><textarea class="form-control recount-remarks" data-record-id="' + item.id + '" rows="2" placeholder="Required: Reason for discrepancy"></textarea></td>';
         html += '</tr>';
     }
@@ -713,6 +772,38 @@ function showRecountModal(recountItems) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
+    // Add validation to recount inputs
+    document.querySelectorAll('.recount-count').forEach(input => {
+        input.addEventListener('blur', function() {
+            let value = this.value;
+            if (value !== '' && value !== null) {
+                if (isNaN(value) || value.includes('.') || parseFloat(value) < 0 || !Number.isInteger(parseFloat(value))) {
+                    alert('Invalid count. Please enter a whole number (no decimals, no negatives).');
+                    this.value = '';
+                    this.focus();
+                } else {
+                    this.value = parseInt(value, 10);
+                }
+            }
+        });
+        
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                this.blur();
+                return;
+            }
+            if (!/[\d]/.test(e.key) && 
+                e.key !== 'Backspace' && 
+                e.key !== 'Delete' && 
+                e.key !== 'Tab' && 
+                e.key !== 'ArrowLeft' && 
+                e.key !== 'ArrowRight') {
+                e.preventDefault();
+                alert('Only numbers are allowed.');
+            }
+        });
+    });
+    
     let modal = new bootstrap.Modal(document.getElementById('recountModal'), {
         backdrop: 'static',
         keyboard: false
@@ -735,14 +826,20 @@ function saveRecounts() {
         let row = input.closest('tr');
         let skuName = row ? row.cells[0].innerText : 'Unknown';
         
+        // Validate recount count
         if (!recountCount || recountCount === '') {
             hasError = true;
             errorMessage += `• Please enter recount count for ${skuName}\n`;
+            input.style.border = '2px solid red';
+        } else if (isNaN(recountCount) || recountCount.includes('.') || parseFloat(recountCount) < 0 || !Number.isInteger(parseFloat(recountCount))) {
+            hasError = true;
+            errorMessage += `• Invalid recount count for ${skuName}. Please enter a whole number (no decimals)\n`;
             input.style.border = '2px solid red';
         } else {
             input.style.border = '';
         }
         
+        // Validate remarks
         if (!remarks || remarks.trim() === '') {
             hasError = true;
             errorMessage += `• Please provide remarks/reason for ${skuName}\n`;
@@ -755,7 +852,7 @@ function saveRecounts() {
         
         recounts.push({
             record_id: recordId,
-            recount_count: recountCount || 0,
+            recount_count: recountCount ? parseInt(recountCount, 10) : 0,
             remarks: remarks || ''
         });
     }
@@ -786,8 +883,6 @@ function saveRecounts() {
                 if (bsModal) bsModal.hide();
                 modal.remove();
             }
-            
-            // Auto-complete the session after recounts are saved
             completeCountingSession();
         } else {
             alert('Error saving recounts');
