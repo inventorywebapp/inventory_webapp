@@ -73,7 +73,7 @@
 .suggestion-item:hover {
     background-color: #f0f0f0;
 }
-/* Completed SKU (session done) - GREEN */
+/* Completed SKU (session done, not expired) - GREEN */
 .sku-completed {
     background-color: #d1e7dd !important;
     border-left: 3px solid #198754;
@@ -89,7 +89,7 @@
 .sku-in-progress:hover {
     background-color: #b6d4fe !important;
 }
-/* Never counted - YELLOW */
+/* Never counted or expired - YELLOW */
 .sku-needs-count {
     background-color: #fff3cd !important;
     border-left: 3px solid #ffc107;
@@ -146,6 +146,11 @@
     color: white;
     position: sticky;
     top: 0;
+}
+/* Black bold text for reference columns */
+.final-expected-col, .kenneth-col, .last-count-col {
+    font-weight: bold;
+    color: #000000 !important;
 }
 </style>
 
@@ -284,9 +289,10 @@ function highlightSkusStatus() {
         
         let isCompleted = row.getAttribute('data-completed') === 'true';
         let isInProgress = row.getAttribute('data-in-progress') === 'true';
+        let isExpired = row.getAttribute('data-expired') === 'true';
         
         if (!count || count === '') {
-            if (isCompleted) {
+            if (isCompleted && !isExpired) {
                 row.classList.add('sku-completed');
                 row.classList.remove('sku-in-progress', 'sku-needs-count', 'sku-typing');
                 completedCount++;
@@ -629,20 +635,27 @@ function displaySkus(skus) {
         let finalCountValue = '';
         let isInProgress = false;
         let isCompleted = false;
+        let isExpired = false;
         let rowClass = '';
         
-        // Get the final count (should be recount if exists, otherwise initial)
-        let finalCount = sku.final_count || sku.current_count || null;
+        // Get the final count
+        let finalCount = sku.final_count || null;
         
-        // Check if this SKU has an existing count from a COMPLETED session
-        if (sku.has_count === true && !sku.in_progress && (!currentSessionId || sku.session_completed === true)) {
+        // Check if this SKU has an existing count from a COMPLETED session (not expired)
+        if (sku.has_count === true && !sku.in_progress && sku.is_completed === true && !sku.is_expired) {
             hasExistingCount = true;
-            existingCountValue = sku.current_count;
             existingCountTime = sku.count_time || '';
-            finalCountValue = sku.final_count || sku.current_count;
+            finalCountValue = sku.final_count;
             isCompleted = true;
             rowClass = 'sku-completed';
             statusBadge = '<span class="badge bg-success">Completed (ready for next count)</span>';
+        }
+        // Check if expired
+        else if (sku.is_expired === true) {
+            hasExistingCount = false;
+            isExpired = true;
+            rowClass = 'sku-needs-count';
+            statusBadge = '<span class="badge bg-warning">Expired - Needs Recount</span>';
         }
         // Check if this SKU has an existing count from current IN-PROGRESS session
         else if (sku.in_progress === true || (sku.has_count === true && sku.current_count !== undefined && sku.current_count !== null && sku.current_count !== '')) {
@@ -671,37 +684,39 @@ function displaySkus(skus) {
         
         // For completed SKUs, the current count field should be BLANK
         let inputValue = (isInProgress && hasExistingCount) ? existingCountValue : '';
-        let inputPlaceholder = (isCompleted && hasExistingCount) ? `Previous: ${finalCountValue}` : 'Enter count';
+        let inputPlaceholder = 'Enter count';
         
-        html += '<tr id="sku-row-' + sku.id + '" class="' + rowClass + '" data-in-progress="' + isInProgress + '" data-completed="' + isCompleted + '">';
+        // Apply black bold class to reference columns
+        let lastCountClass = 'fw-bold text-dark';
+        let finalExpectedClass = 'fw-bold text-dark';
+        let kennethClass = 'fw-bold text-dark';
+        
+        html += '<tr id="sku-row-' + sku.id + '" class="' + rowClass + '" data-in-progress="' + isInProgress + '" data-completed="' + isCompleted + '" data-expired="' + isExpired + '">';
         html += '<td><strong>' + escapeHtml(sku.sku) + '</strong></td>';
         html += '<td>' + escapeHtml(sku.description || '-') + '</td>';
         html += '<td>' + escapeHtml(sku.category || '-') + '</td>';
         html += '<td class="text-nowrap">' + escapeHtml(lastCountDate) + '</td>';
-        html += '<td class="fw-bold">' + (sku.last_count || 0) + '</td>';
+        html += '<td class="' + lastCountClass + '">' + (sku.last_count || 0) + '</td>';
         html += '<td>' + (sku.total_container_qty || 0) + '</td>';
         html += '<td><small>' + escapeHtml(containerDetails) + '</small></td>';
-        html += '<td class="fw-bold text-primary">' + (sku.final_expected_count || 0) + '</td>';
-        html += '<td class="fw-bold text-success">' + (sku.kenneth_inventory || 0) + '</td>';
+        html += '<td class="' + finalExpectedClass + '">' + (sku.final_expected_count || 0) + '</td>';
+        html += '<td class="' + kennethClass + '">' + (sku.kenneth_inventory || 0) + '</td>';
         html += '<td>';
         html += '<input type="text" class="form-control initial-count" data-sku-id="' + sku.id + '" style="min-width: 100px; width: 100px;" placeholder="' + inputPlaceholder + '" inputmode="numeric"';
         if (inputValue) {
             html += ' value="' + inputValue + '"';
         }
-        if (hasExistingCount) {
-            html += ' title="Previously counted on: ' + existingCountTime + '\\nCount: ' + finalCountValue + '"';
-        }
         html += '>';
         html += '</td>';
         html += '<td>';
-        if (existingCountTime) {
+        if (existingCountTime && !isExpired) {
             html += '<span id="last-counted-' + sku.id + '" style="color: #0d6efd; font-weight: bold;">' + existingCountTime + '</span>';
         } else {
             html += '<span id="last-counted-' + sku.id + '">-</span>';
         }
         html += '</td>';
         html += '<td>';
-        if (finalCountValue) {
+        if (finalCountValue && !isExpired) {
             html += '<span id="last-count-value-' + sku.id + '" style="color: #0d6efd; font-weight: bold;">' + finalCountValue + '</span>';
         } else {
             html += '<span id="last-count-value-' + sku.id + '">-</span>';
