@@ -13,6 +13,9 @@ import sys
 import re
 from sqlalchemy import or_
 
+# Configuration for count expiration (in days)
+COUNT_EXPIRATION_DAYS = 14
+
 app = Flask(__name__)
 app.config.from_object(Config)
 
@@ -270,6 +273,9 @@ def get_skus():
     else:
         skus = query.limit(1000).all()
     
+    # Calculate expiration cutoff date
+    expiration_cutoff = get_ph_time() - timedelta(days=COUNT_EXPIRATION_DAYS)
+    
     result = []
     for sku in skus:
         latest_record = CountRecord.query.filter_by(
@@ -280,11 +286,13 @@ def get_skus():
         count_time = None
         has_count = False
         is_completed = False
+        is_expired = False
         
         if latest_record:
             has_count = True
             count_time = latest_record.count_time.strftime('%Y-%m-%d %H:%M:%S') if latest_record.count_time else None
             
+            # Determine the FINAL validated count
             if latest_record.recount_count and latest_record.recount_count > 0:
                 final_count = latest_record.recount_count
             elif latest_record.final_count and latest_record.final_count > 0:
@@ -292,9 +300,16 @@ def get_skus():
             else:
                 final_count = latest_record.initial_count
             
+            # Check if the session is completed
             session = CountingSession.query.get(latest_record.session_id)
             if session and session.is_completed:
                 is_completed = True
+            
+            # Check if the count has expired (> 14 days old)
+            if latest_record.count_time and latest_record.count_time < expiration_cutoff:
+                is_expired = True
+                has_count = False  # Treat as not counted for UI purposes
+                is_completed = False
         
         result.append({
             'id': sku.id, 
@@ -310,9 +325,10 @@ def get_skus():
             'stock_status': sku.stock_status,
             'bypass_recount': sku.bypass_recount,
             'has_count': has_count,
-            'final_count': final_count,
-            'count_time': count_time,
-            'is_completed': is_completed
+            'final_count': final_count if not is_expired else None,
+            'count_time': count_time if not is_expired else None,
+            'is_completed': is_completed and not is_expired,
+            'is_expired': is_expired
         })
     
     return jsonify(result)
@@ -1127,7 +1143,7 @@ def debug_counts(sku_id):
     
     result = f"<h2>Count History for SKU: {sku.sku if sku else 'Unknown'}</h2>"
     result += "<table border='1' cellpadding='5'>"
-    result += "<tr><th>Version</th><th>Count</th><th>Recount</th><th>Final</th><th>Time</th></tr>"
+    result += "<tr><th>Version</th><th>Count</th><th>Recount</th><th>Final</th><th>Time</th><tr>"
     
     for r in records:
         result += f"<tr>"
@@ -1138,7 +1154,7 @@ def debug_counts(sku_id):
         result += f"<td>{r.count_time}</td>"
         result += f"</tr>"
     
-    result += "<td>"
+    result += "</table>"
     result += f"<p><strong>Latest count: {records[-1].initial_count if records else 'None'}</strong></p>"
     result += '<p><a href="/admin">Back to Admin</a></p>'
     
