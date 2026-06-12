@@ -263,50 +263,82 @@ def counting():
                 
             initial_count = float(count_data.get('initial_count', 0))
             
-            # Get the LATEST record for this SKU in this session to get version
-            latest_record = CountRecord.query.filter_by(
-                session_id=session_obj.id, 
-                sku_id=int(sku_id)
-            ).order_by(CountRecord.version.desc()).first()
-            
-            old_value = latest_record.initial_count if latest_record else None
-            old_version = latest_record.version if latest_record else 0
-            new_version = old_version + 1
-            
-            # Check if recount needed
-            recount_needed = check_recount_needed(initial_count, sku.final_expected_count, sku.kenneth_inventory)
-            
-            # ALWAYS CREATE A NEW RECORD (version tracking)
-            new_record = CountRecord(
+            # Check if there's an existing PENDING recount for this SKU in this session
+            pending_recount = CountRecord.query.filter_by(
                 session_id=session_obj.id,
                 sku_id=int(sku_id),
-                initial_count=initial_count,
-                is_recount_needed=recount_needed,
-                count_time=get_ph_time(),
-                version=new_version
-            )
-            db.session.add(new_record)
+                recount_completed=False
+            ).first()
             
-            if recount_needed:
-                recount_needed_skus.append(sku.sku)
-            
-            # Log changes in AuditLog with version info
-            if old_value is not None and old_value != initial_count:
+            if pending_recount:
+                # Update existing pending recount instead of creating new
+                old_value = pending_recount.initial_count
+                old_version = pending_recount.version
+                
+                pending_recount.initial_count = initial_count
+                pending_recount.count_time = get_ph_time()
+                # Keep same version, don't increment
+                
+                # Log the update in AuditLog
                 audit = AuditLog(
                     user_id=current_user.id,
-                    action='Count Changed',
-                    details=f'SKU {sku.sku}: version {old_version} count {old_value} → version {new_version} count {initial_count}',
+                    action='Count Updated',
+                    details=f'SKU {sku.sku}: updated pending recount from {old_value} to {initial_count} (version {old_version})',
                     ip_address=request.remote_addr
                 )
                 db.session.add(audit)
+                
+                # Check if recount still needed
+                recount_needed = check_recount_needed(initial_count, sku.final_expected_count, sku.kenneth_inventory)
+                pending_recount.is_recount_needed = recount_needed
+                
+                if recount_needed:
+                    recount_needed_skus.append(sku.sku)
             else:
-                audit = AuditLog(
-                    user_id=current_user.id,
-                    action='Count Added',
-                    details=f'SKU {sku.sku}: version {new_version} count {initial_count}',
-                    ip_address=request.remote_addr
+                # Get the latest completed record to get version
+                latest_record = CountRecord.query.filter_by(
+                    session_id=session_obj.id, 
+                    sku_id=int(sku_id)
+                ).order_by(CountRecord.version.desc()).first()
+                
+                old_value = latest_record.initial_count if latest_record else None
+                old_version = latest_record.version if latest_record else 0
+                new_version = old_version + 1
+                
+                # Check if recount needed
+                recount_needed = check_recount_needed(initial_count, sku.final_expected_count, sku.kenneth_inventory)
+                
+                # Create new record
+                new_record = CountRecord(
+                    session_id=session_obj.id,
+                    sku_id=int(sku_id),
+                    initial_count=initial_count,
+                    is_recount_needed=recount_needed,
+                    count_time=get_ph_time(),
+                    version=new_version
                 )
-                db.session.add(audit)
+                db.session.add(new_record)
+                
+                if recount_needed:
+                    recount_needed_skus.append(sku.sku)
+                
+                # Log changes in AuditLog
+                if old_value is not None and old_value != initial_count:
+                    audit = AuditLog(
+                        user_id=current_user.id,
+                        action='Count Changed',
+                        details=f'SKU {sku.sku}: version {old_version} count {old_value} → version {new_version} count {initial_count}',
+                        ip_address=request.remote_addr
+                    )
+                    db.session.add(audit)
+                else:
+                    audit = AuditLog(
+                        user_id=current_user.id,
+                        action='Count Added',
+                        details=f'SKU {sku.sku}: version {new_version} count {initial_count}',
+                        ip_address=request.remote_addr
+                    )
+                    db.session.add(audit)
         
         db.session.commit()
         
@@ -348,6 +380,7 @@ def get_recount_list():
     if not session_id:
         return jsonify([])
     
+    # Only get records that need recount AND are NOT completed
     records = CountRecord.query.filter_by(
         session_id=session_id, 
         is_recount_needed=True, 
