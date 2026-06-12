@@ -512,27 +512,10 @@ function displaySkus(skus) {
     html += '</tbody></table></div></div>';
     skusListDiv.innerHTML = html;
     
-    // Load latest counts for all SKUs
-    let skuIds = skus.map(s => s.id).join(',');
-    if (skuIds && currentSessionId) {
-        fetch(`/get_latest_counts?sku_ids=${skuIds}&session_id=${currentSessionId}`)
-            .then(response => response.json())
-            .then(latestCounts => {
-                for (let skuId in latestCounts) {
-                    let countInput = document.querySelector(`.initial-count[data-sku-id="${skuId}"]`);
-                    let versionSpan = document.getElementById(`version-${skuId}`);
-                    if (countInput && latestCounts[skuId]) {
-                        countInput.value = latestCounts[skuId].initial_count;
-                        if (versionSpan) {
-                            versionSpan.textContent = `v${latestCounts[skuId].version}`;
-                        }
-                    }
-                }
-                highlightSkusStatus();
-            });
-    }
-    
     highlightSkusStatus();
+    
+    // Load latest counts for all SKUs
+    loadLatestCountsForSkus(skus);
     
     // Add validation to all count inputs
     document.querySelectorAll('.initial-count').forEach(input => {
@@ -590,6 +573,28 @@ function escapeHtml(text) {
         if (m === '>') return '&gt;';
         return m;
     });
+}
+
+function loadLatestCountsForSkus(skus) {
+    if (!currentSessionId || !skus || skus.length === 0) return;
+    
+    let skuIds = skus.map(s => s.id).join(',');
+    
+    fetch(`/get_latest_counts?sku_ids=${skuIds}&session_id=${currentSessionId}`)
+        .then(response => response.json())
+        .then(latestCounts => {
+            for (let skuId in latestCounts) {
+                let countInput = document.querySelector(`.initial-count[data-sku-id="${skuId}"]`);
+                let versionSpan = document.getElementById(`version-${skuId}`);
+                if (countInput && latestCounts[skuId]) {
+                    countInput.value = latestCounts[skuId].initial_count;
+                    if (versionSpan) {
+                        versionSpan.textContent = `v${latestCounts[skuId].version}`;
+                    }
+                }
+            }
+            highlightSkusStatus();
+        });
 }
 
 function saveAllCounts() {
