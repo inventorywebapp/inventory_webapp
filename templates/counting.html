@@ -249,18 +249,46 @@ function normalizeString(str) {
         .replace(/\s+/g, ' ');     // Normalize spaces
 }
 
-// Barcode/QR Code Scanner Functions
+// ============ QR/BARCODE SCANNER FUNCTIONS - UPDATED VERSION ============
+
 async function startBarcodeScanner() {
     if (isScannerActive) {
         console.log("Scanner already active");
+        showToast("Scanner is already running", "warning");
         return;
+    }
+    
+    // CRITICAL FIX: Ensure SKUs are loaded before scanning
+    if (allSkus.length === 0) {
+        const resultContainer = document.getElementById('qr-reader-results');
+        if (resultContainer) {
+            resultContainer.innerHTML = '<div class="alert alert-warning">📦 Loading SKU data first... Please wait.</div>';
+        }
+        showToast("Loading SKU data...", "info");
+        
+        try {
+            // Load all SKUs first
+            const response = await fetch('/get_skus?day_category=All&item_category=All&search=');
+            const data = await response.json();
+            allSkus = data;
+            console.log(`✅ Loaded ${allSkus.length} SKUs for barcode matching`);
+            
+            if (resultContainer) {
+                resultContainer.innerHTML = `<div class="alert alert-success">✓ Loaded ${allSkus.length} SKUs. Starting scanner...</div>`;
+            }
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (error) {
+            console.error('Error loading SKUs:', error);
+            alert('Failed to load SKU data. Please refresh the page and try again.');
+            return;
+        }
     }
     
     const scannerModal = new bootstrap.Modal(document.getElementById('scannerModal'));
     scannerModal.show();
     
     const resultContainer = document.getElementById('qr-reader-results');
-    resultContainer.innerHTML = '<div class="alert alert-info">Initializing camera... Please wait.</div>';
+    resultContainer.innerHTML = '<div class="alert alert-info">📷 Initializing camera... Please allow camera access when prompted.</div>';
     
     // Clean up existing scanner
     if (html5QrCode) {
@@ -281,16 +309,24 @@ async function startBarcodeScanner() {
     // Delay for cleanup
     await new Promise(resolve => setTimeout(resolve, 300));
     
-    // Create new scanner with better configuration
+    // Create new scanner
     html5QrCode = new Html5Qrcode("qr-reader");
     isScannerActive = true;
     
+    // Improved config for mobile
     const config = {
-        fps: 15,  // Higher FPS for better detection
-        qrbox: { width: 300, height: 300 },
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
         aspectRatio: 1.0,
         showTorchButtonIfSupported: true,
-        formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.UPC_A ]
+        formatsToSupport: [
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.CODE_93
+        ]
     };
     
     try {
@@ -298,25 +334,28 @@ async function startBarcodeScanner() {
             { facingMode: "environment" },
             config,
             (decodedText, decodedResult) => {
-                console.log(`Scanned: "${decodedText}"`);
-                console.log(`Result format:`, decodedResult.result.format.formatName);
+                console.log(`📸 Scanned: "${decodedText}"`);
+                console.log(`Format:`, decodedResult.result.format.formatName);
                 
                 resultContainer.innerHTML = `<div class="alert alert-success">✓ Scanned: ${decodedText}</div>`;
+                showToast(`Scanned: ${decodedText}`, "success");
                 
                 // Stop scanner after successful scan
                 stopBarcodeScanner();
                 
-                // Search for the scanned code
-                searchByBarcode(decodedText);
+                // Enhanced search with multiple strategies
+                searchByBarcodeEnhanced(decodedText);
             },
             (errorMessage) => {
                 // Silent ignore - keep scanning
-                console.log("Scanning...");
+                // console.log("Scanning...");
             }
         );
+        resultContainer.innerHTML = '<div class="alert alert-success">✅ Camera ready! Point at a QR code or barcode.</div>';
     } catch (err) {
         console.error(`Error starting scanner: ${err}`);
-        resultContainer.innerHTML = `<div class="alert alert-danger">Cannot access camera: ${err.message || err}. Please check camera permissions.</div>`;
+        resultContainer.innerHTML = `<div class="alert alert-danger">❌ Cannot access camera: ${err.message || err}. Please check camera permissions.</div>`;
+        showToast("Camera error: Please check permissions", "error");
         isScannerActive = false;
     }
 }
@@ -350,76 +389,137 @@ function manualBarcodeEntry() {
     let barcode = prompt('Enter barcode/QR code value:');
     if (barcode && barcode.trim()) {
         stopBarcodeScanner();
-        searchByBarcode(barcode.trim());
+        searchByBarcodeEnhanced(barcode.trim());
     }
 }
 
-function searchByBarcode(barcode) {
+// Enhanced barcode search function with multiple matching strategies
+function searchByBarcodeEnhanced(barcode) {
     if (allSkus.length === 0) {
-        fetch('/get_skus?day_category=All&item_category=All&search=')
-            .then(response => response.json())
-            .then(data => {
-                allSkus = data;
-                performBarcodeSearch(barcode);
-            })
-            .catch(error => {
-                console.error('Error loading SKUs:', error);
-                alert('Error loading SKU data. Please refresh and try again.');
-            });
-    } else {
-        performBarcodeSearch(barcode);
+        console.error("No SKUs loaded");
+        alert("SKU data not loaded. Please refresh the page.");
+        return;
     }
-}
-
-function performBarcodeSearch(barcode) {
+    
     let searchTerm = barcode.trim();
     let normalizedSearch = normalizeString(searchTerm);
     
-    console.log("=== BARCODE SEARCH ===");
+    console.log("=== ENHANCED BARCODE SEARCH ===");
     console.log("Raw scanned:", searchTerm);
     console.log("Normalized:", normalizedSearch);
     console.log("Available SKUs count:", allSkus.length);
+    console.log("Sample SKUs:", allSkus.slice(0, 5).map(s => s.sku));
     
     let matches = [];
     
-    // Try multiple matching strategies
+    // Strategy 1: Exact match
     for (let i = 0; i < allSkus.length; i++) {
         const sku = allSkus[i];
-        const normalizedSku = normalizeString(sku.sku);
-        
-        // Strategy 1: Exact match
         if (sku.sku === searchTerm) {
             matches.push({ sku: sku, type: 'EXACT', score: 100 });
         }
-        // Strategy 2: Case insensitive exact
-        else if (sku.sku.toLowerCase() === searchTerm.toLowerCase()) {
-            matches.push({ sku: sku, type: 'CASE_INSENSITIVE', score: 95 });
-        }
-        // Strategy 3: Normalized match
-        else if (normalizedSku === normalizedSearch) {
-            matches.push({ sku: sku, type: 'NORMALIZED', score: 90 });
-        }
-        // Strategy 4: Contains match
-        else if (normalizedSku.includes(normalizedSearch) || normalizedSearch.includes(normalizedSku)) {
-            matches.push({ sku: sku, type: 'CONTAINS', score: 70 });
-        }
-        // Strategy 5: Word match
-        else if (sku.sku.toLowerCase().includes(searchTerm.toLowerCase())) {
-            matches.push({ sku: sku, type: 'PARTIAL', score: 60 });
+    }
+    
+    // Strategy 2: Case-insensitive exact
+    if (matches.length === 0) {
+        for (let i = 0; i < allSkus.length; i++) {
+            const sku = allSkus[i];
+            if (sku.sku.toLowerCase() === searchTerm.toLowerCase()) {
+                matches.push({ sku: sku, type: 'CASE_INSENSITIVE', score: 95 });
+            }
         }
     }
+    
+    // Strategy 3: Normalized match (remove special chars)
+    if (matches.length === 0) {
+        for (let i = 0; i < allSkus.length; i++) {
+            const sku = allSkus[i];
+            const normalizedSku = normalizeString(sku.sku);
+            if (normalizedSku === normalizedSearch) {
+                matches.push({ sku: sku, type: 'NORMALIZED', score: 90 });
+            }
+        }
+    }
+    
+    // Strategy 4: Contains match (QR might have extra prefix/suffix)
+    if (matches.length === 0) {
+        for (let i = 0; i < allSkus.length; i++) {
+            const sku = allSkus[i];
+            const normalizedSku = normalizeString(sku.sku);
+            if (normalizedSku.includes(normalizedSearch) || normalizedSearch.includes(normalizedSku)) {
+                matches.push({ sku: sku, type: 'CONTAINS', score: 70 });
+            }
+        }
+    }
+    
+    // Strategy 5: Partial word match
+    if (matches.length === 0) {
+        for (let i = 0; i < allSkus.length; i++) {
+            const sku = allSkus[i];
+            if (sku.sku.toLowerCase().includes(searchTerm.toLowerCase())) {
+                matches.push({ sku: sku, type: 'PARTIAL', score: 60 });
+            }
+        }
+    }
+    
+    // Strategy 6: Extract numbers from QR code (if QR contains URLs or prefixes)
+    if (matches.length === 0) {
+        const numberMatch = searchTerm.match(/\d+/g);
+        if (numberMatch) {
+            const extractedNumber = numberMatch[0];
+            console.log("Extracted number from QR:", extractedNumber);
+            for (let i = 0; i < allSkus.length; i++) {
+                const sku = allSkus[i];
+                if (sku.sku.includes(extractedNumber)) {
+                    matches.push({ sku: sku, type: 'EXTRACTED_NUMBER', score: 50 });
+                }
+            }
+        }
+    }
+    
+    // Strategy 7: Remove common QR prefixes (like 'https://', 'sku:', 'product:')
+    if (matches.length === 0) {
+        let cleanedTerm = searchTerm
+            .replace(/^https?:\/\//i, '')
+            .replace(/^sku[:=]/i, '')
+            .replace(/^product[:=]/i, '')
+            .replace(/^barcode[:=]/i, '')
+            .replace(/[^a-zA-Z0-9-]/g, '');
+        
+        if (cleanedTerm !== searchTerm) {
+            console.log("Cleaned QR term:", cleanedTerm);
+            for (let i = 0; i < allSkus.length; i++) {
+                const sku = allSkus[i];
+                if (sku.sku.toLowerCase() === cleanedTerm.toLowerCase() ||
+                    sku.sku.toLowerCase().includes(cleanedTerm.toLowerCase())) {
+                    matches.push({ sku: sku, type: 'CLEANED_PREFIX', score: 85 });
+                }
+            }
+        }
+    }
+    
+    // Remove duplicates (keep highest score)
+    const uniqueMatches = [];
+    const seenSkus = new Set();
+    for (const match of matches) {
+        if (!seenSkus.has(match.sku.id)) {
+            seenSkus.add(match.sku.id);
+            uniqueMatches.push(match);
+        }
+    }
+    matches = uniqueMatches;
     
     // Sort by score
     matches.sort((a, b) => b.score - a.score);
     
     console.log("Matches found:", matches.length);
-    matches.slice(0, 3).forEach(m => {
+    matches.slice(0, 5).forEach(m => {
         console.log(`  - ${m.sku.sku} (${m.type}, score: ${m.score})`);
     });
     
     if (matches.length === 1) {
         const matchedSku = matches[0].sku;
-        console.log(`SELECTED: ${matchedSku.sku} (${matches[0].type})`);
+        console.log(`✅ SELECTED: ${matchedSku.sku} (${matches[0].type})`);
         
         document.getElementById('searchSku').value = matchedSku.sku;
         applyFilters();
@@ -439,24 +539,43 @@ function performBarcodeSearch(barcode) {
     }
     else if (matches.length > 1) {
         console.log("Multiple matches - showing selection");
-        let matchList = matches.slice(0, 5).map(m => `• ${m.sku.sku} (${m.type})`).join('\n');
-        alert(`Multiple matches found:\n\n${matchList}\n\nPlease select from search results.`);
-        document.getElementById('searchSku').value = searchTerm;
-        applyFilters();
+        let matchList = matches.slice(0, 5).map((m, idx) => `${idx + 1}. ${m.sku.sku} (${m.type})`).join('\n');
+        let selectedIndex = prompt(`Multiple matches found (${matches.length}):\n\n${matchList}\n\nEnter number to select (1-${Math.min(5, matches.length)}):`);
+        
+        if (selectedIndex && !isNaN(selectedIndex)) {
+            const idx = parseInt(selectedIndex) - 1;
+            if (idx >= 0 && idx < matches.length) {
+                const matchedSku = matches[idx].sku;
+                document.getElementById('searchSku').value = matchedSku.sku;
+                applyFilters();
+                showToast(`✓ Selected: ${matchedSku.sku}`, 'success');
+            } else {
+                alert('Invalid selection.');
+            }
+        }
     }
     else {
-        console.log("NO MATCH FOUND");
-        console.log("First 5 SKUs in system:", allSkus.slice(0, 5).map(s => s.sku));
+        console.log("❌ NO MATCH FOUND");
+        console.log("First 10 SKUs in system:", allSkus.slice(0, 10).map(s => s.sku));
         
         let sampleSkus = allSkus.slice(0, 5).map(s => s.sku).join(', ');
-        alert(`"${searchTerm}" not found.\n\nTip: Try manual search or check QR code.\n\nExample SKUs: ${sampleSkus}...`);
+        
+        let debugInfo = `"${searchTerm}" not found in system.\n\n`;
+        debugInfo += `💡 TIPS:\n`;
+        debugInfo += `• Make sure the QR code contains the EXACT SKU value\n`;
+        debugInfo += `• Try typing the SKU manually in search box\n`;
+        debugInfo += `• Check if this SKU exists in the current filters\n\n`;
+        debugInfo += `📋 Example SKUs in system:\n${sampleSkus}...`;
+        
+        alert(debugInfo);
         document.getElementById('searchSku').value = searchTerm;
+        applyFilters();
     }
 }
 
 function showToast(message, type = 'info') {
     let toast = document.createElement('div');
-    toast.className = `alert alert-${type === 'success' ? 'success' : (type === 'warning' ? 'warning' : 'info')} alert-dismissible fade show position-fixed`;
+    toast.className = `alert alert-${type === 'success' ? 'success' : (type === 'error' ? 'danger' : (type === 'warning' ? 'warning' : 'info'))} alert-dismissible fade show position-fixed`;
     toast.style.bottom = '20px';
     toast.style.right = '20px';
     toast.style.zIndex = '9999';
@@ -467,6 +586,8 @@ function showToast(message, type = 'info') {
         toast.remove();
     }, 4000);
 }
+
+// ============ END OF QR/BARCODE SCANNER FUNCTIONS ============
 
 function filterItemCategoriesByWarehouse() {
     let warehouse = document.getElementById('warehouse').value;
@@ -889,7 +1010,7 @@ function displaySkus(skus) {
     html += '<th>Last Counted Date</th>';
     html += '<th>Previous Count</th>';
     html += '<th>Status</th>';
-    html += '</table>';
+    html += '</tr>';
     html += '</thead><tbody>';
     
     for (let i = 0; i < skus.length; i++) {
@@ -973,7 +1094,7 @@ function displaySkus(skus) {
             html += ' value="' + inputValue + '"';
         }
         html += '>';
-        html += '</td>';
+        html += '</tr>';
         html += '<td>';
         if (existingCountTime && !isExpired) {
             html += '<span id="last-counted-' + sku.id + '" style="color: #0d6efd; font-weight: bold;">' + existingCountTime + '</span>';
