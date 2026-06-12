@@ -20,22 +20,20 @@
                     <i class="bi bi-person-circle"></i> {{ current_user.full_name }}
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
-                    <!-- Dashboard - Everyone sees -->
                     <li><a class="dropdown-item" href="{{ url_for('dashboard') }}">Dashboard</a></li>
                     
-                    <!-- Counting - Only users with count permission -->
                     {% if current_user.has_permission('count') %}
                     <li><a class="dropdown-item" href="{{ url_for('counting') }}">Start Counting</a></li>
                     {% endif %}
                     
-                    <!-- Admin Panel - Only admin -->
-                    {% if current_user.role == 'admin' %}
-                    <li><a class="dropdown-item" href="{{ url_for('admin_dashboard') }}">Admin Panel</a></li>
-                    {% endif %}
-                    
-                    <!-- Audit Panel - Only auditor or users with export_audit permission -->
-                    {% if current_user.role == 'auditor' or current_user.has_permission('export_audit') %}
-                    <li><a class="dropdown-item" href="{{ url_for('audit_dashboard') }}">Audit Panel</a></li>
+                    <!-- Unified Panel - shows for admin, manager, supervisor, auditor -->
+                    {% if current_user.role in ['admin', 'manager', 'inventory_supervisor', 'auditor'] %}
+                    <li><a class="dropdown-item" href="{{ url_for('unified_panel') }}">
+                        {% if current_user.role == 'admin' %}Admin Panel
+                        {% elif current_user.role == 'manager' %}Manager Panel
+                        {% elif current_user.role == 'inventory_supervisor' %}Supervisor Panel
+                        {% else %}Audit Panel{% endif %}
+                    </a></li>
                     {% endif %}
                     
                     <li><hr class="dropdown-divider"></li>
