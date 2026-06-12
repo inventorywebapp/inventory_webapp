@@ -463,7 +463,7 @@ def admin_dashboard():
 @app.route('/export_counts', methods=['POST'])
 @login_required
 def export_counts():
-    """Export count data with multiple filters"""
+    """Export count data including uncounted SKUs"""
     if current_user.role not in ['admin', 'audit']:
         flash('Access denied', 'error')
         return redirect(url_for('index'))
@@ -475,68 +475,113 @@ def export_counts():
         filter_day_category = request.form.get('filter_day_category')
         filter_item_category = request.form.get('filter_item_category')
         
-        # Start with all sessions
-        query = CountingSession.query
+        # Get all SKUs based on filters
+        sku_query = SKU.query
         
-        # Apply date filter
+        # Apply category filters to SKUs
+        if filter_day_category and filter_day_category != 'All':
+            sku_query = sku_query.filter(SKU.category == filter_day_category)
+        if filter_item_category and filter_item_category != 'All':
+            sku_query = sku_query.filter(SKU.description == filter_item_category)
+        
+        all_skus_in_category = sku_query.all()
+        
+        # Get counting sessions
+        session_query = CountingSession.query
+        
         if filter_date and filter_date.strip():
             try:
                 target_date = datetime.strptime(filter_date, '%Y-%m-%d')
                 start_date = target_date.replace(hour=0, minute=0, second=0)
                 end_date = target_date.replace(hour=23, minute=59, second=59)
-                query = query.filter(CountingSession.session_date.between(start_date, end_date))
+                session_query = session_query.filter(CountingSession.session_date.between(start_date, end_date))
             except ValueError:
                 pass
         
-        # Apply warehouse filter
         if filter_warehouse and filter_warehouse != 'All':
-            query = query.filter(CountingSession.warehouse == filter_warehouse)
+            session_query = session_query.filter(CountingSession.warehouse == filter_warehouse)
         
-        sessions = query.all()
+        sessions = session_query.all()
         
-        if not sessions:
-            flash('No counting sessions found for the selected filters', 'warning')
-            return redirect(url_for('admin_dashboard'))
-        
-        # Group by day category from SKU
-        sheets_data = {}
-        
+        # Build a map of counted SKUs per session
+        counted_skus_map = {}
         for session_obj in sessions:
             for record in session_obj.count_records:
-                if not record.sku:
-                    continue
-                sku = record.sku
-                day_category = sku.category or 'Uncategorized'
-                
-                # Apply day category filter
-                if filter_day_category and filter_day_category != 'All' and day_category != filter_day_category:
-                    continue
-                
-                # Apply item category filter
-                if filter_item_category and filter_item_category != 'All' and sku.description != filter_item_category:
-                    continue
-                
-                if day_category not in sheets_data:
-                    sheets_data[day_category] = []
-                
+                if record.sku:
+                    key = f"{session_obj.id}_{record.sku_id}"
+                    counted_skus_map[key] = {
+                        'session': session_obj,
+                        'record': record,
+                        'sku': record.sku
+                    }
+        
+        # Group by day category
+        sheets_data = {}
+        
+        # Process each SKU (including uncounted)
+        for sku in all_skus_in_category:
+            day_category = sku.category or 'Uncategorized'
+            
+            # Find if this SKU was counted in any session
+            counted_in_session = None
+            count_record = None
+            session_obj = None
+            
+            for session_obj_temp in sessions:
+                for record in session_obj_temp.count_records:
+                    if record.sku_id == sku.id:
+                        counted_in_session = session_obj_temp
+                        count_record = record
+                        session_obj = session_obj_temp
+                        break
+                if counted_in_session:
+                    break
+            
+            if day_category not in sheets_data:
+                sheets_data[day_category] = []
+            
+            if count_record:
+                # SKU was counted
                 row_data = {
                     'SKU': str(sku.sku),
                     'Description': str(sku.description) if sku.description else '',
                     'Day Category': str(day_category),
-                    'Initial Count': record.initial_count,
-                    'Recount Count': record.recount_count if record.recount_count else '',
-                    'Final Count': record.final_count if record.final_count else '',
-                    'Remarks': str(record.remarks) if record.remarks else '',
-                    'Date/Time Counted': record.count_time.strftime('%Y-%m-%d %H:%M:%S') if record.count_time else '',
-                    'Counter': session_obj.user.full_name if session_obj.user else 'Unknown',
-                    'Warehouse': str(session_obj.warehouse) if session_obj.warehouse else '',
-                    'Session Status': 'Completed' if session_obj.is_completed else 'In Progress',
+                    'Count Status': 'COMPLETED',
+                    'Initial Count': count_record.initial_count,
+                    'Recount Count': count_record.recount_count if count_record.recount_count else '',
+                    'Final Count': count_record.final_count if count_record.final_count else '',
+                    'Remarks': str(count_record.remarks) if count_record.remarks else '',
+                    'Date/Time Counted': count_record.count_time.strftime('%Y-%m-%d %H:%M:%S') if count_record.count_time else '',
+                    'Counter': session_obj.user.full_name if session_obj and session_obj.user else 'Unknown',
+                    'Warehouse': session_obj.warehouse if session_obj else '',
+                    'Session Status': 'Completed' if session_obj and session_obj.is_completed else 'In Progress',
                     'Last Count Reference': sku.last_count,
                     'Last Count Date': str(sku.last_count_date) if sku.last_count_date else '',
                     'Final Expected Count': sku.final_expected_count,
                     'Kenneth Inventory': sku.kenneth_inventory
                 }
-                sheets_data[day_category].append(row_data)
+            else:
+                # SKU was NOT counted - highlight this
+                row_data = {
+                    'SKU': str(sku.sku),
+                    'Description': str(sku.description) if sku.description else '',
+                    'Day Category': str(day_category),
+                    'Count Status': '⚠️ NOT COUNTED ⚠️',
+                    'Initial Count': 'NOT COUNTED',
+                    'Recount Count': 'N/A',
+                    'Final Count': 'PENDING',
+                    'Remarks': 'SKU was not counted in this session',
+                    'Date/Time Counted': 'NOT COUNTED',
+                    'Counter': 'N/A',
+                    'Warehouse': filter_warehouse if filter_warehouse and filter_warehouse != 'All' else 'All Warehouses',
+                    'Session Status': 'MISSING',
+                    'Last Count Reference': sku.last_count,
+                    'Last Count Date': str(sku.last_count_date) if sku.last_count_date else '',
+                    'Final Expected Count': sku.final_expected_count,
+                    'Kenneth Inventory': sku.kenneth_inventory
+                }
+            
+            sheets_data[day_category].append(row_data)
         
         # Create Excel file
         output = BytesIO()
@@ -547,8 +592,27 @@ def export_counts():
                     safe_sheet_name = str(sheet_name)[:31].replace('/', '-').replace('\\', '-').replace('*', '-').replace('?', '-').replace(':', '-')
                     df = pd.DataFrame(data)
                     df.to_excel(writer, sheet_name=safe_sheet_name, index=False)
+                    
+                    # Color-code the "Count Status" column for uncounted items
+                    worksheet = writer.sheets[safe_sheet_name]
+                    
+                    # Find the "Count Status" column index
+                    status_col = None
+                    for idx, col in enumerate(df.columns):
+                        if col == 'Count Status':
+                            status_col = idx + 1  # Excel columns are 1-indexed
+                            break
+                    
+                    if status_col:
+                        from openpyxl.styles import PatternFill
+                        yellow_fill = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
+                        
+                        for row_idx in range(2, len(data) + 2):  # Start from row 2 (after header)
+                            cell = worksheet.cell(row=row_idx, column=status_col)
+                            if cell.value and 'NOT COUNTED' in str(cell.value):
+                                cell.fill = yellow_fill
             else:
-                df = pd.DataFrame({'Message': ['No counting data found for the selected filters']})
+                df = pd.DataFrame({'Message': ['No SKU data found for the selected filters']})
                 df.to_excel(writer, sheet_name='No Data', index=False)
         
         output.seek(0)
