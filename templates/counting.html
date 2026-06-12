@@ -225,6 +225,7 @@ let itemsPerPage = 50;
 let currentSessionId = null;
 let searchTimeout = null;
 let html5QrCode = null;
+let isScannerActive = false;
 
 // Sort day categories
 let allDayCategories = [...allDayCategoriesRaw].sort((a, b) => {
@@ -240,23 +241,41 @@ function getUrlParameter(name) {
 }
 
 // Barcode/QR Code Scanner Functions
-function startBarcodeScanner() {
+async function startBarcodeScanner() {
+    // Prevent multiple scanners
+    if (isScannerActive) {
+        console.log("Scanner already active");
+        return;
+    }
+    
     const scannerModal = new bootstrap.Modal(document.getElementById('scannerModal'));
     scannerModal.show();
     
     const resultContainer = document.getElementById('qr-reader-results');
     resultContainer.innerHTML = '<div class="alert alert-info">Initializing camera... Please wait.</div>';
     
-    // Clean up any existing scanner
+    // Properly clean up existing scanner
     if (html5QrCode) {
         try {
-            html5QrCode.stop().catch(() => {});
-        } catch(e) {}
+            await html5QrCode.stop();
+        } catch(e) {
+            console.log("Error stopping existing scanner:", e);
+        }
         html5QrCode = null;
     }
     
+    // Clear the reader element completely
+    const readerElement = document.getElementById('qr-reader');
+    if (readerElement) {
+        readerElement.innerHTML = '';
+    }
+    
+    // Small delay to ensure cleanup
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
     // Create new scanner
     html5QrCode = new Html5Qrcode("qr-reader");
+    isScannerActive = true;
     
     const config = {
         fps: 10,
@@ -265,38 +284,48 @@ function startBarcodeScanner() {
         showTorchButtonIfSupported: true
     };
     
-    html5QrCode.start(
-        { facingMode: "environment" },
-        config,
-        (decodedText, decodedResult) => {
-            // Success callback - found a code
-            console.log(`Scanned: ${decodedText}`);
-            resultContainer.innerHTML = `<div class="alert alert-success">✓ Scanned: ${decodedText}</div>`;
-            
-            // Stop scanner after successful scan
-            stopBarcodeScanner();
-            
-            // Search for the scanned code
-            searchByBarcode(decodedText);
-        },
-        (errorMessage) => {
-            // Error callback - ignore, just keep scanning
-            // Don't show errors to user
-        }
-    ).catch((err) => {
+    try {
+        await html5QrCode.start(
+            { facingMode: "environment" },
+            config,
+            (decodedText, decodedResult) => {
+                console.log(`Scanned: ${decodedText}`);
+                resultContainer.innerHTML = `<div class="alert alert-success">✓ Scanned: ${decodedText}</div>`;
+                
+                // Stop scanner after successful scan
+                stopBarcodeScanner();
+                
+                // Search for the scanned code
+                searchByBarcode(decodedText);
+            },
+            (errorMessage) => {
+                // Silent ignore - just keep scanning
+            }
+        );
+    } catch (err) {
         console.error(`Error starting scanner: ${err}`);
         resultContainer.innerHTML = `<div class="alert alert-danger">Cannot access camera: ${err.message || err}. Please check camera permissions.</div>`;
-    });
+        isScannerActive = false;
+    }
 }
 
-function stopBarcodeScanner() {
+async function stopBarcodeScanner() {
+    isScannerActive = false;
+    
     if (html5QrCode) {
-        html5QrCode.stop().then(() => {
-            console.log("Scanner stopped");
-        }).catch((err) => {
+        try {
+            await html5QrCode.stop();
+            console.log("Scanner stopped successfully");
+        } catch (err) {
             console.error("Error stopping scanner:", err);
-        });
+        }
         html5QrCode = null;
+    }
+    
+    // Clear the reader element to release camera
+    const readerElement = document.getElementById('qr-reader');
+    if (readerElement) {
+        readerElement.innerHTML = '';
     }
     
     const scannerModal = bootstrap.Modal.getInstance(document.getElementById('scannerModal'));
@@ -368,7 +397,6 @@ function performBarcodeSearch(barcode) {
         }, 500);
     }
     else if (exactMatches.length > 1) {
-        // Multiple exact matches - shouldn't happen with SKU, but handle
         let matchList = exactMatches.map(s => `• ${s.sku} - ${s.description || ''}`).join('\n');
         alert(`Multiple SKUs match "${searchTerm}":\n\n${matchList}\n\nPlease select from the search results.`);
         document.getElementById('searchSku').value = searchTerm;
@@ -400,13 +428,11 @@ function performBarcodeSearch(barcode) {
         applyFilters();
     }
     else {
-        // No match found - show helpful message
         showToast(`SKU "${searchTerm}" not found. Try scanning again or use manual search.`, 'warning');
     }
 }
 
 function showToast(message, type = 'info') {
-    // Create temporary toast notification
     let toast = document.createElement('div');
     toast.className = `alert alert-${type === 'success' ? 'success' : (type === 'warning' ? 'warning' : 'info')} alert-dismissible fade show position-fixed`;
     toast.style.bottom = '20px';
@@ -1193,7 +1219,7 @@ function showRecountModal(recountItems) {
         html += '</tr>';
     }
     
-    html += '</tbody></table></div>';
+    html += '</tbody></tr></div>';
     html += '<div class="mt-3 d-flex justify-content-between">';
     html += '<button class="btn btn-secondary" onclick="closeRecountModal()">Close</button>';
     html += '<button class="btn btn-success" onclick="saveRecounts()">Save Recounts & Complete Session</button>';
@@ -1396,6 +1422,11 @@ function completeCounting() {
             }
         });
 }
+
+// Ensure proper cleanup when modal is hidden
+document.getElementById('scannerModal').addEventListener('hidden.bs.modal', function () {
+    stopBarcodeScanner();
+});
 
 document.getElementById('warehouse').addEventListener('change', function() {
     filterItemCategoriesByWarehouse();
