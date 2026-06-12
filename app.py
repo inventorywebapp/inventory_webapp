@@ -1189,6 +1189,32 @@ def get_in_progress_skus(session_id):
     
     return jsonify({'skus': skus_data, 'count': len(skus_data)})
 
+
+# Add this endpoint after your existing routes and before the health check
+
+@app.route('/api/active_session')
+@login_required
+def get_active_session():
+    """Get the current active session for the user"""
+    session = CountingSession.query.filter_by(
+        user_id=current_user.id,
+        is_completed=False
+    ).order_by(CountingSession.session_date.desc()).first()
+    
+    if session:
+        return jsonify({'session_id': session.id})
+    return jsonify({'session_id': None})
+
+# Health check endpoint for Render
+@app.route('/health')
+def health_check():
+    return jsonify({'status': 'healthy'}), 200
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
+    
+
 # Health check endpoint for Render
 @app.route('/health')
 def health_check():
