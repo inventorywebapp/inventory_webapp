@@ -80,32 +80,37 @@
     </div>
 
     <div class="tab-pane fade" id="audit">
-    <div class="card">
-        <div class="card-header">
-            <h5>Audit Trail</h5>
-        </div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-bordered table-sm">
-                    <thead>
-                        <tr><th>Timestamp (PHT)</th><th>User</th><th>Action</th><th>Details</th><th>IP Address</th></tr>
-                    </thead>
-                    <tbody>
-                        {% for log in audit_logs %}
-                        <tr>
-                            <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                            <td>{{ log.user.full_name if log.user }}</td>
-                            <td>{{ log.action }}</td>
-                            <td>{{ log.details|replace('.0', '') if log.details else '' }}</td>
-                            <td>{{ log.ip_address }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <div class="card">
+            <div class="card-header">
+                <h5>Audit Trail</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm" id="auditTable">
+                        <thead>
+                            <tr><th>Timestamp (PHT)</th><th>User</th><th>Action</th><th>Details</th><th>IP Address</th></tr>
+                        </thead>
+                        <tbody id="auditLogsBody">
+                            {% for log in audit_logs %}
+                            <tr>
+                                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                <td>{{ log.user.full_name if log.user }}</td>
+                                <td>{{ log.action }}</td>
+                                <td>{{ log.details|replace('.0', '') if log.details else '' }}</td>
+                                <td>{{ log.ip_address }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-end mt-2">
+                    <button class="btn btn-sm btn-secondary" onclick="refreshAuditLogs()">
+                        <i class="bi bi-arrow-repeat"></i> Refresh Audit Logs
+                    </button>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
     <div class="tab-pane fade" id="export">
         <div class="card">
@@ -247,6 +252,41 @@
 </div>
 
 <script>
+// Function to format details by removing .0 from numbers
+function formatDetails(details) {
+    if (!details) return '';
+    return details.replace(/(\d+)\.0/g, '$1');
+}
+
+// Function to load audit logs dynamically
+function loadAuditLogs() {
+    fetch('/get_audit_logs')
+        .then(response => response.json())
+        .then(logs => {
+            let tbody = document.getElementById('auditLogsBody');
+            if (!tbody) return;
+            
+            tbody.innerHTML = '';
+            logs.forEach(log => {
+                let row = tbody.insertRow();
+                row.insertCell(0).textContent = log.timestamp;
+                row.insertCell(1).textContent = log.user;
+                row.insertCell(2).textContent = log.action;
+                row.insertCell(3).textContent = formatDetails(log.details);
+                row.insertCell(4).textContent = log.ip_address;
+            });
+        })
+        .catch(error => {
+            console.error('Error loading audit logs:', error);
+        });
+}
+
+// Function to refresh audit logs
+function refreshAuditLogs() {
+    loadAuditLogs();
+}
+
+// Function to sync from Google Drive
 function syncFromDrive() {
     if(confirm('Sync SKU data from Google Drive? This will update your inventory with the latest Excel file.')) {
         $('#syncResult').html('<div class="alert alert-info">Syncing... Please wait up to 30 seconds.</div>');
@@ -275,5 +315,57 @@ function syncFromDrive() {
         });
     }
 }
+
+// Auto-refresh audit logs every 30 seconds if on audit tab
+let refreshInterval = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Load audit logs when page loads
+    loadAuditLogs();
+    
+    // Set up interval to refresh when on audit tab
+    const auditTab = document.querySelector('a[href="#audit"]');
+    const exportTab = document.querySelector('a[href="#export"]');
+    const syncTab = document.querySelector('a[href="#sync"]');
+    
+    function startRefresh() {
+        if (refreshInterval) clearInterval(refreshInterval);
+        refreshInterval = setInterval(function() {
+            // Only refresh if audit tab is active
+            const auditPane = document.getElementById('audit');
+            if (auditPane && auditPane.classList.contains('show', 'active')) {
+                loadAuditLogs();
+            }
+        }, 30000);
+    }
+    
+    function stopRefresh() {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+            refreshInterval = null;
+        }
+    }
+    
+    if (auditTab) {
+        auditTab.addEventListener('shown.bs.tab', function() {
+            loadAuditLogs();
+            startRefresh();
+        });
+    }
+    
+    if (exportTab) {
+        exportTab.addEventListener('shown.bs.tab', stopRefresh);
+    }
+    
+    if (syncTab) {
+        syncTab.addEventListener('shown.bs.tab', stopRefresh);
+    }
+    
+    // Start refresh if audit is active on load
+    const auditPane = document.getElementById('audit');
+    if (auditPane && auditPane.classList.contains('show', 'active')) {
+        startRefresh();
+    }
+});
 </script>
 {% endblock %}
