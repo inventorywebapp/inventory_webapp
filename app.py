@@ -1108,7 +1108,7 @@ def debug_counts(sku_id):
         result += f"<td>{r.count_time}</td>"
         result += f"</tr>"
     
-    result += "</table>"
+    result += "<td>"
     result += f"<p><strong>Latest count: {records[-1].initial_count if records else 'None'}</strong></p>"
     result += '<p><a href="/admin">Back to Admin</a></p>'
     
@@ -1134,7 +1134,7 @@ def debug_session(session_id):
         result += f"<td>{r.count_time}</td>"
         result += f"<td>{r.recount_count if r.recount_count else '-'}</td>"
         result += f"<td>{r.final_count if r.final_count else '-'}</td>"
-        result += f"</table>"
+        result += f"</tr>"
     
     result += "</table>"
     result += '<p><a href="/admin">Back to Admin</a></p>'
@@ -1189,9 +1189,7 @@ def get_in_progress_skus(session_id):
     
     return jsonify({'skus': skus_data, 'count': len(skus_data)})
 
-
 # Add this endpoint after your existing routes and before the health check
-
 @app.route('/api/active_session')
 @login_required
 def get_active_session():
@@ -1204,16 +1202,6 @@ def get_active_session():
     if session:
         return jsonify({'session_id': session.id})
     return jsonify({'session_id': None})
-
-# Health check endpoint for Render
-@app.route('/health')
-def health_check():
-    return jsonify({'status': 'healthy'}), 200
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
-    
 
 # Health check endpoint for Render
 @app.route('/health')
