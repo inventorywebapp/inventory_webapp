@@ -272,20 +272,43 @@ def get_skus():
     
     result = []
     for sku in skus:
-        # Get the LATEST count for this SKU (from ANY session - completed or in-progress)
+        # Get the LATEST count record for this SKU (any session)
         latest_record = CountRecord.query.filter_by(
             sku_id=sku.id
         ).order_by(CountRecord.version.desc()).first()
         
-        # Get the session info for this record
-        session_info = None
-        if latest_record:
-            session_info = CountingSession.query.get(latest_record.session_id)
+        # Get the FINAL count (recount_count if exists, otherwise initial_count)
+        final_count = None
+        count_time = None
+        has_count = False
+        is_completed = False
         
-        # Determine if SKU has a valid count
-        has_count = latest_record is not None
-        current_count = latest_record.initial_count if latest_record else None
-        count_time = latest_record.count_time.strftime('%Y-%m-%d %H:%M:%S') if latest_record and latest_record.count_time else None
+        if latest_record:
+            has_count = True
+            count_time = latest_record.count_time.strftime('%Y-%m-%d %H:%M:%S') if latest_record.count_time else None
+            
+            # Determine the FINAL validated count
+            if latest_record.recount_count and latest_record.recount_count > 0:
+                final_count = latest_record.recount_count
+            elif latest_record.final_count and latest_record.final_count > 0:
+                final_count = latest_record.final_count
+            else:
+                final_count = latest_record.initial_count
+            
+            # Check if the session is completed
+            session = CountingSession.query.get(latest_record.session_id)
+            if session and session.is_completed:
+                is_completed = True
+        
+        # For in-progress session, get the current count
+        current_count = None
+        if current_session_id:
+            current_record = CountRecord.query.filter_by(
+                session_id=current_session_id,
+                sku_id=sku.id
+            ).order_by(CountRecord.version.desc()).first()
+            if current_record:
+                current_count = current_record.initial_count
         
         result.append({
             'id': sku.id, 
@@ -301,8 +324,10 @@ def get_skus():
             'stock_status': sku.stock_status,
             'bypass_recount': sku.bypass_recount,
             'has_count': has_count,
-            'current_count': current_count,
-            'count_time': count_time
+            'current_count': current_count if current_count else final_count,
+            'final_count': final_count,
+            'count_time': count_time,
+            'is_completed': is_completed
         })
     
     return jsonify(result)
@@ -1169,7 +1194,6 @@ def get_in_progress_skus(session_id):
     if not session_obj:
         return jsonify({'error': 'Session not found'}), 404
     
-    # Get all SKUs that have count records in this session
     counted_sku_ids = db.session.query(CountRecord.sku_id).filter(
         CountRecord.session_id == session_id
     ).distinct().all()
@@ -1179,7 +1203,6 @@ def get_in_progress_skus(session_id):
     if not counted_ids:
         return jsonify({'skus': [], 'message': 'No SKUs have been counted yet'})
     
-    # Get the latest version for each counted SKU
     skus_data = []
     for sku_id in counted_ids:
         sku = SKU.query.get(sku_id)
@@ -1189,6 +1212,14 @@ def get_in_progress_skus(session_id):
         ).order_by(CountRecord.version.desc()).first()
         
         if sku and latest_record:
+            # Get the final count (recount if exists)
+            if latest_record.recount_count and latest_record.recount_count > 0:
+                final_count = latest_record.recount_count
+            elif latest_record.final_count and latest_record.final_count > 0:
+                final_count = latest_record.final_count
+            else:
+                final_count = latest_record.initial_count
+            
             skus_data.append({
                 'id': sku.id,
                 'sku': sku.sku,
@@ -1202,9 +1233,12 @@ def get_in_progress_skus(session_id):
                 'kenneth_inventory': sku.kenneth_inventory,
                 'stock_status': sku.stock_status,
                 'bypass_recount': sku.bypass_recount,
+                'has_count': True,
                 'current_count': latest_record.initial_count,
+                'final_count': final_count,
                 'count_time': latest_record.count_time.strftime('%Y-%m-%d %H:%M:%S') if latest_record.count_time else '',
-                'version': latest_record.version
+                'version': latest_record.version,
+                'in_progress': True
             })
     
     return jsonify({'skus': skus_data, 'count': len(skus_data)})
