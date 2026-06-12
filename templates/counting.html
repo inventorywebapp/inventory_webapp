@@ -653,7 +653,16 @@ function checkForRecounts() {
             if (data.length > 0) {
                 showRecountModal(data);
             } else {
-                alert('No items need recount. You can complete the counting session.');
+                // Check if there are any pending recounts (double check)
+                fetch('/check_recount_status?session_id=' + currentSessionId)
+                    .then(res => res.json())
+                    .then(status => {
+                        if (!status.has_pending_recounts) {
+                            alert('All counts are valid. You can complete the counting session.');
+                        } else {
+                            alert('No items need recount. You can complete the counting session.');
+                        }
+                    });
             }
         });
 }
@@ -757,22 +766,37 @@ function completeCounting() {
         return;
     }
     
-    if (confirm('Complete this counting session?')) {
-        fetch('/complete_counting', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({session_id: currentSessionId})
-        })
+    // First check if there are pending recounts
+    fetch('/check_recount_status?session_id=' + currentSessionId)
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
-                alert('Session completed!');
-                window.location.href = '/dashboard';
+            if (data.has_pending_recounts) {
+                alert(`Cannot complete session. You have ${data.count} pending recount(s) that need to be completed first.`);
+                return;
+            }
+            
+            if (confirm('Complete this counting session? This will mark all counts as final.')) {
+                fetch('/complete_counting', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({session_id: currentSessionId})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message || 'Session completed!');
+                        window.location.href = '/dashboard';
+                    } else {
+                        alert(data.message || 'Error completing session');
+                    }
+                })
+                .catch(error => {
+                    alert('Error: ' + error);
+                });
             }
         });
-    }
 }
 
 // Event listeners
