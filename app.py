@@ -425,6 +425,7 @@ def get_latest_counts():
     for sku_id in sku_id_list:
         if not sku_id:
             continue
+        # Get the record with HIGHEST version number for this SKU in this session
         latest = CountRecord.query.filter_by(
             session_id=session_id,
             sku_id=int(sku_id)
@@ -546,13 +547,13 @@ def export_counts():
         
         sessions = session_query.all()
         
-        # Build a map of the LATEST count for each SKU
+        # Build a map of the LATEST count for each SKU (across all versions)
         latest_counts = {}
         for session_obj in sessions:
             for record in session_obj.count_records:
                 if record.sku:
                     key = f"{session_obj.id}_{record.sku_id}"
-                    # Only keep if this is the latest version
+                    # Only keep if this is the latest version (highest version number)
                     if key not in latest_counts or record.version > latest_counts[key]['record'].version:
                         latest_counts[key] = {
                             'session': session_obj,
@@ -842,6 +843,34 @@ def debug_counts(sku_id):
     result += "</table>"
     result += f"<p><strong>Latest count should be: {records[-1].initial_count if records else 'None'}</strong></p>"
     result += '<p><a href="/counting">Back to Counting</a></p>'
+    
+    return result
+
+@app.route('/debug_session/<int:session_id>')
+@login_required
+def debug_session(session_id):
+    """Debug endpoint to see all counts in a session"""
+    if current_user.role != 'admin':
+        return "Unauthorized", 403
+    
+    records = CountRecord.query.filter_by(session_id=session_id).order_by(CountRecord.sku_id, CountRecord.version).all()
+    
+    result = f"<h2>Session {session_id} - All Count Records</h2>"
+    result += "<table border='1' cellpadding='5'>"
+    result += "<tr><th>SKU</th><th>Version</th><th>Count</th><th>Time</th><th>Recount</th><th>Final</th></tr>"
+    
+    for r in records:
+        result += f"<tr>"
+        result += f"<td>{r.sku.sku if r.sku else 'Unknown'}</td>"
+        result += f"<td>{r.version}</td>"
+        result += f"<td>{r.initial_count}</td>"
+        result += f"<td>{r.count_time}</td>"
+        result += f"<td>{r.recount_count if r.recount_count else '-'}</td>"
+        result += f"<td>{r.final_count if r.final_count else '-'}</td>"
+        result += f"</tr>"
+    
+    result += "</table>"
+    result += '<p><a href="/admin">Back to Admin</a></p>'
     
     return result
 
