@@ -729,6 +729,7 @@ def delete_user():
 @app.route('/export_counts', methods=['POST'])
 @login_required
 def export_counts():
+    """Export count data - shows LATEST count from the MOST RECENT session for each SKU (No Version/Session ID)"""
     if not current_user.has_permission('export_counts'):
         flash('Access denied', 'error')
         return redirect(url_for('dashboard'))
@@ -867,7 +868,8 @@ def export_counts():
                         for row_idx in range(2, len(data) + 2):
                             cell = worksheet.cell(row=row_idx, column=status_col)
                             if cell.value and 'NOT COUNTED' in str(cell.value):
-                                cell.fill = yellow_fill            else:
+                                cell.fill = yellow_fill
+            else:
                 df = pd.DataFrame({'Message': ['No SKU data found for the selected filters']})
                 df.to_excel(writer, sheet_name='No Data', index=False)
         
