@@ -375,6 +375,7 @@ def save_recount():
         record = CountRecord.query.get(recount_data.get('record_id'))
         if record:
             record.recount_count = float(recount_data.get('recount_count', 0))
+            # Final count should be the recount count (the corrected value)
             record.final_count = record.recount_count
             record.remarks = recount_data.get('remarks', '')
             record.recount_completed = True
@@ -579,16 +580,24 @@ def export_counts():
             if found:
                 count_record = found['record']
                 session_obj = found['session']
-                # SKU was counted - show latest version
+                
+                # Determine FINAL COUNT correctly
+                if count_record.recount_count and count_record.recount_count > 0:
+                    final_count = count_record.recount_count
+                elif count_record.initial_count is not None:
+                    final_count = count_record.initial_count
+                else:
+                    final_count = ''
+                
                 row_data = {
                     'SKU': str(sku.sku),
                     'Description': str(sku.description) if sku.description else '',
                     'Day Category': str(day_category),
                     'Count Status': 'COMPLETED',
                     'Version': count_record.version,
-                    'Initial Count': count_record.initial_count,
+                    'Initial Count': count_record.initial_count if count_record.initial_count is not None else '',
                     'Recount Count': count_record.recount_count if count_record.recount_count else '',
-                    'Final Count': count_record.final_count if count_record.final_count else '',
+                    'Final Count': final_count,
                     'Remarks': str(count_record.remarks) if count_record.remarks else '',
                     'Date/Time Counted': count_record.count_time.strftime('%Y-%m-%d %H:%M:%S') if count_record.count_time else '',
                     'Counter': session_obj.user.full_name if session_obj and session_obj.user else 'Unknown',
@@ -798,6 +807,43 @@ def sync_data():
             return jsonify({'success': False, 'message': 'Sync failed. Check server logs for details.'}), 500
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+
+@app.route('/debug_counts/<int:sku_id>')
+@login_required
+def debug_counts(sku_id):
+    """Debug endpoint to see all versions of a SKU count"""
+    if current_user.role != 'admin':
+        return "Unauthorized", 403
+    
+    session_id = request.args.get('session_id')
+    if not session_id:
+        return "Need session_id parameter"
+    
+    records = CountRecord.query.filter_by(
+        session_id=session_id,
+        sku_id=sku_id
+    ).order_by(CountRecord.version).all()
+    
+    sku = SKU.query.get(sku_id)
+    
+    result = f"<h2>Count History for SKU: {sku.sku if sku else 'Unknown'}</h2>"
+    result += "<table border='1' cellpadding='5'>"
+    result += "<tr><th>Version</th><th>Count</th><th>Recount</th><th>Final</th><th>Time</th></tr>"
+    
+    for r in records:
+        result += f"<tr>"
+        result += f"<td>{r.version}</td>"
+        result += f"<td>{r.initial_count}</td>"
+        result += f"<td>{r.recount_count if r.recount_count else '-'}</td>"
+        result += f"<td>{r.final_count if r.final_count else '-'}</td>"
+        result += f"<td>{r.count_time}</td>"
+        result += f"</tr>"
+    
+    result += "</table>"
+    result += f"<p><strong>Latest count should be: {records[-1].initial_count if records else 'None'}</strong></p>"
+    result += '<p><a href="/counting">Back to Counting</a></p>'
+    
+    return result
 
 # Health check endpoint for Render
 @app.route('/health')
