@@ -31,13 +31,7 @@
                 <div class="table-responsive">
                     <table class="table table-bordered">
                         <thead>
-                            <tr>
-                                <th>Username</th>
-                                <th>Full Name</th>
-                                <th>Role</th>
-                                <th>Status</th>
-                                <th>Created</th>
-                            </tr>
+                            <tr><th>Username</th><th>Full Name</th><th>Role</th><th>Status</th><th>Created</th></tr>
                         </thead>
                         <tbody>
                             {% for user in users %}
@@ -65,14 +59,7 @@
                 <div class="table-responsive">
                     <table class="table table-bordered">
                         <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>User</th>
-                                <th>Warehouse</th>
-                                <th>Date</th>
-                                <th>Status</th>
-                                <th>Items Counted</th>
-                            </tr>
+                            <tr><th>ID</th><th>User</th><th>Warehouse</th><th>Date</th><th>Status</th><th>Items Counted</th></tr>
                         </thead>
                         <tbody>
                             {% for session in sessions %}
@@ -101,13 +88,7 @@
                 <div class="table-responsive">
                     <table class="table table-bordered table-sm">
                         <thead>
-                            <tr>
-                                <th>Timestamp (PHT)</th>
-                                <th>User</th>
-                                <th>Action</th>
-                                <th>Details</th>
-                                <th>IP Address</th>
-                            </tr>
+                            <tr><th>Timestamp (PHT)</th><th>User</th><th>Action</th><th>Details</th><th>IP Address</th></tr>
                         </thead>
                         <tbody>
                             {% for log in audit_logs %}
@@ -133,12 +114,12 @@
             </div>
             <div class="card-body">
                 
-                <!-- SUMMARY EXPORT -->
+                <!-- SECTION 1: Export Current Counts -->
                 <div class="alert alert-info">
-                    <h6><i class="bi bi-file-excel"></i> Summary Export (One row per SKU)</h6>
-                    <p>Shows the LATEST count for each SKU. Best for management reports and current inventory status.</p>
+                    <h6><i class="bi bi-file-excel"></i> Export Current Counts</h6>
+                    <p>Export the final counted quantities for each SKU. Organized by Day Category.</p>
                 </div>
-                <form action="{{ url_for('export_counts_summary') }}" method="POST">
+                <form action="{{ url_for('export_counts') }}" method="POST">
                     <div class="row">
                         <div class="col-md-3 mb-3">
                             <label>Filter by Date</label>
@@ -173,70 +154,31 @@
                             </select>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary">Export Summary (Latest Counts)</button>
-                </form>
-                
-                <hr class="my-4">
-                
-                <!-- DETAILED EXPORT -->
-                <div class="alert alert-secondary">
-                    <h6><i class="bi bi-file-excel"></i> Detailed Export (All Count History)</h6>
-                    <p>Shows EVERY count record including all changes. Best for audit trails and investigation.</p>
-                </div>
-                <form action="{{ url_for('export_counts_detailed') }}" method="POST">
                     <div class="row">
-                        <div class="col-md-3 mb-3">
-                            <label>Filter by Date</label>
-                            <input type="date" name="filter_date" class="form-control">
-                            <small class="text-muted">Leave empty for all dates</small>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <label>Filter by Warehouse</label>
-                            <select name="filter_warehouse" class="form-control">
-                                <option value="All">-- All Warehouses --</option>
-                                {% for warehouse in warehouses %}
-                                <option value="{{ warehouse }}">{{ warehouse }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <label>Filter by Day Category</label>
-                            <select name="filter_day_category" class="form-control">
-                                <option value="All">-- All Day Categories --</option>
-                                {% for cat in day_categories %}
-                                <option value="{{ cat }}">{{ cat }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <label>Filter by Item Category</label>
-                            <select name="filter_item_category" class="form-control">
-                                <option value="All">-- All Item Categories --</option>
-                                {% for cat in item_categories %}
-                                <option value="{{ cat }}">{{ cat }}</option>
-                                {% endfor %}
-                            </select>
+                        <div class="col-md-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-file-excel"></i> Export Current Counts
+                            </button>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-secondary">Export Detailed (All Changes)</button>
                 </form>
                 
                 <hr class="my-4">
                 
-                <!-- AUDIT LOG EXPORT -->
+                <!-- SECTION 2: Export Audit Log -->
                 <div class="alert alert-warning">
                     <h6><i class="bi bi-clock-history"></i> Export Audit Log</h6>
-                    <p>Export complete history of all user actions (logins, count changes, etc.)</p>
+                    <p>Export complete history of all changes (who changed what, when, and from/to values).</p>
                 </div>
                 <form action="{{ url_for('export_audit_log') }}" method="POST">
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label>Start Date</label>
-                            <input type="date" name="start_date" class="form-control">
+                            <input type="date" name="start_date" class="form-control" required>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label>End Date</label>
-                            <input type="date" name="end_date" class="form-control">
+                            <input type="date" name="end_date" class="form-control" required>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label>Filter by User</label>
@@ -248,8 +190,23 @@
                             </select>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-warning">Export Audit Log</button>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <button type="submit" class="btn btn-warning">
+                                <i class="bi bi-clock-history"></i> Export Audit Log
+                            </button>
+                        </div>
+                    </div>
                 </form>
+                
+                <hr>
+                <h6>Instructions:</h6>
+                <ul>
+                    <li><strong>Current Counts:</strong> Shows the final counted quantities. Use filters to narrow down.</li>
+                    <li><strong>Audit Log:</strong> Shows complete history of all changes for compliance and investigation.</li>
+                    <li><strong>Current Counts</strong> are organized by Day Category sheets.</li>
+                    <li><strong>Audit Log</strong> is exported as a single sheet with all change history.</li>
+                </ul>
             </div>
         </div>
     </div>
@@ -292,25 +249,29 @@
 <script>
 function syncFromDrive() {
     if(confirm('Sync SKU data from Google Drive? This will update your inventory with the latest Excel file.')) {
-        document.getElementById('syncResult').innerHTML = '<div class="alert alert-info">Syncing... Please wait up to 30 seconds.</div>';
+        $('#syncResult').html('<div class="alert alert-info">Syncing... Please wait up to 30 seconds.</div>');
         
-        fetch('/sync_data', {
+        $.ajax({
+            url: '/sync_data',
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
+            contentType: 'application/json',
+            success: function(response) {
+                if(response.success) {
+                    $('#syncResult').html('<div class="alert alert-success">✓ ' + response.message + '</div>');
+                    setTimeout(function() { location.reload(); }, 2000);
+                } else {
+                    $('#syncResult').html('<div class="alert alert-danger">✗ ' + response.message + '</div>');
+                }
             },
-        })
-        .then(response => response.json())
-        .then(data => {
-            if(data.success) {
-                document.getElementById('syncResult').innerHTML = '<div class="alert alert-success">✓ ' + data.message + '</div>';
-                setTimeout(function() { location.reload(); }, 2000);
-            } else {
-                document.getElementById('syncResult').innerHTML = '<div class="alert alert-danger">✗ ' + (data.message || 'Sync failed') + '</div>';
+            error: function(xhr) {
+                let errorMsg = 'Sync failed. ';
+                if(xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg += xhr.responseJSON.message;
+                } else {
+                    errorMsg += 'Check server logs for details.';
+                }
+                $('#syncResult').html('<div class="alert alert-danger">✗ ' + errorMsg + '</div>');
             }
-        })
-        .catch(error => {
-            document.getElementById('syncResult').innerHTML = '<div class="alert alert-danger">✗ Sync failed. Check server logs.</div>';
         });
     }
 }
