@@ -161,6 +161,33 @@ function getUrlParameter(name) {
     return urlParams.get(name);
 }
 
+// Function to check and set active session
+function checkAndSetActiveSession() {
+    // First check URL param
+    let sessionIdFromUrl = getUrlParameter('session_id');
+    if (sessionIdFromUrl) {
+        currentSessionId = parseInt(sessionIdFromUrl);
+        return currentSessionId;
+    }
+    
+    // If no session in URL, check if there's an active session from previous save
+    if (!currentSessionId) {
+        fetch('/api/active_session')
+            .then(response => response.json())
+            .then(data => {
+                if (data.session_id) {
+                    currentSessionId = data.session_id;
+                    // Reload current view to show pre-counted SKUs
+                    if (filteredSkus.length > 0) {
+                        loadExistingCountsForSkus();
+                    }
+                }
+            })
+            .catch(error => console.error('Error checking active session:', error));
+    }
+    return currentSessionId;
+}
+
 function filterItemCategoriesByWarehouse() {
     let warehouse = document.getElementById('warehouse').value;
     let itemCategorySelect = document.getElementById('itemCategory');
@@ -506,6 +533,7 @@ function displaySkusWithPagination() {
     }
     
     // After displaying SKUs, load existing counts for this session (if any)
+    // This runs for BOTH continue session AND normal view
     if (currentSessionId && filteredSkus.length > 0) {
         loadExistingCountsForSkus();
     }
@@ -604,7 +632,7 @@ function displaySkus(skus) {
         html += '</tr>';
     }
     
-    html += '</tbody><table></div></div>';
+    html += '</tbody></table></div></div>';
     
     // If this is a continued session, prepend the banner
     let sessionIdFromUrl = getUrlParameter('session_id');
@@ -622,11 +650,6 @@ function displaySkus(skus) {
     }
     
     highlightSkusStatus();
-    
-    // Load existing counts if we have a session ID (for both continue session AND normal view)
-    if (currentSessionId && filteredSkus.length > 0) {
-        loadExistingCountsForSkus();
-    }
     
     // Add event listeners for count inputs
     document.querySelectorAll('.initial-count').forEach(input => {
@@ -854,7 +877,7 @@ function showRecountModal(recountItems) {
         html += '<td class="bg-info">' + (item.kenneth_inventory || 0) + '</td>';
         html += '<td><input type="text" class="form-control recount-count" data-record-id="' + item.id + '" style="width: 120px;" placeholder="Enter whole number" inputmode="numeric"></td>';
         html += '<td><textarea class="form-control recount-remarks" data-record-id="' + item.id + '" rows="2" placeholder="Optional: Reason for discrepancy (e.g., 9 were damaged)" style="width: 250px;"></textarea></td>';
-        html += '</tr>';
+        html += '</td>';
     }
     
     html += '</tbody></table></div>';
@@ -1061,6 +1084,23 @@ function completeCounting() {
         });
 }
 
+// Also add this endpoint to app.py for active session check
+function checkActiveSession() {
+    if (!currentSessionId) {
+        fetch('/api/active_session')
+            .then(response => response.json())
+            .then(data => {
+                if (data.session_id) {
+                    currentSessionId = data.session_id;
+                    if (filteredSkus.length > 0) {
+                        loadExistingCountsForSkus();
+                    }
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+}
+
 document.getElementById('warehouse').addEventListener('change', function() {
     filterItemCategoriesByWarehouse();
     applyFilters();
@@ -1081,7 +1121,19 @@ document.addEventListener('DOMContentLoaded', function() {
         currentSessionId = parseInt(sessionIdFromUrl);
         loadInProgressSkus();
     } else {
-        applyFilters();
+        // No session in URL, check if there's an active session
+        fetch('/api/active_session')
+            .then(response => response.json())
+            .then(data => {
+                if (data.session_id) {
+                    currentSessionId = data.session_id;
+                }
+                applyFilters();
+            })
+            .catch(error => {
+                console.error('Error checking active session:', error);
+                applyFilters();
+            });
     }
 });
 </script>
