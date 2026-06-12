@@ -793,11 +793,24 @@ def get_audit_logs():
         return jsonify([])
     
     logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(200).all()
-    return jsonify([{
-        'timestamp': l.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-        'user': l.user.full_name if l.user else 'Unknown',
-        'action': l.action, 'details': l.details, 'ip_address': l.ip_address
-    } for l in logs])
+    result = []
+    for log in logs:
+        # Clean up details to remove .0 from numbers
+        details = log.details
+        if details:
+            # Replace .0 with empty string for whole numbers
+            import re
+            details = re.sub(r'(\d+)\.0', r'\1', details)
+        
+        result.append({
+            'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            'user': log.user.full_name if log.user else 'Unknown',
+            'action': log.action,
+            'details': details,
+            'ip_address': log.ip_address
+        })
+    
+    return jsonify(result)
 
 @app.route('/api/cleanup', methods=['POST'])
 @login_required
