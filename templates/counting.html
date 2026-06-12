@@ -41,23 +41,31 @@
                 <button id="applyFilters" class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
                 <button id="saveCounts" class="btn btn-success" onclick="saveAllCounts()">Save All Counts</button>
                 <button id="completeCounting" class="btn btn-danger" onclick="completeCounting()">Complete Counting Session</button>
-                <button id="scanBarcodeBtn" class="btn btn-info" onclick="startBarcodeScan()">
-                    <i class="bi bi-upc-scan"></i> Scan Barcode
+                <button id="scanBarcodeBtn" class="btn btn-info" onclick="startBarcodeScanner()">
+                    <i class="bi bi-upc-scan"></i> Scan Barcode/QR
                 </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Hidden video element for barcode scanning -->
-<div id="scannerContainer" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999;">
-    <div style="position: relative; width: 100%; height: 100%;">
-        <video id="scannerVideo" style="width: 100%; height: auto; max-height: 80%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);"></video>
-        <canvas id="scannerCanvas" style="display: none;"></canvas>
-        <div style="position: absolute; bottom: 20px; left: 0; right: 0; text-align: center;">
-            <button class="btn btn-danger" onclick="stopBarcodeScan()">Cancel Scan</button>
+<!-- Scanner Modal -->
+<div class="modal fade" id="scannerModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-upc-scan"></i> Scan Barcode or QR Code</h5>
+                <button type="button" class="btn-close btn-close-white" onclick="stopBarcodeScanner()"></button>
+            </div>
+            <div class="modal-body" style="padding: 0;">
+                <div id="qr-reader" style="width: 100%;"></div>
+                <div id="qr-reader-results" class="mt-2 text-center p-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="stopBarcodeScanner()">Cancel</button>
+                <button class="btn btn-primary" onclick="manualBarcodeEntry()">Manual Entry</button>
+            </div>
         </div>
-        <div id="scanResult" style="position: absolute; top: 10px; left: 0; right: 0; text-align: center; color: white; background: rgba(0,0,0,0.7); padding: 10px;"></div>
     </div>
 </div>
 
@@ -167,7 +175,16 @@
     font-weight: bold;
     color: #000000 !important;
 }
+#qr-reader {
+    min-height: 400px;
+}
+#qr-reader__scan_region {
+    background: #000;
+}
 </style>
+
+<!-- Load html5-qrcode library -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
 <script>
 // Day Category order mapping
@@ -203,8 +220,7 @@ let currentPage = 1;
 let itemsPerPage = 50;
 let currentSessionId = null;
 let searchTimeout = null;
-let scannerStream = null;
-let scanning = false;
+let html5QrCode = null;
 
 // Sort day categories
 let allDayCategories = [...allDayCategoriesRaw].sort((a, b) => {
@@ -219,121 +235,167 @@ function getUrlParameter(name) {
     return urlParams.get(name);
 }
 
-// Barcode Scanning Functions
-function startBarcodeScan() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert('Camera access is not supported on this device. Please use the search box.');
-        return;
+// Barcode/QR Code Scanner Functions
+function startBarcodeScanner() {
+    const scannerModal = new bootstrap.Modal(document.getElementById('scannerModal'));
+    scannerModal.show();
+    
+    const qrReaderElement = document.getElementById('qr-reader');
+    const resultContainer = document.getElementById('qr-reader-results');
+    
+    if (html5QrCode) {
+        try {
+            html5QrCode.stop().catch(() => {});
+        } catch(e) {}
     }
     
-    document.getElementById('scannerContainer').style.display = 'block';
-    document.getElementById('scanResult').innerHTML = 'Initializing camera...';
+    html5QrCode = new Html5Qrcode("qr-reader");
     
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-        .then(function(stream) {
-            scannerStream = stream;
-            let video = document.getElementById('scannerVideo');
-            video.srcObject = stream;
-            video.setAttribute('playsinline', true);
-            video.play();
-            scanning = true;
-            scanBarcode();
-        })
-        .catch(function(err) {
-            console.error('Camera error:', err);
-            document.getElementById('scanResult').innerHTML = 'Cannot access camera. Please check permissions.';
-            setTimeout(() => {
-                document.getElementById('scannerContainer').style.display = 'none';
-            }, 2000);
+    const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0,
+        showTorchButtonIfSupported: true
+    };
+    
+    html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        (decodedText, decodedResult) => {
+            // Success callback
+            console.log(`Scanned: ${decodedText}`);
+            resultContainer.innerHTML = `<div class="alert alert-success">✓ Scanned: ${decodedText}</div>`;
+            
+            // Stop scanner
+            stopBarcodeScanner();
+            
+            // Search for the scanned SKU
+            searchByBarcode(decodedText);
+        },
+        (errorMessage) => {
+            // Error callback - ignore, just keep scanning
+            // console.log(errorMessage);
+        }
+    ).catch((err) => {
+        console.error(`Error starting scanner: ${err}`);
+        resultContainer.innerHTML = `<div class="alert alert-danger">Cannot access camera: ${err}</div>`;
+    });
+}
+
+function stopBarcodeScanner() {
+    if (html5QrCode) {
+        html5QrCode.stop().then(() => {
+            console.log("Scanner stopped");
+        }).catch((err) => {
+            console.error("Error stopping scanner:", err);
         });
-}
-
-function scanBarcode() {
-    if (!scanning) return;
-    
-    let video = document.getElementById('scannerVideo');
-    let canvas = document.getElementById('scannerCanvas');
-    let context = canvas.getContext('2d');
-    
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        let imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-        
-        // Simple barcode detection using js library approach
-        // Since we can't add external libraries easily, we'll use a simple approach
-        // For actual barcode scanning, you would add a library like html5-qrcode
-        // For now, we'll use a text input fallback
-        document.getElementById('scanResult').innerHTML = 'Point camera at barcode/QR code...<br><small>Press Cancel to use manual entry</small>';
+        html5QrCode = null;
     }
     
-    setTimeout(scanBarcode, 500);
-}
-
-function stopBarcodeScan() {
-    scanning = false;
-    if (scannerStream) {
-        scannerStream.getTracks().forEach(track => track.stop());
-        scannerStream = null;
+    const scannerModal = bootstrap.Modal.getInstance(document.getElementById('scannerModal'));
+    if (scannerModal) {
+        scannerModal.hide();
     }
-    document.getElementById('scannerContainer').style.display = 'none';
-    document.getElementById('scannerVideo').srcObject = null;
+    document.getElementById('qr-reader-results').innerHTML = '';
 }
 
-// Manual barcode input (fallback for devices without camera or when scan fails)
 function manualBarcodeEntry() {
-    let barcode = prompt('Enter barcode number:');
+    stopBarcodeScanner();
+    let barcode = prompt('Enter barcode/QR code number:');
     if (barcode && barcode.trim()) {
         searchByBarcode(barcode.trim());
     }
 }
 
 function searchByBarcode(barcode) {
-    // Search for SKU that matches the barcode
+    // First, try to load all SKUs if not already loaded
+    if (allSkus.length === 0) {
+        // Load SKUs first
+        fetch('/get_skus?day_category=All&item_category=All&search=')
+            .then(response => response.json())
+            .then(data => {
+                allSkus = data;
+                performBarcodeSearch(barcode);
+            })
+            .catch(error => {
+                console.error('Error loading SKUs:', error);
+                alert('Error loading SKU data. Please try again.');
+            });
+    } else {
+        performBarcodeSearch(barcode);
+    }
+}
+
+function performBarcodeSearch(barcode) {
+    // Search for exact match first
     let matchedSku = null;
+    let partialMatches = [];
+    
     for (let i = 0; i < allSkus.length; i++) {
-        if (allSkus[i].sku.toLowerCase() === barcode.toLowerCase() ||
-            allSkus[i].sku.toLowerCase().includes(barcode.toLowerCase())) {
-            matchedSku = allSkus[i];
+        const sku = allSkus[i];
+        // Exact match (case insensitive)
+        if (sku.sku.toLowerCase() === barcode.toLowerCase()) {
+            matchedSku = sku;
             break;
+        }
+        // Partial match
+        if (sku.sku.toLowerCase().includes(barcode.toLowerCase())) {
+            partialMatches.push(sku);
         }
     }
     
     if (matchedSku) {
-        // Set search box value
+        // Exact match found
         document.getElementById('searchSku').value = matchedSku.sku;
-        // Apply filters to show only this SKU
         applyFilters();
-        alert(`Found SKU: ${matchedSku.sku} - ${matchedSku.description || ''}`);
-        // Scroll to the SKU
+        alert(`✓ Found SKU: ${matchedSku.sku} - ${matchedSku.description || ''}`);
+        
+        // Highlight and scroll to the SKU
         setTimeout(() => {
             let row = document.getElementById(`sku-row-${matchedSku.id}`);
             if (row) {
                 row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                row.style.backgroundColor = '#ffff99';
+                row.style.backgroundColor = '#a8d5ff';
                 setTimeout(() => {
                     row.style.backgroundColor = '';
                 }, 3000);
             }
         }, 500);
-    } else {
-        alert(`SKU "${barcode}" not found. Please check the barcode and try again.`);
+    } 
+    else if (partialMatches.length === 1) {
+        // Single partial match
+        matchedSku = partialMatches[0];
+        document.getElementById('searchSku').value = matchedSku.sku;
+        applyFilters();
+        alert(`✓ Found SKU: ${matchedSku.sku} - ${matchedSku.description || ''}`);
+        
+        setTimeout(() => {
+            let row = document.getElementById(`sku-row-${matchedSku.id}`);
+            if (row) {
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                row.style.backgroundColor = '#a8d5ff';
+                setTimeout(() => {
+                    row.style.backgroundColor = '';
+                }, 3000);
+            }
+        }, 500);
+    }
+    else if (partialMatches.length > 1) {
+        // Multiple matches - show suggestion
+        let matchList = partialMatches.slice(0, 5).map(s => `• ${s.sku} - ${s.description || ''}`).join('\n');
+        alert(`Multiple SKUs found for "${barcode}":\n\n${matchList}\n\nPlease select from the search results.`);
+        document.getElementById('searchSku').value = barcode;
+        applyFilters();
+    }
+    else {
+        // No match found
+        alert(`SKU "${barcode}" not found. Please check the barcode/QR code and try again.`);
     }
 }
 
-// Add manual entry option
+// Add manual entry button next to scan button
 document.addEventListener('DOMContentLoaded', function() {
-    // Add manual entry button next to scan button
-    let scanBtn = document.getElementById('scanBarcodeBtn');
-    if (scanBtn && scanBtn.parentNode) {
-        let manualBtn = document.createElement('button');
-        manualBtn.id = 'manualEntryBtn';
-        manualBtn.className = 'btn btn-secondary ms-2';
-        manualBtn.innerHTML = '<i class="bi bi-keyboard"></i> Manual Entry';
-        manualBtn.onclick = function() { manualBarcodeEntry(); };
-        scanBtn.parentNode.appendChild(manualBtn);
-    }
+    // Already have scan button, manual entry is in modal footer
 });
 
 function filterItemCategoriesByWarehouse() {
@@ -743,7 +805,7 @@ function displaySkus(skus) {
     
     let html = '<div class="col-12"><div class="table-responsive"><table class="table table-bordered table-hover table-striped">';
     html += '<thead class="table-dark">';
-    html += '<tr>';
+    html += '</tr>';
     html += '<th>SKU</th>';
     html += '<th>Description (Item Category)</th>';
     html += '<th>Day Category</th>';
@@ -1086,7 +1148,7 @@ function checkForRecounts() {
 function showRecountModal(recountItems) {
     let html = '<div class="table-responsive"><table class="table table-bordered">';
     html += '<thead class="table-dark">';
-    html += '<tr>';
+    html += '</td>';
     html += '<th>SKU</th>';
     html += '<th>Description</th>';
     html += '<th>Initial Count</th>';
