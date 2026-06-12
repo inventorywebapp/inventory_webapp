@@ -272,12 +272,10 @@ def get_skus():
     
     result = []
     for sku in skus:
-        # Get the LATEST count record for this SKU (any session)
         latest_record = CountRecord.query.filter_by(
             sku_id=sku.id
         ).order_by(CountRecord.version.desc()).first()
         
-        # Get the FINAL count (recount_count if exists, otherwise initial_count)
         final_count = None
         count_time = None
         has_count = False
@@ -287,7 +285,6 @@ def get_skus():
             has_count = True
             count_time = latest_record.count_time.strftime('%Y-%m-%d %H:%M:%S') if latest_record.count_time else None
             
-            # Determine the FINAL validated count
             if latest_record.recount_count and latest_record.recount_count > 0:
                 final_count = latest_record.recount_count
             elif latest_record.final_count and latest_record.final_count > 0:
@@ -295,20 +292,9 @@ def get_skus():
             else:
                 final_count = latest_record.initial_count
             
-            # Check if the session is completed
             session = CountingSession.query.get(latest_record.session_id)
             if session and session.is_completed:
                 is_completed = True
-        
-        # For in-progress session, get the current count
-        current_count = None
-        if current_session_id:
-            current_record = CountRecord.query.filter_by(
-                session_id=current_session_id,
-                sku_id=sku.id
-            ).order_by(CountRecord.version.desc()).first()
-            if current_record:
-                current_count = current_record.initial_count
         
         result.append({
             'id': sku.id, 
@@ -324,7 +310,6 @@ def get_skus():
             'stock_status': sku.stock_status,
             'bypass_recount': sku.bypass_recount,
             'has_count': has_count,
-            'current_count': current_count if current_count else final_count,
             'final_count': final_count,
             'count_time': count_time,
             'is_completed': is_completed
