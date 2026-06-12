@@ -112,9 +112,13 @@ def shutdown_session(exception=None):
 @login_required
 def index():
     if current_user.role == 'admin':
-        return redirect(url_for('admin_dashboard'))
+        return redirect(url_for('unified_panel'))
+    elif current_user.role == 'manager':
+        return redirect(url_for('unified_panel'))
+    elif current_user.role == 'inventory_supervisor':
+        return redirect(url_for('unified_panel'))
     elif current_user.role == 'auditor':
-        return redirect(url_for('audit_dashboard'))
+        return redirect(url_for('unified_panel'))
     elif current_user.has_permission('count'):
         return redirect(url_for('counting'))
     else:
@@ -168,11 +172,9 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    # Optimized: Use count() instead of loading all objects
     total_skus = SKU.query.count()
     active_sessions_count = CountingSession.query.filter_by(is_completed=False).count()
     
-    # Get active session details
     active_session_info = None
     if active_sessions_count > 0:
         latest_session = CountingSession.query.filter_by(is_completed=False).order_by(CountingSession.session_date.desc()).first()
@@ -184,21 +186,17 @@ def dashboard():
                 'started_by': latest_session.user.full_name if latest_session.user else 'Unknown'
             }
     
-    # Get Day Categories in Mon→Sat order
     day_categories_raw = db.session.query(SKU.category).distinct().all()
     day_order = {'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6}
     day_categories = [c[0] for c in day_categories_raw if c[0] and c[0] != '']
     day_categories.sort(key=lambda x: day_order.get(x, 999))
     
-    # Get Item Categories alphabetically (limited for performance)
     item_categories_raw = db.session.query(SKU.description).distinct().all()
     item_categories = [c[0] for c in item_categories_raw if c[0] and c[0] != '']
     item_categories.sort()
     
     warehouses = ['Main Warehouse', '5th Floor Warehouse']
     
-    # Optimized: Get completed SKU counts per day category using a single query
-    # Get all completed count records at once
     completed_records = db.session.query(CountRecord.sku_id).join(
         CountingSession
     ).filter(
@@ -207,18 +205,14 @@ def dashboard():
     
     completed_sku_ids = set([r[0] for r in completed_records])
     
-    # Calculate progress for each Day Category
     day_category_progress = []
     for day_cat in day_categories:
-        # Get SKU IDs in this category (optimized: only get IDs, not full objects)
         sku_ids_in_category = db.session.query(SKU.id).filter(SKU.category == day_cat).all()
         sku_ids = [s[0] for s in sku_ids_in_category]
         total_in_category = len(sku_ids)
         
-        # Count completed SKUs in this category
         completed_count = len([sid for sid in sku_ids if sid in completed_sku_ids])
         
-        # Calculate percentage (fix: use float division)
         if total_in_category > 0:
             percentage = (completed_count / total_in_category) * 100
             percentage = round(percentage, 2)
@@ -246,7 +240,6 @@ def dashboard():
 @app.route('/get_skus')
 @login_required
 def get_skus():
-    """Get SKUs with filters - SMART LIMIT LOGIC"""
     day_category = request.args.get('day_category')
     item_category = request.args.get('item_category')
     search = request.args.get('search', '')
@@ -573,6 +566,48 @@ def complete_counting():
         return jsonify({'success': True, 'message': 'Counting session completed successfully!'})
     return jsonify({'success': False, 'message': 'Session not found'}), 404
 
+@app.route('/unified_panel')
+@login_required
+def unified_panel():
+    """Unified panel with role-based tab visibility"""
+    users = User.query.all() if current_user.role == 'admin' else []
+    sessions = CountingSession.query.order_by(CountingSession.session_date.desc()).limit(50).all()
+    audit_logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(100).all()
+    
+    warehouses = ['Main Warehouse', '5th Floor Warehouse', 'All']
+    day_categories_raw = db.session.query(SKU.category).distinct().all()
+    item_categories_raw = db.session.query(SKU.description).distinct().all()
+    
+    day_order = {'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6}
+    day_categories = [c[0] for c in day_categories_raw if c[0] and c[0] != '']
+    day_categories.sort(key=lambda x: day_order.get(x, 999))
+    
+    item_categories = [c[0] for c in item_categories_raw if c[0] and c[0] != '']
+    item_categories.sort()
+    
+    return render_template('unified_panel.html', 
+                         users=users, 
+                         sessions=sessions, 
+                         audit_logs=audit_logs,
+                         warehouses=warehouses,
+                         day_categories=day_categories,
+                         item_categories=item_categories)
+
+@app.route('/continue_session/<int:session_id>')
+@login_required
+def continue_session(session_id):
+    """Continue an active counting session with previously counted SKUs"""
+    session_obj = CountingSession.query.get(session_id)
+    if not session_obj:
+        flash('Session not found', 'error')
+        return redirect(url_for('counting'))
+    
+    if session_obj.is_completed:
+        flash('This session is already completed', 'warning')
+        return redirect(url_for('counting'))
+    
+    return redirect(url_for('counting', session_id=session_obj.id))
+
 @app.route('/admin')
 @login_required
 def admin_dashboard():
@@ -741,7 +776,6 @@ def delete_user():
 @app.route('/export_counts', methods=['POST'])
 @login_required
 def export_counts():
-    """Export count data - shows LATEST count from the MOST RECENT session for each SKU (No Version/Session ID)"""
     if not current_user.has_permission('export_counts'):
         flash('Access denied', 'error')
         return redirect(url_for('dashboard'))
@@ -1100,7 +1134,7 @@ def debug_session(session_id):
         result += f"<td>{r.count_time}</td>"
         result += f"<td>{r.recount_count if r.recount_count else '-'}</td>"
         result += f"<td>{r.final_count if r.final_count else '-'}</td>"
-        result += f"</tr>"
+        result += f"</table>"
     
     result += "</table>"
     result += '<p><a href="/admin">Back to Admin</a></p>'
