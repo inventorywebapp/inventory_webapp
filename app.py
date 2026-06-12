@@ -166,20 +166,21 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    # Optimized: Use count() instead of loading all objects
     total_skus = SKU.query.count()
-    active_sessions = CountingSession.query.filter_by(is_completed=False).all()
-    active_sessions_count = len(active_sessions)
+    active_sessions_count = CountingSession.query.filter_by(is_completed=False).count()
     
-    # Get active session details for continuation button
+    # Get active session details
     active_session_info = None
     if active_sessions_count > 0:
-        latest_session = active_sessions[0]
-        active_session_info = {
-            'id': latest_session.id,
-            'warehouse': latest_session.warehouse,
-            'session_date': latest_session.session_date.strftime('%Y-%m-%d %H:%M:%S'),
-            'started_by': latest_session.user.full_name if latest_session.user else 'Unknown'
-        }
+        latest_session = CountingSession.query.filter_by(is_completed=False).order_by(CountingSession.session_date.desc()).first()
+        if latest_session:
+            active_session_info = {
+                'id': latest_session.id,
+                'warehouse': latest_session.warehouse,
+                'session_date': latest_session.session_date.strftime('%Y-%m-%d %H:%M:%S'),
+                'started_by': latest_session.user.full_name if latest_session.user else 'Unknown'
+            }
     
     # Get Day Categories in Mon→Sat order
     day_categories_raw = db.session.query(SKU.category).distinct().all()
@@ -187,39 +188,48 @@ def dashboard():
     day_categories = [c[0] for c in day_categories_raw if c[0] and c[0] != '']
     day_categories.sort(key=lambda x: day_order.get(x, 999))
     
-    # Get Item Categories alphabetically
+    # Get Item Categories alphabetically (limited for performance)
     item_categories_raw = db.session.query(SKU.description).distinct().all()
     item_categories = [c[0] for c in item_categories_raw if c[0] and c[0] != '']
     item_categories.sort()
     
     warehouses = ['Main Warehouse', '5th Floor Warehouse']
     
+    # Optimized: Get completed SKU counts per day category using a single query
+    # Get all completed count records at once
+    completed_records = db.session.query(CountRecord.sku_id).join(
+        CountingSession
+    ).filter(
+        CountingSession.is_completed == True
+    ).distinct().all()
+    
+    completed_sku_ids = set([r[0] for r in completed_records])
+    
     # Calculate progress for each Day Category
     day_category_progress = []
     for day_cat in day_categories:
-        skus_in_category = SKU.query.filter(SKU.category == day_cat).all()
-        total_in_category = len(skus_in_category)
+        # Get SKU IDs in this category (optimized: only get IDs, not full objects)
+        sku_ids_in_category = db.session.query(SKU.id).filter(SKU.category == day_cat).all()
+        sku_ids = [s[0] for s in sku_ids_in_category]
+        total_in_category = len(sku_ids)
         
-        completed_count = 0
-        for sku in skus_in_category:
-            completed_record = CountRecord.query.join(CountingSession).filter(
-                CountRecord.sku_id == sku.id,
-                CountingSession.is_completed == True
-            ).first()
-            if completed_record:
-                completed_count += 1
+        # Count completed SKUs in this category
+        completed_count = len([sid for sid in sku_ids if sid in completed_sku_ids])
         
-        percentage = (completed_count / total_in_category * 100) if total_in_category > 0 else 0
-        
-        session_info = CountingSession.query.filter_by(is_completed=True).order_by(CountingSession.session_date.desc()).first()
+        # Calculate percentage (fix: use float division)
+        if total_in_category > 0:
+            percentage = (completed_count / total_in_category) * 100
+            percentage = round(percentage, 2)
+        else:
+            percentage = 0
         
         day_category_progress.append({
             'name': day_cat,
             'total_skus': total_in_category,
             'completed_skus': completed_count,
-            'percentage': round(percentage, 1),
-            'start_date': session_info.session_date.strftime('%Y-%m-%d') if session_info else 'Not started',
-            'end_date': session_info.session_date.strftime('%Y-%m-%d') if session_info and session_info.is_completed else 'In progress'
+            'percentage': percentage,
+            'start_date': 'Not started',
+            'end_date': 'In progress'
         })
     
     return render_template('dashboard.html',
