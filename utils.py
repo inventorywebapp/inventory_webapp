@@ -21,7 +21,7 @@ def get_ph_time():
 def check_recount_needed(initial_count, expected_count, kenneth_count):
     """
     Check if recount is needed based on discrepancy > 3 or < -3
-    Negative values in expected_count or kenneth_count are treated as 0
+    NEGATIVE VALUES in expected_count or kenneth_count are TREATED AS 0
     """
     if initial_count is None:
         return False
@@ -29,18 +29,35 @@ def check_recount_needed(initial_count, expected_count, kenneth_count):
     try:
         initial = float(initial_count)
         
-        # Treat negative values as 0
-        expected = float(expected_count) if expected_count and float(expected_count) > 0 else 0
-        kenneth = float(kenneth_count) if kenneth_count and float(kenneth_count) > 0 else 0
+        # CRITICAL FIX: Treat negative values as 0
+        # If expected_count is negative, None, or invalid, use 0
+        if expected_count is not None:
+            try:
+                exp_val = float(expected_count)
+                expected = exp_val if exp_val > 0 else 0
+            except (ValueError, TypeError):
+                expected = 0
+        else:
+            expected = 0
+        
+        # If kenneth_count is negative, None, or invalid, use 0
+        if kenneth_count is not None:
+            try:
+                ken_val = float(kenneth_count)
+                kenneth = ken_val if ken_val > 0 else 0
+            except (ValueError, TypeError):
+                kenneth = 0
+        else:
+            kenneth = 0
         
     except (ValueError, TypeError):
         return False
     
-    # Compare with Final Expected Count
-    diff_expected = abs(initial - expected) if expected else 0
+    # Compare with Final Expected Count (which is now 0 if negative)
+    diff_expected = abs(initial - expected)
     
-    # Compare with Kenneth's Inventory
-    diff_kenneth = abs(initial - kenneth) if kenneth else 0
+    # Compare with Kenneth's Inventory (which is now 0 if negative)
+    diff_kenneth = abs(initial - kenneth)
     
     # If either difference is greater than 3, recount needed
     if diff_expected > 3 or diff_kenneth > 3:
