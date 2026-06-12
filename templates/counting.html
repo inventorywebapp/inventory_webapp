@@ -240,9 +240,17 @@ function getUrlParameter(name) {
     return urlParams.get(name);
 }
 
+// Normalize string for comparison (remove spaces, dashes, special characters, convert to lowercase)
+function normalizeString(str) {
+    if (!str) return '';
+    return str.toLowerCase()
+        .trim()
+        .replace(/[^\w]/g, '')  // Remove all non-word characters (spaces, dashes, punctuation)
+        .replace(/\s+/g, '');    // Remove any remaining spaces
+}
+
 // Barcode/QR Code Scanner Functions
 async function startBarcodeScanner() {
-    // If already scanning, don't start again
     if (isScanning) {
         console.log("Scanner already running");
         return;
@@ -254,7 +262,6 @@ async function startBarcodeScanner() {
     const resultContainer = document.getElementById('qr-reader-results');
     resultContainer.innerHTML = '<div class="alert alert-info">Initializing camera... Please wait.</div>';
     
-    // Clean up any existing scanner properly
     if (html5QrCode) {
         try {
             await html5QrCode.stop();
@@ -264,10 +271,8 @@ async function startBarcodeScanner() {
         html5QrCode = null;
     }
     
-    // Small delay to ensure cleanup
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    // Create new scanner
     html5QrCode = new Html5Qrcode("qr-reader");
     isScanning = true;
     
@@ -283,19 +288,13 @@ async function startBarcodeScanner() {
             { facingMode: "environment" },
             config,
             (decodedText, decodedResult) => {
-                // Success callback - found a code
                 console.log(`Scanned: "${decodedText}"`);
                 resultContainer.innerHTML = `<div class="alert alert-success">✓ Scanned: ${decodedText}</div>`;
-                
-                // Stop scanner after successful scan
                 stopBarcodeScanner();
-                
-                // Search for the scanned code
                 searchByBarcode(decodedText);
             },
             (errorMessage) => {
-                // Error callback - ignore scanning errors
-                console.log("Scanning...");
+                // Silent ignore
             }
         );
     } catch (err) {
@@ -318,7 +317,6 @@ async function stopBarcodeScanner() {
         html5QrCode = null;
     }
     
-    // Clear the reader element
     const readerElement = document.getElementById('qr-reader');
     if (readerElement) {
         readerElement.innerHTML = '';
@@ -340,7 +338,6 @@ function manualBarcodeEntry() {
 }
 
 function searchByBarcode(barcode) {
-    // First, ensure SKUs are loaded
     if (allSkus.length === 0) {
         fetch('/get_skus?day_category=All&item_category=All&search=')
             .then(response => response.json())
@@ -359,30 +356,49 @@ function searchByBarcode(barcode) {
 
 function performBarcodeSearch(barcode) {
     let searchTerm = barcode.trim();
-    let matchedSku = null;
-    let partialMatches = [];
-    let exactMatches = [];
+    let normalizedSearch = normalizeString(searchTerm);
     
-    // Clean the search term (remove spaces, dashes, special chars)
-    let cleanSearchTerm = searchTerm.toLowerCase().replace(/[^\w]/g, '');
+    console.log("Searching for:", searchTerm);
+    console.log("Normalized search:", normalizedSearch);
+    console.log("Available SKUs:", allSkus.map(s => s.sku));
     
+    let matches = [];
+    
+    // Try multiple matching strategies
     for (let i = 0; i < allSkus.length; i++) {
         const sku = allSkus[i];
-        const cleanSku = sku.sku.toLowerCase().replace(/[^\w]/g, '');
+        const normalizedSku = normalizeString(sku.sku);
         
+        // Strategy 1: Exact match (case insensitive)
         if (sku.sku.toLowerCase() === searchTerm.toLowerCase()) {
-            exactMatches.push(sku);
-        } else if (cleanSku === cleanSearchTerm) {
-            exactMatches.push(sku);
-        } else if (sku.sku.toLowerCase().includes(searchTerm.toLowerCase())) {
-            partialMatches.push(sku);
-        } else if (cleanSku.includes(cleanSearchTerm)) {
-            partialMatches.push(sku);
+            matches.push({ sku: sku, type: 'exact', score: 100 });
+        }
+        // Strategy 2: Normalized match (ignoring spaces, dashes, special chars)
+        else if (normalizedSku === normalizedSearch) {
+            matches.push({ sku: sku, type: 'normalized', score: 90 });
+        }
+        // Strategy 3: SKU contains search term
+        else if (sku.sku.toLowerCase().includes(searchTerm.toLowerCase())) {
+            matches.push({ sku: sku, type: 'contains', score: 70 });
+        }
+        // Strategy 4: Normalized SKU contains normalized search
+        else if (normalizedSku.includes(normalizedSearch)) {
+            matches.push({ sku: sku, type: 'normalized_contains', score: 60 });
+        }
+        // Strategy 5: Search term contains SKU (partial)
+        else if (searchTerm.toLowerCase().includes(sku.sku.toLowerCase())) {
+            matches.push({ sku: sku, type: 'reverse_contains', score: 50 });
         }
     }
     
-    if (exactMatches.length === 1) {
-        matchedSku = exactMatches[0];
+    // Sort by score (highest first)
+    matches.sort((a, b) => b.score - a.score);
+    
+    console.log("Matches found:", matches.map(m => ({ sku: m.sku.sku, type: m.type, score: m.score })));
+    
+    if (matches.length === 1) {
+        // Single match - perfect
+        const matchedSku = matches[0].sku;
         document.getElementById('searchSku').value = matchedSku.sku;
         applyFilters();
         showToast(`✓ Found SKU: ${matchedSku.sku}`, 'success');
@@ -398,39 +414,23 @@ function performBarcodeSearch(barcode) {
             }
         }, 500);
     }
-    else if (exactMatches.length > 1) {
-        let matchList = exactMatches.slice(0, 5).map(s => `• ${s.sku} - ${s.description || ''}`).join('\n');
-        alert(`Multiple SKUs match "${searchTerm}":\n\n${matchList}\n\nPlease select from the search results.`);
-        document.getElementById('searchSku').value = searchTerm;
-        applyFilters();
-    }
-    else if (partialMatches.length === 1) {
-        matchedSku = partialMatches[0];
-        document.getElementById('searchSku').value = matchedSku.sku;
-        applyFilters();
-        showToast(`✓ Found SKU: ${matchedSku.sku}`, 'success');
-        
-        setTimeout(() => {
-            let row = document.getElementById(`sku-row-${matchedSku.id}`);
-            if (row) {
-                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                row.style.backgroundColor = '#a8d5ff';
-                setTimeout(() => {
-                    row.style.backgroundColor = '';
-                }, 3000);
-            }
-        }, 500);
-    }
-    else if (partialMatches.length > 1) {
-        let matchList = partialMatches.slice(0, 5).map(s => `• ${s.sku} - ${s.description || ''}`).join('\n');
-        let remaining = partialMatches.length - 5;
-        if (remaining > 0) matchList += `\n• ... and ${remaining} more`;
-        alert(`Multiple SKUs found for "${searchTerm}":\n\n${matchList}\n\nPlease select from the search results.`);
+    else if (matches.length > 1) {
+        // Multiple matches - show selection
+        let matchList = matches.slice(0, 5).map(m => `• ${m.sku.sku} - ${m.sku.description || ''}`).join('\n');
+        alert(`Multiple matches found for "${searchTerm}":\n\n${matchList}\n\nPlease select from the search results.`);
         document.getElementById('searchSku').value = searchTerm;
         applyFilters();
     }
     else {
-        showToast(`SKU "${searchTerm}" not found. Try scanning again or use manual search.`, 'warning');
+        // No match - show debug info
+        console.log("NO MATCH FOUND!");
+        console.log("Scanned value:", searchTerm);
+        console.log("Normalized:", normalizedSearch);
+        console.log("Sample SKUs (normalized):", allSkus.slice(0, 10).map(s => ({ sku: s.sku, normalized: normalizeString(s.sku) })));
+        
+        let sampleSkus = allSkus.slice(0, 5).map(s => s.sku).join(', ');
+        alert(`SKU "${searchTerm}" not found.\n\nTip: Try using manual search or check the QR code value.\n\nExample SKUs in system:\n${sampleSkus}...`);
+        document.getElementById('searchSku').value = searchTerm;
     }
 }
 
@@ -972,7 +972,7 @@ function displaySkus(skus) {
         html += '</tr>';
     }
     
-    html += '</tbody></table></div></div>';
+    html += '</tbody><tr></div></div>';
     
     let sessionIdFromUrl = getUrlParameter('session_id');
     if (sessionIdFromUrl && currentSessionId == sessionIdFromUrl && filteredSkus.length > 0) {
@@ -1206,7 +1206,7 @@ function showRecountModal(recountItems) {
     html += '<th>Kenneth\'s Inventory</th>';
     html += '<th>Recount Count</th>';
     html += '<th>Remarks (Optional)</th>';
-    html += '</tr></thead><tbody>';
+    html += '</td></thead><tbody>';
     
     for (let i = 0; i < recountItems.length; i++) {
         let item = recountItems[i];
@@ -1221,7 +1221,7 @@ function showRecountModal(recountItems) {
         html += '</tr>';
     }
     
-    html += '</tbody><table></div>';
+    html += '</tbody></table></div>';
     html += '<div class="mt-3 d-flex justify-content-between">';
     html += '<button class="btn btn-secondary" onclick="closeRecountModal()">Close</button>';
     html += '<button class="btn btn-success" onclick="saveRecounts()">Save Recounts & Complete Session</button>';
