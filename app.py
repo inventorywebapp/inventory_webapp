@@ -273,8 +273,11 @@ def get_skus():
     else:
         skus = query.limit(1000).all()
     
-    # Calculate expiration cutoff date
-    expiration_cutoff = get_ph_time() - timedelta(days=COUNT_EXPIRATION_DAYS)
+    # Calculate expiration cutoff date (timezone-naive for comparison)
+    now = get_ph_time()
+    expiration_cutoff = now - timedelta(days=COUNT_EXPIRATION_DAYS)
+    # Make it timezone-naive for comparison with database times
+    expiration_cutoff_naive = expiration_cutoff.replace(tzinfo=None)
     
     result = []
     for sku in skus:
@@ -290,7 +293,12 @@ def get_skus():
         
         if latest_record:
             has_count = True
-            count_time = latest_record.count_time.strftime('%Y-%m-%d %H:%M:%S') if latest_record.count_time else None
+            # Make count_time timezone-naive for comparison
+            if latest_record.count_time:
+                count_time_naive = latest_record.count_time.replace(tzinfo=None) if hasattr(latest_record.count_time, 'replace') else latest_record.count_time
+                count_time = latest_record.count_time.strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                count_time_naive = None
             
             # Determine the FINAL validated count
             if latest_record.recount_count and latest_record.recount_count > 0:
@@ -306,7 +314,7 @@ def get_skus():
                 is_completed = True
             
             # Check if the count has expired (> 14 days old)
-            if latest_record.count_time and latest_record.count_time < expiration_cutoff:
+            if count_time_naive and count_time_naive < expiration_cutoff_naive:
                 is_expired = True
                 has_count = False  # Treat as not counted for UI purposes
                 is_completed = False
