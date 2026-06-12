@@ -504,6 +504,44 @@ function displaySkusWithPagination() {
     } else {
         paginationDiv.style.display = 'none';
     }
+    
+    // After displaying SKUs, load existing counts for this session (if any)
+    if (currentSessionId && filteredSkus.length > 0) {
+        loadExistingCountsForSkus();
+    }
+}
+
+function loadExistingCountsForSkus() {
+    let skuIds = filteredSkus.map(s => s.id).join(',');
+    if (!skuIds) return;
+    
+    fetch(`/get_latest_counts?sku_ids=${skuIds}&session_id=${currentSessionId}`)
+        .then(response => response.json())
+        .then(latestCounts => {
+            for (let skuId in latestCounts) {
+                let countInput = document.querySelector(`.initial-count[data-sku-id="${skuId}"]`);
+                let lastCountedSpan = document.getElementById(`last-counted-${skuId}`);
+                if (countInput && latestCounts[skuId]) {
+                    // Update the input field with existing count
+                    countInput.value = latestCounts[skuId].initial_count;
+                    countInput.setAttribute('title', `Previously counted on: ${latestCounts[skuId].count_time}\nCount: ${latestCounts[skuId].initial_count}`);
+                    
+                    // Update the Last Counted Date column
+                    if (lastCountedSpan) {
+                        lastCountedSpan.innerHTML = latestCounts[skuId].count_time;
+                        lastCountedSpan.style.color = '#0d6efd';
+                        lastCountedSpan.style.fontWeight = 'bold';
+                    }
+                    
+                    // Add pre-counted class to row
+                    let row = countInput.closest('tr');
+                    if (row) {
+                        row.classList.add('sku-pre-counted');
+                    }
+                }
+            }
+            highlightSkusStatus();
+        });
 }
 
 function displaySkus(skus) {
@@ -535,12 +573,9 @@ function displaySkus(skus) {
     for (let i = 0; i < skus.length; i++) {
         let sku = skus[i];
         let statusBadge = '';
-        let hasCurrentCount = sku.current_count !== undefined && sku.current_count !== null;
         
         if (sku.bypass_recount) {
             statusBadge = '<span class="badge bg-warning">Bypass</span>';
-        } else if (hasCurrentCount) {
-            statusBadge = '<span class="badge bg-info">Previously Counted</span>';
         }
         
         let containerDetails = sku.container_details || '-';
@@ -553,10 +588,6 @@ function displaySkus(skus) {
             lastCountDate = lastCountDate.split(' ')[0];
         }
         
-        let currentCountValue = (sku.current_count !== undefined && sku.current_count !== null) ? sku.current_count : '';
-        let countTimeValue = sku.count_time || '';
-        let inputPlaceholder = hasCurrentCount ? `Previously: ${sku.current_count}` : 'Enter count';
-        
         html += '<tr id="sku-row-' + sku.id + '">';
         html += '<td><strong>' + escapeHtml(sku.sku) + '</strong></td>';
         html += '<td>' + escapeHtml(sku.description || '-') + '</td>';
@@ -567,25 +598,13 @@ function displaySkus(skus) {
         html += '<td><small>' + escapeHtml(containerDetails) + '</small></td>';
         html += '<td class="fw-bold text-primary">' + (sku.final_expected_count || 0) + '</td>';
         html += '<td class="fw-bold text-success">' + (sku.kenneth_inventory || 0) + '</td>';
-        html += '<td>';
-        html += '<input type="text" class="form-control initial-count" data-sku-id="' + sku.id + '" style="min-width: 100px; width: 100px;" placeholder="' + inputPlaceholder + '" inputmode="numeric"';
-        if (hasCurrentCount) {
-            html += ' value="' + sku.current_count + '" title="Previously counted on: ' + countTimeValue + '\\nCount: ' + sku.current_count + '"';
-        }
-        html += '>';
-        html += '</td>';
-        html += '<td>';
-        if (countTimeValue) {
-            html += '<small class="text-muted">' + countTimeValue + '</small>';
-        } else {
-            html += '-';
-        }
-        html += '</td>';
+        html += '<td><input type="text" class="form-control initial-count" data-sku-id="' + sku.id + '" style="min-width: 100px; width: 100px;" placeholder="Enter count" inputmode="numeric"></td>';
+        html += '<td><span id="last-counted-' + sku.id + '" class="text-muted">-</span></td>';
         html += '<td>' + statusBadge + '</td>';
         html += '</tr>';
     }
     
-    html += '</tbody></table></div></div>';
+    html += '</tbody><table></div></div>';
     
     // If this is a continued session, prepend the banner
     let sessionIdFromUrl = getUrlParameter('session_id');
@@ -603,6 +622,11 @@ function displaySkus(skus) {
     }
     
     highlightSkusStatus();
+    
+    // Load existing counts if we have a session ID (for both continue session AND normal view)
+    if (currentSessionId && filteredSkus.length > 0) {
+        loadExistingCountsForSkus();
+    }
     
     // Add event listeners for count inputs
     document.querySelectorAll('.initial-count').forEach(input => {
@@ -818,7 +842,7 @@ function showRecountModal(recountItems) {
     html += '<th>Kenneth\'s Inventory</th>';
     html += '<th>Recount Count</th>';
     html += '<th>Remarks (Optional)</th>';
-    html += '</table></thead><tbody>';
+    html += '</tr></thead><tbody>';
     
     for (let i = 0; i < recountItems.length; i++) {
         let item = recountItems[i];
@@ -1054,6 +1078,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check if we're continuing a session
     let sessionIdFromUrl = getUrlParameter('session_id');
     if (sessionIdFromUrl) {
+        currentSessionId = parseInt(sessionIdFromUrl);
         loadInProgressSkus();
     } else {
         applyFilters();
