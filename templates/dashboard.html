@@ -16,7 +16,10 @@
         <div class="card text-white bg-success mb-3">
             <div class="card-body">
                 <h5 class="card-title">Active Counting Sessions</h5>
-                <p class="card-text display-4">{{ active_sessions }}</p>
+                <p class="card-text display-4">{{ active_sessions_count }}</p>
+                {% if active_session_info %}
+                <small class="text-white">Started: {{ active_session_info.session_date }}</small>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -24,7 +27,70 @@
         <div class="card text-white bg-info mb-3">
             <div class="card-body">
                 <h5 class="card-title">Quick Actions</h5>
-                <a href="{{ url_for('counting') }}" class="btn btn-light">Start Counting</a>
+                <a href="{{ url_for('counting') }}" class="btn btn-light">Start New Counting</a>
+                {% if active_session_info %}
+                <a href="{{ url_for('counting') }}?session_id={{ active_session_info.id }}" class="btn btn-warning mt-2 d-block">Continue Active Session</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Day Category Progress Section -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5>Counting Progress by Day Category</h5>
+            </div>
+            <div class="card-body">
+                {% if day_category_progress %}
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Day Category</th>
+                                <th>Total SKUs</th>
+                                <th>Completed SKUs</th>
+                                <th>Progress</th>
+                                <th>Start Date</th>
+                                <th>Completion Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for progress in day_category_progress %}
+                            <tr>
+                                <td><strong>{{ progress.name }}</strong></td>
+                                <td>{{ progress.total_skus }}</td>
+                                <td>{{ progress.completed_skus }}</td>
+                                <td>
+                                    <div class="progress">
+                                        <div class="progress-bar {% if progress.percentage == 100 %}bg-success{% elif progress.percentage >= 50 %}bg-info{% else %}bg-warning{% endif %}" 
+                                             role="progressbar" 
+                                             style="width: {{ progress.percentage }}%;" 
+                                             aria-valuenow="{{ progress.percentage }}" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="100">
+                                            {{ progress.percentage }}%
+                                        </div>
+                                    </div>
+                                \n</div>
+                                <td>{{ progress.start_date }}</div>
+                                <td>
+                                    {% if progress.percentage == 100 %}
+                                        <span class="badge bg-success">{{ progress.end_date }}</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">In Progress</span>
+                                    {% endif %}
+                                </div>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">No day category data available. Please sync data from Google Drive.</div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -51,17 +117,20 @@
                 <h5>Categories</h5>
             </div>
             <div class="card-body">
-                <h6>Day Categories</h6>
+                <h6>Day Categories (Mon → Sat)</h6>
                 <ul class="list-group mb-3">
-                    {% for cat in day_categories[:5] %}
+                    {% for cat in day_categories[:7] %}
                     <li class="list-group-item">{{ cat }}</li>
                     {% endfor %}
                 </ul>
-                <h6>Item Categories</h6>
+                <h6>Item Categories (A → Z)</h6>
                 <ul class="list-group">
-                    {% for cat in item_categories[:5] %}
+                    {% for cat in item_categories[:10] %}
                     <li class="list-group-item">{{ cat }}</li>
                     {% endfor %}
+                    {% if item_categories|length > 10 %}
+                    <li class="list-group-item text-muted">... and {{ item_categories|length - 10 }} more</li>
+                    {% endif %}
                 </ul>
             </div>
         </div>
