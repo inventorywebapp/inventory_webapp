@@ -445,7 +445,12 @@ function loadInProgressSkus() {
         .then(response => response.json())
         .then(data => {
             if (data.skus && data.skus.length > 0) {
-                // The data already has current_count and count_time from the API
+                // Mark each SKU as having a current count
+                for (let i = 0; i < data.skus.length; i++) {
+                    data.skus[i].has_count = true;
+                    data.skus[i].current_count = data.skus[i].current_count;
+                    data.skus[i].count_time = data.skus[i].count_time;
+                }
                 allSkus = data.skus;
                 filteredSkus = data.skus;
                 currentPage = 1;
@@ -573,7 +578,7 @@ function displaySkus(skus) {
     
     let html = '<div class="col-12"><div class="table-responsive"><table class="table table-bordered table-hover table-striped">';
     html += '<thead class="table-dark">';
-    html += '</tr>';
+    html += '<tr>';
     html += '<th>SKU</th>';
     html += '<th>Description (Item Category)</th>';
     html += '<th>Day Category</th>';
@@ -595,12 +600,21 @@ function displaySkus(skus) {
         let hasCurrentCount = false;
         let currentCountValue = '';
         let countTimeValue = '';
+        let rowClass = '';
         
         // Check if this SKU has a current_count from the API (for continue session)
-        if (sku.current_count !== undefined && sku.current_count !== null) {
+        if (sku.current_count !== undefined && sku.current_count !== null && sku.current_count !== '') {
             hasCurrentCount = true;
             currentCountValue = sku.current_count;
             countTimeValue = sku.count_time || '';
+            rowClass = 'sku-pre-counted';  // BLUE for pre-counted
+        }
+        // Also check if it has a current count from the latest counts (for normal view)
+        else if (sku.has_count) {
+            hasCurrentCount = true;
+            currentCountValue = sku.current_count;
+            countTimeValue = sku.count_time || '';
+            rowClass = 'sku-pre-counted';  // BLUE for pre-counted
         }
         
         if (sku.bypass_recount) {
@@ -619,7 +633,7 @@ function displaySkus(skus) {
         
         let inputPlaceholder = hasCurrentCount ? `Previously: ${currentCountValue}` : 'Enter count';
         
-        html += '<tr id="sku-row-' + sku.id + '">';
+        html += '<tr id="sku-row-' + sku.id + '" class="' + rowClass + '">';
         html += '<td><strong>' + escapeHtml(sku.sku) + '</strong></td>';
         html += '<td>' + escapeHtml(sku.description || '-') + '</td>';
         html += '<td>' + escapeHtml(sku.category || '-') + '</td>';
