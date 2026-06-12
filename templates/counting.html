@@ -742,25 +742,30 @@ function checkForRecounts() {
 }
 
 function showRecountModal(recountItems) {
+    console.log("Recount items:", recountItems); // Debug log
+    
     let html = '<div class="table-responsive"><table class="table table-bordered">';
-    html += '<thead><tr>';
+    html += '<thead class="table-dark">';
+    html += '<tr>';
     html += '<th>SKU</th>';
+    html += '<th>Description</th>';
     html += '<th>Initial Count</th>';
-    html += '<th>Final Expected</th>';
-    html += '<th>Kenneth\'s Inv</th>';
+    html += '<th>Final Expected Count</th>';
+    html += '<th>Kenneth\'s Inventory</th>';
     html += '<th>Recount Count</th>';
     html += '<th>Remarks (Optional)</th>';
-    html += '</table></thead><tbody>';
+    html += '</tr></thead><tbody>';
     
     for (let i = 0; i < recountItems.length; i++) {
         let item = recountItems[i];
         html += '<tr>';
-        html += '<td>' + escapeHtml(item.sku) + '</td>';
-        html += '<td class="bg-warning">' + item.initial_count + '</td>';
+        html += '<td><strong>' + escapeHtml(item.sku) + '</strong></td>';
+        html += '<td>' + escapeHtml(item.description || '-') + '</td>';
+        html += '<td class="bg-warning">' + (item.initial_count || 0) + '</td>';
         html += '<td class="bg-info">' + (item.final_expected_count || 0) + '</td>';
         html += '<td class="bg-info">' + (item.kenneth_inventory || 0) + '</td>';
         html += '<td><input type="text" class="form-control recount-count" data-record-id="' + item.id + '" style="width: 120px;" placeholder="Enter whole number" inputmode="numeric"></td>';
-        html += '<td><textarea class="form-control recount-remarks" data-record-id="' + item.id + '" rows="2" placeholder="Optional: Reason for discrepancy (e.g., 9 were damaged)"></textarea></td>';
+        html += '<td><textarea class="form-control recount-remarks" data-record-id="' + item.id + '" rows="2" placeholder="Optional: Reason for discrepancy (e.g., 9 were damaged)" style="width: 250px;"></textarea></td>';
         html += '</tr>';
     }
     
@@ -772,7 +777,7 @@ function showRecountModal(recountItems) {
     
     let modalHtml = `
         <div class="modal fade" id="recountModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-xl">
                 <div class="modal-content">
                     <div class="modal-header bg-warning">
                         <h5 class="modal-title">⚠️ Recount Required</h5>
