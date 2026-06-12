@@ -29,7 +29,7 @@
                 <h5 class="card-title">Quick Actions</h5>
                 <a href="{{ url_for('counting') }}" class="btn btn-light">Start New Counting</a>
                 {% if active_session_info %}
-                <a href="{{ url_for('counting') }}?session_id={{ active_session_info.id }}" class="btn btn-warning mt-2 d-block">Continue Active Session</a>
+                <a href="{{ url_for('continue_session', session_id=active_session_info.id) }}" class="btn btn-warning mt-2 d-block">Continue Active Session</a>
                 {% endif %}
             </div>
         </div>
