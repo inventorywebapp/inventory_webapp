@@ -10,6 +10,7 @@ from io import BytesIO
 from datetime import datetime, timedelta
 import os
 import sys
+import re
 from sqlalchemy import or_
 
 app = Flask(__name__)
@@ -28,7 +29,7 @@ login_manager.session_protection = "strong"
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# Create default admin user
+# Create default users
 def create_default_users():
     with app.app_context():
         db.create_all()
@@ -47,19 +48,37 @@ def create_default_users():
                 username='staff1',
                 password=generate_password_hash('staff123'),
                 full_name='Inventory Staff',
-                role='staff',
+                role='inventory_staff',
                 is_active=True
             )
             db.session.add(staff)
             
-            audit = User(
-                username='audit1',
-                password=generate_password_hash('audit123'),
-                full_name='Audit User',
-                role='audit',
+            supervisor = User(
+                username='supervisor1',
+                password=generate_password_hash('super123'),
+                full_name='Inventory Supervisor',
+                role='inventory_supervisor',
                 is_active=True
             )
-            db.session.add(audit)
+            db.session.add(supervisor)
+            
+            auditor = User(
+                username='auditor1',
+                password=generate_password_hash('audit123'),
+                full_name='Audit User',
+                role='auditor',
+                is_active=True
+            )
+            db.session.add(auditor)
+            
+            manager = User(
+                username='manager1',
+                password=generate_password_hash('manager123'),
+                full_name='Manager',
+                role='manager',
+                is_active=True
+            )
+            db.session.add(manager)
             
             db.session.commit()
             print("Default users created!", file=sys.stderr)
@@ -94,10 +113,10 @@ def shutdown_session(exception=None):
 def index():
     if current_user.role == 'admin':
         return redirect(url_for('admin_dashboard'))
-    elif current_user.role == 'audit':
+    elif current_user.role == 'auditor':
         return redirect(url_for('audit_dashboard'))
     else:
-        return redirect(url_for('counting'))
+        return redirect(url_for('dashboard'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -108,6 +127,10 @@ def login():
         user = User.query.filter_by(username=username).first()
         
         if user and check_password_hash(user.password, password):
+            if not user.is_active:
+                flash('Your account is disabled. Please contact administrator.', 'error')
+                return redirect(url_for('login'))
+            
             login_user(user, remember=True)
             
             audit = AuditLog(
@@ -143,21 +166,70 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    if current_user.role == 'audit':
-        return redirect(url_for('audit_dashboard'))
-    
     total_skus = SKU.query.count()
-    active_sessions = CountingSession.query.filter_by(is_completed=False).count()
-    day_categories = db.session.query(SKU.category).distinct().all()
-    item_categories = db.session.query(SKU.description).distinct().all()
+    active_sessions = CountingSession.query.filter_by(is_completed=False).all()
+    active_sessions_count = len(active_sessions)
+    
+    # Get active session details for continuation button
+    active_session_info = None
+    if active_sessions_count > 0:
+        latest_session = active_sessions[0]
+        active_session_info = {
+            'id': latest_session.id,
+            'warehouse': latest_session.warehouse,
+            'session_date': latest_session.session_date.strftime('%Y-%m-%d %H:%M:%S'),
+            'started_by': latest_session.user.full_name if latest_session.user else 'Unknown'
+        }
+    
+    # Get Day Categories in Mon→Sat order
+    day_categories_raw = db.session.query(SKU.category).distinct().all()
+    day_order = {'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6}
+    day_categories = [c[0] for c in day_categories_raw if c[0] and c[0] != '']
+    day_categories.sort(key=lambda x: day_order.get(x, 999))
+    
+    # Get Item Categories alphabetically
+    item_categories_raw = db.session.query(SKU.description).distinct().all()
+    item_categories = [c[0] for c in item_categories_raw if c[0] and c[0] != '']
+    item_categories.sort()
+    
     warehouses = ['Main Warehouse', '5th Floor Warehouse']
+    
+    # Calculate progress for each Day Category
+    day_category_progress = []
+    for day_cat in day_categories:
+        skus_in_category = SKU.query.filter(SKU.category == day_cat).all()
+        total_in_category = len(skus_in_category)
+        
+        completed_count = 0
+        for sku in skus_in_category:
+            completed_record = CountRecord.query.join(CountingSession).filter(
+                CountRecord.sku_id == sku.id,
+                CountingSession.is_completed == True
+            ).first()
+            if completed_record:
+                completed_count += 1
+        
+        percentage = (completed_count / total_in_category * 100) if total_in_category > 0 else 0
+        
+        session_info = CountingSession.query.filter_by(is_completed=True).order_by(CountingSession.session_date.desc()).first()
+        
+        day_category_progress.append({
+            'name': day_cat,
+            'total_skus': total_in_category,
+            'completed_skus': completed_count,
+            'percentage': round(percentage, 1),
+            'start_date': session_info.session_date.strftime('%Y-%m-%d') if session_info else 'Not started',
+            'end_date': session_info.session_date.strftime('%Y-%m-%d') if session_info and session_info.is_completed else 'In progress'
+        })
     
     return render_template('dashboard.html',
                          total_skus=total_skus,
-                         active_sessions=active_sessions,
-                         day_categories=[c[0] for c in day_categories if c[0] and c[0] != ''],
-                         item_categories=[c[0] for c in item_categories if c[0] and c[0] != ''],
-                         warehouses=warehouses)
+                         active_sessions_count=active_sessions_count,
+                         active_session_info=active_session_info,
+                         day_categories=day_categories,
+                         item_categories=item_categories[:10],
+                         warehouses=warehouses,
+                         day_category_progress=day_category_progress)
 
 @app.route('/get_skus')
 @login_required
@@ -169,10 +241,8 @@ def get_skus():
     
     query = SKU.query
     
-    # Track if any filters are applied
     is_filtered = False
     
-    # Apply filters only if not "All" or empty
     if day_category and day_category != 'All' and day_category != '-- All Day Categories --':
         query = query.filter(SKU.category == day_category)
         is_filtered = True
@@ -190,15 +260,10 @@ def get_skus():
         )
         is_filtered = True
     
-    # SMART LIMIT:
-    # - If filters are applied, show ALL matching SKUs (user wants specific results)
-    # - If no filters, limit to 1000 for performance (user is just browsing)
     if is_filtered:
         skus = query.all()
-        print(f"Filtered query returned {len(skus)} SKUs", file=sys.stderr)
     else:
         skus = query.limit(1000).all()
-        print(f"Unfiltered query (limited to 1000) returned {len(skus)} SKUs", file=sys.stderr)
     
     result = [{
         'id': s.id, 
@@ -236,9 +301,9 @@ def search_suggestions():
 @app.route('/counting', methods=['GET', 'POST'])
 @login_required
 def counting():
-    if current_user.role not in ['staff', 'admin']:
+    if not current_user.has_permission('count'):
         flash('Access denied', 'error')
-        return redirect(url_for('index'))
+        return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
         data = request.json
@@ -246,7 +311,6 @@ def counting():
         counts = data.get('counts', {})
         warehouse = data.get('warehouse')
         
-        # Get or create session
         session_obj = CountingSession.query.get(session_id)
         if not session_obj:
             session_obj = CountingSession(user_id=current_user.id, warehouse=warehouse)
@@ -254,7 +318,6 @@ def counting():
             db.session.commit()
             session_id = session_obj.id
         
-        # Process each SKU count
         recount_needed_skus = []
         for sku_id, count_data in counts.items():
             sku = SKU.query.get(int(sku_id))
@@ -263,7 +326,6 @@ def counting():
                 
             initial_count = float(count_data.get('initial_count', 0))
             
-            # Check if there's an existing PENDING recount for this SKU in this session
             pending_recount = CountRecord.query.filter_by(
                 session_id=session_obj.id,
                 sku_id=int(sku_id),
@@ -271,15 +333,12 @@ def counting():
             ).first()
             
             if pending_recount:
-                # Update existing pending recount instead of creating new
                 old_value = pending_recount.initial_count
                 old_version = pending_recount.version
                 
                 pending_recount.initial_count = initial_count
                 pending_recount.count_time = get_ph_time()
-                # Keep same version, don't increment
                 
-                # Log the update in AuditLog
                 audit = AuditLog(
                     user_id=current_user.id,
                     action='Count Updated',
@@ -288,14 +347,12 @@ def counting():
                 )
                 db.session.add(audit)
                 
-                # Check if recount still needed
                 recount_needed = check_recount_needed(initial_count, sku.final_expected_count, sku.kenneth_inventory)
                 pending_recount.is_recount_needed = recount_needed
                 
                 if recount_needed:
                     recount_needed_skus.append(sku.sku)
             else:
-                # Get the latest completed record to get version
                 latest_record = CountRecord.query.filter_by(
                     session_id=session_obj.id, 
                     sku_id=int(sku_id)
@@ -305,10 +362,8 @@ def counting():
                 old_version = latest_record.version if latest_record else 0
                 new_version = old_version + 1
                 
-                # Check if recount needed
                 recount_needed = check_recount_needed(initial_count, sku.final_expected_count, sku.kenneth_inventory)
                 
-                # Create new record
                 new_record = CountRecord(
                     session_id=session_obj.id,
                     sku_id=int(sku_id),
@@ -322,7 +377,6 @@ def counting():
                 if recount_needed:
                     recount_needed_skus.append(sku.sku)
                 
-                # Log changes in AuditLog
                 if old_value is not None and old_value != initial_count:
                     audit = AuditLog(
                         user_id=current_user.id,
@@ -342,7 +396,6 @@ def counting():
         
         db.session.commit()
         
-        # Log the save action
         audit = AuditLog(
             user_id=current_user.id,
             action='Initial Count Saved',
@@ -359,14 +412,16 @@ def counting():
             'recount_needed_skus': recount_needed_skus[:10]
         })
     
-    # GET request - show counting page
     warehouses = ['Main Warehouse', '5th Floor Warehouse']
-    day_categories = db.session.query(SKU.category).distinct().all()
-    item_categories = db.session.query(SKU.description).distinct().all()
+    day_categories_raw = db.session.query(SKU.category).distinct().all()
+    item_categories_raw = db.session.query(SKU.description).distinct().all()
     
-    # Filter out None/Empty values
-    day_categories = [c[0] for c in day_categories if c[0] and c[0] != '']
-    item_categories = [c[0] for c in item_categories if c[0] and c[0] != '']
+    day_order = {'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6}
+    day_categories = [c[0] for c in day_categories_raw if c[0] and c[0] != '']
+    day_categories.sort(key=lambda x: day_order.get(x, 999))
+    
+    item_categories = [c[0] for c in item_categories_raw if c[0] and c[0] != '']
+    item_categories.sort()
     
     return render_template('counting.html',
                          warehouses=warehouses,
@@ -380,7 +435,6 @@ def get_recount_list():
     if not session_id:
         return jsonify([])
     
-    # Only get records that need recount AND are NOT completed
     records = CountRecord.query.filter_by(
         session_id=session_id, 
         is_recount_needed=True, 
@@ -403,6 +457,9 @@ def get_recount_list():
 @app.route('/save_recount', methods=['POST'])
 @login_required
 def save_recount():
+    if not current_user.has_permission('recount'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 403
+    
     data = request.json
     for recount_data in data.get('recounts', []):
         record = CountRecord.query.get(recount_data.get('record_id'))
@@ -509,18 +566,22 @@ def complete_counting():
 def admin_dashboard():
     if current_user.role != 'admin':
         flash('Admin access required', 'error')
-        return redirect(url_for('index'))
+        return redirect(url_for('dashboard'))
     
     users = User.query.all()
     sessions = CountingSession.query.order_by(CountingSession.session_date.desc()).limit(50).all()
     audit_logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(100).all()
     
     warehouses = ['Main Warehouse', '5th Floor Warehouse', 'All']
-    day_categories = db.session.query(SKU.category).distinct().all()
-    item_categories = db.session.query(SKU.description).distinct().all()
+    day_categories_raw = db.session.query(SKU.category).distinct().all()
+    item_categories_raw = db.session.query(SKU.description).distinct().all()
     
-    day_categories = [c[0] for c in day_categories if c[0] and c[0] != '']
-    item_categories = [c[0] for c in item_categories if c[0] and c[0] != '']
+    day_order = {'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6}
+    day_categories = [c[0] for c in day_categories_raw if c[0] and c[0] != '']
+    day_categories.sort(key=lambda x: day_order.get(x, 999))
+    
+    item_categories = [c[0] for c in item_categories_raw if c[0] and c[0] != '']
+    item_categories.sort()
     
     return render_template('admin.html', 
                          users=users, 
@@ -530,22 +591,154 @@ def admin_dashboard():
                          day_categories=day_categories,
                          item_categories=item_categories)
 
+@app.route('/admin/users')
+@login_required
+def admin_users():
+    if current_user.role != 'admin':
+        flash('Admin access required', 'error')
+        return redirect(url_for('dashboard'))
+    
+    users = User.query.all()
+    return render_template('admin_users.html', users=users)
+
+@app.route('/admin/create_user', methods=['POST'])
+@login_required
+def create_user():
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 403
+    
+    username = request.form.get('username')
+    password = request.form.get('password')
+    full_name = request.form.get('full_name')
+    role = request.form.get('role')
+    
+    if User.query.filter_by(username=username).first():
+        return jsonify({'success': False, 'message': 'Username already exists'}), 400
+    
+    new_user = User(
+        username=username,
+        password=generate_password_hash(password),
+        full_name=full_name,
+        role=role,
+        is_active=True
+    )
+    db.session.add(new_user)
+    db.session.commit()
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action='User Created',
+        details=f'Created user {username} with role {role}',
+        ip_address=request.remote_addr
+    )
+    db.session.add(audit)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'User created successfully'})
+
+@app.route('/admin/edit_user', methods=['POST'])
+@login_required
+def edit_user():
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 403
+    
+    user_id = request.form.get('user_id')
+    full_name = request.form.get('full_name')
+    role = request.form.get('role')
+    is_active = request.form.get('is_active') == 'true'
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'success': False, 'message': 'User not found'}), 404
+    
+    old_role = user.role
+    user.full_name = full_name
+    user.role = role
+    user.is_active = is_active
+    
+    db.session.commit()
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action='User Updated',
+        details=f'Updated user {user.username}: role {old_role} → {role}, active={is_active}',
+        ip_address=request.remote_addr
+    )
+    db.session.add(audit)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'User updated successfully'})
+
+@app.route('/admin/reset_password', methods=['POST'])
+@login_required
+def reset_password():
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 403
+    
+    user_id = request.form.get('user_id')
+    new_password = request.form.get('new_password')
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'success': False, 'message': 'User not found'}), 404
+    
+    user.password = generate_password_hash(new_password)
+    db.session.commit()
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action='Password Reset',
+        details=f'Reset password for user {user.username}',
+        ip_address=request.remote_addr
+    )
+    db.session.add(audit)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'Password reset successfully'})
+
+@app.route('/admin/delete_user', methods=['POST'])
+@login_required
+def delete_user():
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 403
+    
+    user_id = request.form.get('user_id')
+    
+    if int(user_id) == current_user.id:
+        return jsonify({'success': False, 'message': 'Cannot delete your own account'}), 400
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'success': False, 'message': 'User not found'}), 404
+    
+    username = user.username
+    db.session.delete(user)
+    db.session.commit()
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action='User Deleted',
+        details=f'Deleted user {username}',
+        ip_address=request.remote_addr
+    )
+    db.session.add(audit)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'User deleted successfully'})
+
 @app.route('/export_counts', methods=['POST'])
 @login_required
 def export_counts():
-    """Export count data - shows LATEST count from the MOST RECENT session for each SKU (No Version/Session ID)"""
-    if current_user.role not in ['admin', 'audit']:
+    if not current_user.has_permission('export_counts'):
         flash('Access denied', 'error')
-        return redirect(url_for('index'))
+        return redirect(url_for('dashboard'))
     
     try:
-        # Get filter parameters
         filter_date = request.form.get('filter_date')
         filter_warehouse = request.form.get('filter_warehouse')
         filter_day_category = request.form.get('filter_day_category')
         filter_item_category = request.form.get('filter_item_category')
         
-        # Get all SKUs based on filters
         sku_query = SKU.query
         
         if filter_day_category and filter_day_category != 'All':
@@ -555,7 +748,6 @@ def export_counts():
         
         all_skus_in_category = sku_query.all()
         
-        # Get counting sessions
         session_query = CountingSession.query
         
         if filter_date and filter_date.strip():
@@ -572,7 +764,6 @@ def export_counts():
         
         sessions = session_query.all()
         
-        # For each SKU, find the LATEST record from the MOST RECENT session
         sku_latest = {}
         
         for sku in all_skus_in_category:
@@ -580,7 +771,6 @@ def export_counts():
             best_session = None
             
             for session_obj in sessions:
-                # Get the latest version for this SKU in this session
                 record = CountRecord.query.filter_by(
                     session_id=session_obj.id,
                     sku_id=sku.id
@@ -597,7 +787,6 @@ def export_counts():
                 'session': best_session
             }
         
-        # Group by day category
         sheets_data = {}
         
         for sku_id, data in sku_latest.items():
@@ -611,7 +800,6 @@ def export_counts():
                 sheets_data[day_category] = []
             
             if count_record and session_obj:
-                # SKU was counted
                 if count_record.recount_count and count_record.recount_count > 0:
                     final_count = count_record.recount_count
                 else:
@@ -636,7 +824,6 @@ def export_counts():
                     'Kenneth Inventory': sku.kenneth_inventory
                 }
             else:
-                # SKU was NOT counted
                 row_data = {
                     'SKU': str(sku.sku),
                     'Description': str(sku.description) if sku.description else '',
@@ -658,7 +845,6 @@ def export_counts():
             
             sheets_data[day_category].append(row_data)
         
-        # Create Excel file
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             if sheets_data:
@@ -681,8 +867,7 @@ def export_counts():
                         for row_idx in range(2, len(data) + 2):
                             cell = worksheet.cell(row=row_idx, column=status_col)
                             if cell.value and 'NOT COUNTED' in str(cell.value):
-                                cell.fill = yellow_fill
-            else:
+                                cell.fill = yellow_fill            else:
                 df = pd.DataFrame({'Message': ['No SKU data found for the selected filters']})
                 df.to_excel(writer, sheet_name='No Data', index=False)
         
@@ -710,10 +895,9 @@ def export_counts():
 @app.route('/export_audit_log', methods=['POST'])
 @login_required
 def export_audit_log():
-    """Export audit log data - with integer formatting"""
-    if current_user.role not in ['admin', 'audit']:
+    if not current_user.has_permission('export_audit'):
         flash('Access denied', 'error')
-        return redirect(url_for('index'))
+        return redirect(url_for('dashboard'))
     
     try:
         start_date = request.form.get('start_date')
@@ -748,13 +932,10 @@ def export_audit_log():
             flash('No audit log data found for the selected filters', 'warning')
             return redirect(url_for('admin_dashboard'))
         
-        # Prepare data for export with integer formatting
         audit_data = []
         for log in logs:
             details = log.details
             if details:
-                # Replace .0 with empty string for whole numbers
-                import re
                 details = re.sub(r'(\d+)\.0', r'\1', details)
             
             audit_data.append({
@@ -788,25 +969,22 @@ def export_audit_log():
 @app.route('/audit')
 @login_required
 def audit_dashboard():
-    if current_user.role != 'audit':
-        flash('Audit access required', 'error')
-        return redirect(url_for('index'))
+    if current_user.role != 'auditor' and current_user.role != 'admin' and not current_user.has_permission('export_audit'):
+        flash('Access denied', 'error')
+        return redirect(url_for('dashboard'))
     return render_template('audit.html')
 
 @app.route('/get_audit_logs')
 @login_required
 def get_audit_logs():
-    if current_user.role not in ['admin', 'audit']:
+    if current_user.role not in ['admin', 'auditor'] and not current_user.has_permission('export_audit'):
         return jsonify([])
     
     logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(200).all()
     result = []
     for log in logs:
-        # Clean up details to remove .0 from numbers
         details = log.details
         if details:
-            # Replace .0 with empty string for whole numbers
-            import re
             details = re.sub(r'(\d+)\.0', r'\1', details)
         
         result.append({
@@ -902,7 +1080,7 @@ def debug_session(session_id):
     
     for r in records:
         result += f"<tr>"
-        result += f"<td>{r.sku.sku if r.sku else 'Unknown'}</td>"
+        result += f"日上午{r.sku.sku if r.sku else 'Unknown'}</td>"
         result += f"日上午{r.version}</td>"
         result += f"<td>{r.initial_count}</td>"
         result += f"<td>{r.count_time}</td>"
