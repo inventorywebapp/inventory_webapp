@@ -73,7 +73,6 @@
 .suggestion-item:hover {
     background-color: #f0f0f0;
 }
-/* Highlight uncounted SKU rows */
 .sku-uncounted {
     background-color: #fff3cd !important;
     border-left: 3px solid #ffc107;
@@ -81,11 +80,24 @@
 .sku-uncounted:hover {
     background-color: #ffe69e !important;
 }
-/* Counter badge */
+.sku-counted {
+    background-color: #d1e7dd !important;
+    border-left: 3px solid #198754;
+}
 .uncounted-badge {
     display: inline-block;
     background-color: #ffc107;
     color: #856404;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-left: 10px;
+}
+.counted-badge {
+    display: inline-block;
+    background-color: #198754;
+    color: white;
     padding: 2px 8px;
     border-radius: 12px;
     font-size: 12px;
@@ -129,14 +141,13 @@ let itemsPerPage = 50;
 let currentSessionId = null;
 let searchTimeout = null;
 
-// Sort day categories in Mon, Tue, Wed, Thu, Fri, Sat order
+// Sort day categories
 let allDayCategories = [...allDayCategoriesRaw].sort((a, b) => {
     let orderA = DAY_ORDER[a] || 999;
     let orderB = DAY_ORDER[b] || 999;
     return orderA - orderB;
 });
 
-// Function to filter item categories based on warehouse selection
 function filterItemCategoriesByWarehouse() {
     let warehouse = document.getElementById('warehouse').value;
     let itemCategorySelect = document.getElementById('itemCategory');
@@ -170,7 +181,6 @@ function filterItemCategoriesByWarehouse() {
     updateDayCategories();
 }
 
-// Function to update day categories based on selected item category
 function updateDayCategories() {
     let selectedItemCategory = document.getElementById('itemCategory').value;
     let dayCategorySelect = document.getElementById('dayCategory');
@@ -212,42 +222,59 @@ function updateDayCategories() {
     }
 }
 
-// Function to highlight rows without counts
-function highlightUncountedSkus() {
+function highlightSkusStatus() {
     let countInputs = document.querySelectorAll('.initial-count');
     let uncountedCount = 0;
+    let countedCount = 0;
     
     for (let i = 0; i < countInputs.length; i++) {
         let input = countInputs[i];
         let row = input.closest('tr');
         let count = input.value;
         
-        if (!count || count === '' || parseFloat(count) === 0) {
-            if (row) row.classList.add('sku-uncounted');
+        // Blank = not counted (yellow)
+        // Has value (including 0) = counted (green)
+        if (!count || count === '') {
+            if (row) {
+                row.classList.add('sku-uncounted');
+                row.classList.remove('sku-counted');
+            }
             uncountedCount++;
         } else {
-            if (row) row.classList.remove('sku-uncounted');
+            if (row) {
+                row.classList.remove('sku-uncounted');
+                row.classList.add('sku-counted');
+            }
+            countedCount++;
         }
     }
     
-    // Update the page title or add a badge
-    let existingBadge = document.getElementById('uncountedBadge');
+    // Update badges
+    let existingUncountedBadge = document.getElementById('uncountedBadge');
+    let existingCountedBadge = document.getElementById('countedBadge');
+    
+    if (existingCountedBadge) existingCountedBadge.remove();
+    if (existingUncountedBadge) existingUncountedBadge.remove();
+    
+    let title = document.querySelector('h2');
+    
+    if (countedCount > 0) {
+        let badge = document.createElement('span');
+        badge.id = 'countedBadge';
+        badge.className = 'counted-badge';
+        badge.innerHTML = `${countedCount} SKU(s) counted`;
+        title.appendChild(badge);
+    }
+    
     if (uncountedCount > 0) {
-        if (!existingBadge) {
-            let badge = document.createElement('span');
-            badge.id = 'uncountedBadge';
-            badge.className = 'uncounted-badge';
-            badge.innerHTML = `${uncountedCount} SKU(s) need count`;
-            document.querySelector('h2').appendChild(badge);
-        } else {
-            existingBadge.innerHTML = `${uncountedCount} SKU(s) need count`;
-        }
-    } else if (existingBadge) {
-        existingBadge.remove();
+        let badge = document.createElement('span');
+        badge.id = 'uncountedBadge';
+        badge.className = 'uncounted-badge';
+        badge.innerHTML = `${uncountedCount} SKU(s) need count`;
+        title.appendChild(badge);
     }
 }
 
-// Smart search that shows suggestions instantly without Apply Filters
 function setupSmartSearch() {
     let searchInput = document.getElementById('searchSku');
     let suggestionsDiv = document.getElementById('suggestions');
@@ -341,13 +368,9 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
               '&item_category=' + encodeURIComponent(itemCategory) + 
               '&search=' + encodeURIComponent(search);
     
-    console.log('Fetching:', url);
-    
     fetch(url)
         .then(response => response.json())
         .then(data => {
-            console.log('Received:', data.length, 'SKUs from server');
-            
             allSkus = data;
             
             let warehouseFiltered = [];
@@ -364,13 +387,10 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
                 }
             }
             
-            console.log('After warehouse filter:', warehouseFiltered.length, 'SKUs');
-            
             filteredSkus = warehouseFiltered;
             currentPage = 1;
             displaySkusWithPagination();
             loadingDiv.style.display = 'none';
-            
             updateDayCategories();
         })
         .catch(error => {
@@ -407,7 +427,7 @@ function displaySkus(skus) {
     
     let html = '<div class="col-12"><div class="table-responsive"><table class="table table-bordered table-hover table-striped">';
     html += '<thead class="table-dark">';
-    html += '</tr>';
+    html += '<tr>';
     html += '<th>SKU</th>';
     html += '<th>Description (Item Category)</th>';
     html += '<th>Day Category</th>';
@@ -434,7 +454,6 @@ function displaySkus(skus) {
             containerDetails = containerDetails.substring(0, 50) + '...';
         }
         
-        // Format the last count date nicely
         let lastCountDate = sku.last_count_date || '-';
         if (lastCountDate !== '-' && lastCountDate.length > 10) {
             lastCountDate = lastCountDate.split(' ')[0];
@@ -450,7 +469,7 @@ function displaySkus(skus) {
         html += '<td><small>' + escapeHtml(containerDetails) + '</small></td>';
         html += '<td class="fw-bold text-primary">' + (sku.final_expected_count || 0) + '</td>';
         html += '<td class="fw-bold text-success">' + (sku.kenneth_inventory || 0) + '</td>';
-        html += '<td><input type="number" class="form-control initial-count" data-sku-id="' + sku.id + '" value="0" step="0.01" style="min-width: 100px; width: 100px;"></td>';
+        html += '<td><input type="number" class="form-control initial-count" data-sku-id="' + sku.id + '" step="0.01" style="min-width: 100px; width: 100px;" placeholder="Enter count"></td>';
         html += '<td>' + statusBadge + '</td>';
         html += '</tr>';
     }
@@ -458,35 +477,20 @@ function displaySkus(skus) {
     html += '</tbody></table></div></div>';
     skusListDiv.innerHTML = html;
     
-    // Highlight uncounted SKUs and add event listeners
-    highlightUncountedSkus();
+    highlightSkusStatus();
     
-    // Add event listeners to update highlighting when user types
+    // Add event listeners for real-time highlighting
     document.querySelectorAll('.initial-count').forEach(input => {
         input.addEventListener('input', function() {
             let row = this.closest('tr');
-            if (this.value && parseFloat(this.value) !== 0) {
+            if (this.value && this.value !== '') {
                 row.classList.remove('sku-uncounted');
+                row.classList.add('sku-counted');
             } else {
+                row.classList.remove('sku-counted');
                 row.classList.add('sku-uncounted');
             }
-            
-            // Update badge count
-            let uncounted = document.querySelectorAll('.sku-uncounted').length;
-            let badge = document.getElementById('uncountedBadge');
-            if (uncounted > 0) {
-                if (!badge) {
-                    let newBadge = document.createElement('span');
-                    newBadge.id = 'uncountedBadge';
-                    newBadge.className = 'uncounted-badge';
-                    newBadge.innerHTML = `${uncounted} SKU(s) need count`;
-                    document.querySelector('h2').appendChild(newBadge);
-                } else {
-                    badge.innerHTML = `${uncounted} SKU(s) need count`;
-                }
-            } else if (badge) {
-                badge.remove();
-            }
+            highlightSkusStatus();
         });
     });
 }
@@ -522,84 +526,69 @@ function saveAllCounts() {
     let warehouse = document.getElementById('warehouse').value;
     let warehouseDisplay = warehouse === '5thFloor' ? '5th Floor Warehouse' : (warehouse === 'Main' ? 'Main Warehouse' : 'All Warehouses');
     
-    // Get all count inputs
     let countInputs = document.querySelectorAll('.initial-count');
     let totalSkus = countInputs.length;
     let countedSkus = 0;
-    let zeroCountSkus = 0;
-    let uncountedSkus = [];
-    let zeroCountSkuNames = [];
+    let blankSkus = 0;
+    let zeroSkus = 0;
+    let blankSkuNames = [];
     
-    // Analyze which SKUs have counts
+    // Count how many SKUs have values (including zeros)
     for (let i = 0; i < countInputs.length; i++) {
         let input = countInputs[i];
         let count = input.value;
-        
-        // Find SKU name from the row
         let row = input.closest('tr');
         let skuName = row ? row.cells[0].innerText : 'Unknown SKU';
         
-        if (count && parseFloat(count) !== 0) {
+        if (count && count !== '') {
             countedSkus++;
-        } else if (count && parseFloat(count) === 0) {
-            zeroCountSkus++;
-            zeroCountSkuNames.push(skuName);
-        } else {
-            // Empty count
-            uncountedSkus.push(skuName);
-        }
-    }
-    
-    let remainingSkus = totalSkus - countedSkus - zeroCountSkus;
-    
-    // Build warning message
-    let warningMessage = '';
-    let requiresConfirmation = false;
-    
-    if (remainingSkus > 0) {
-        warningMessage = `⚠️ WARNING: You have ${remainingSkus} SKU(s) with NO count entered!\n\n`;
-        warningMessage += `Total SKUs in current view: ${totalSkus}\n`;
-        warningMessage += `SKUs with counts: ${countedSkus}\n`;
-        warningMessage += `SKUs with zero count: ${zeroCountSkus}\n`;
-        warningMessage += `SKUs without counts: ${remainingSkus}\n\n`;
-        
-        if (remainingSkus <= 5) {
-            warningMessage += `Uncounted SKUs:\n${uncountedSkus.map(s => `  • ${s}`).join('\n')}\n\n`;
-        } else {
-            warningMessage += `First ${Math.min(5, uncountedSkus.length)} uncounted SKUs:\n${uncountedSkus.slice(0, 5).map(s => `  • ${s}`).join('\n')}\n`;
-            if (remainingSkus > 5) {
-                warningMessage += `  ... and ${remainingSkus - 5} more\n\n`;
+            if (parseFloat(count) === 0) {
+                zeroSkus++;
             }
+        } else {
+            blankSkus++;
+            blankSkuNames.push(skuName);
+        }
+    }
+    
+    // Warning for blank SKUs
+    if (blankSkus > 0) {
+        let warningMsg = `⚠️ You have ${blankSkus} SKU(s) with NO count entered.\n\n`;
+        warningMsg += `Total SKUs: ${totalSkus}\n`;
+        warningMsg += `Counted: ${countedSkus}\n`;
+        warningMsg += `Blank: ${blankSkus}\n\n`;
+        
+        if (blankSkus <= 5) {
+            warningMsg += `Uncounted SKUs:\n${blankSkuNames.map(s => `  • ${s}`).join('\n')}\n\n`;
+        } else {
+            warningMsg += `First 5 uncounted: ${blankSkuNames.slice(0, 5).join(', ')}\n`;
+            warningMsg += `... and ${blankSkus - 5} more\n\n`;
         }
         
-        warningMessage += `Are you sure you want to save with missing counts?`;
-        requiresConfirmation = true;
-    }
-    
-    // Show confirmation dialog if needed
-    if (requiresConfirmation) {
-        if (!confirm(warningMessage)) {
-            return; // User cancelled
-        }
-    } else if (countedSkus === 0 && zeroCountSkus === 0) {
-        if (!confirm(`No counts have been entered for any SKU. Save anyway?`)) {
-            return;
-        }
-    } else {
-        // Normal save with summary
-        if (!confirm(`Save counts for ${countedSkus + zeroCountSkus} out of ${totalSkus} SKUs to ${warehouseDisplay}?`)) {
+        warningMsg += `Are you sure you want to save with missing counts?`;
+        
+        if (!confirm(warningMsg)) {
             return;
         }
     }
     
-    // Prepare counts to save
+    // Prepare counts (only save non-blank values)
     let counts = {};
     for (let i = 0; i < countInputs.length; i++) {
         let input = countInputs[i];
         let skuId = input.getAttribute('data-sku-id');
         let count = input.value;
-        // Save all counts (including zeros)
-        counts[skuId] = {initial_count: count || 0};
+        
+        // Only save if user entered something (including zero)
+        if (count && count !== '') {
+            counts[skuId] = {initial_count: count};
+        }
+        // Blank SKUs are NOT saved - they remain uncounted
+    }
+    
+    if (Object.keys(counts).length === 0) {
+        alert('No counts entered. Please enter at least one count before saving.');
+        return;
     }
     
     let saveBtn = document.getElementById('saveCounts');
@@ -621,16 +610,20 @@ function saveAllCounts() {
     .then(data => {
         if (data.success) {
             currentSessionId = data.session_id;
-            let successMessage = `✓ Counts saved successfully!\n\n`;
-            successMessage += `Saved ${Object.keys(counts).length} SKU counts`;
             
             if (data.recount_needed_count > 0) {
-                successMessage += `\n\n⚠️ ${data.recount_needed_count} SKU(s) need recount (discrepancy > 3)`;
-                successMessage += `\nPlease check the recount list.`;
+                alert(`⚠️ ${data.recount_needed_count} SKU(s) need recount (discrepancy > 3)\n\nThe recount window will now open.`);
+                checkForRecounts();
+            } else {
+                let completeMsg = `✓ Counts saved successfully!\n\n`;
+                completeMsg += `Saved ${Object.keys(counts).length} SKU counts\n`;
+                completeMsg += `✅ No discrepancies found.\n\n`;
+                completeMsg += `Do you want to complete the counting session now?`;
+                
+                if (confirm(completeMsg)) {
+                    completeCountingSession();
+                }
             }
-            
-            alert(successMessage);
-            checkForRecounts();
         } else {
             alert('Error saving counts');
         }
@@ -653,14 +646,13 @@ function checkForRecounts() {
             if (data.length > 0) {
                 showRecountModal(data);
             } else {
-                // Check if there are any pending recounts (double check)
                 fetch('/check_recount_status?session_id=' + currentSessionId)
                     .then(res => res.json())
                     .then(status => {
                         if (!status.has_pending_recounts) {
-                            alert('All counts are valid. You can complete the counting session.');
-                        } else {
-                            alert('No items need recount. You can complete the counting session.');
+                            if (confirm('All counts are valid!\n\nDo you want to complete the counting session now?')) {
+                                completeCountingSession();
+                            }
                         }
                     });
             }
@@ -675,7 +667,7 @@ function showRecountModal(recountItems) {
     html += '<th>Final Expected</th>';
     html += '<th>Kenneth\'s Inv</th>';
     html += '<th>Recount Count</th>';
-    html += '<th>Remarks</th>';
+    html += '<th>Remarks (Required)</th>';
     html += '</tr></thead><tbody>';
     
     for (let i = 0; i < recountItems.length; i++) {
@@ -685,23 +677,28 @@ function showRecountModal(recountItems) {
         html += '<td class="bg-warning">' + item.initial_count + '</td>';
         html += '<td class="bg-info">' + (item.final_expected_count || 0) + '</td>';
         html += '<td class="bg-info">' + (item.kenneth_inventory || 0) + '</td>';
-        html += '<td><input type="number" class="form-control recount-count" data-record-id="' + item.id + '" step="0.01"></td>';
-        html += '<td><textarea class="form-control recount-remarks" data-record-id="' + item.id + '" rows="2" placeholder="Reason for discrepancy (e.g., 9 were damaged)"></textarea></td>';
+        html += '<td><input type="number" class="form-control recount-count" data-record-id="' + item.id + '" step="0.01" style="width: 120px;"></td>';
+        html += '<td><textarea class="form-control recount-remarks" data-record-id="' + item.id + '" rows="2" placeholder="Required: Reason for discrepancy"></textarea></td>';
         html += '</tr>';
     }
     
     html += '</tbody></table></div>';
-    html += '<button class="btn btn-primary mt-3" onclick="saveRecounts()">Save Recounts</button>';
+    html += '<div class="mt-3 text-end">';
+    html += '<button class="btn btn-success" onclick="saveRecounts()">Save Recounts & Complete Session</button>';
+    html += '</div>';
     
     let modalHtml = `
-        <div class="modal fade" id="recountModal" tabindex="-1">
+        <div class="modal fade" id="recountModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Recount Required Items</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <div class="modal-header bg-warning">
+                        <h5 class="modal-title">⚠️ Recount Required</h5>
                     </div>
                     <div class="modal-body">
+                        <div class="alert alert-danger">
+                            <strong>Important:</strong> The following SKUs have discrepancies greater than 3 units.
+                            Please recount and provide a reason for the discrepancy.
+                        </div>
                         ${html}
                     </div>
                 </div>
@@ -716,13 +713,18 @@ function showRecountModal(recountItems) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
-    let modal = new bootstrap.Modal(document.getElementById('recountModal'));
+    let modal = new bootstrap.Modal(document.getElementById('recountModal'), {
+        backdrop: 'static',
+        keyboard: false
+    });
     modal.show();
 }
 
 function saveRecounts() {
     let recounts = [];
     let countInputs = document.querySelectorAll('.recount-count');
+    let hasError = false;
+    let errorMessage = '';
     
     for (let i = 0; i < countInputs.length; i++) {
         let input = countInputs[i];
@@ -730,19 +732,43 @@ function saveRecounts() {
         let recountCount = input.value;
         let remarks = document.querySelector('.recount-remarks[data-record-id="' + recordId + '"]').value;
         
-        if (recountCount && parseFloat(recountCount) !== 0) {
-            recounts.push({
-                record_id: recordId,
-                recount_count: recountCount,
-                remarks: remarks || ''
-            });
+        let row = input.closest('tr');
+        let skuName = row ? row.cells[0].innerText : 'Unknown';
+        
+        if (!recountCount || recountCount === '') {
+            hasError = true;
+            errorMessage += `• Please enter recount count for ${skuName}\n`;
+            input.style.border = '2px solid red';
+        } else {
+            input.style.border = '';
         }
+        
+        if (!remarks || remarks.trim() === '') {
+            hasError = true;
+            errorMessage += `• Please provide remarks/reason for ${skuName}\n`;
+            let remarksInput = document.querySelector('.recount-remarks[data-record-id="' + recordId + '"]');
+            remarksInput.style.border = '2px solid red';
+        } else {
+            let remarksInput = document.querySelector('.recount-remarks[data-record-id="' + recordId + '"]');
+            remarksInput.style.border = '';
+        }
+        
+        recounts.push({
+            record_id: recordId,
+            recount_count: recountCount || 0,
+            remarks: remarks || ''
+        });
     }
     
-    if (recounts.length === 0) {
-        alert('No recount counts entered');
+    if (hasError) {
+        alert('Please fix the following issues:\n\n' + errorMessage);
         return;
     }
+    
+    let saveBtn = document.querySelector('#recountModal .btn-success');
+    let originalText = saveBtn.textContent;
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
     
     fetch('/save_recount', {
         method: 'POST',
@@ -754,9 +780,52 @@ function saveRecounts() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Recounts saved!');
-            location.reload();
+            let modal = document.getElementById('recountModal');
+            if (modal) {
+                let bsModal = bootstrap.Modal.getInstance(modal);
+                if (bsModal) bsModal.hide();
+                modal.remove();
+            }
+            
+            // Auto-complete the session after recounts are saved
+            completeCountingSession();
+        } else {
+            alert('Error saving recounts');
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalText;
         }
+    })
+    .catch(error => {
+        alert('Error: ' + error);
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalText;
+    });
+}
+
+function completeCountingSession() {
+    if (!currentSessionId) {
+        alert('Please save counts first');
+        return;
+    }
+    
+    fetch('/complete_counting', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({session_id: currentSessionId})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✓ Counting session completed successfully!');
+            window.location.href = '/dashboard';
+        } else {
+            alert(data.message || 'Error completing session');
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error);
     });
 }
 
@@ -766,7 +835,6 @@ function completeCounting() {
         return;
     }
     
-    // First check if there are pending recounts
     fetch('/check_recount_status?session_id=' + currentSessionId)
         .then(response => response.json())
         .then(data => {
@@ -776,25 +844,7 @@ function completeCounting() {
             }
             
             if (confirm('Complete this counting session? This will mark all counts as final.')) {
-                fetch('/complete_counting', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({session_id: currentSessionId})
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert(data.message || 'Session completed!');
-                        window.location.href = '/dashboard';
-                    } else {
-                        alert(data.message || 'Error completing session');
-                    }
-                })
-                .catch(error => {
-                    alert('Error: ' + error);
-                });
+                completeCountingSession();
             }
         });
 }
@@ -812,7 +862,6 @@ document.getElementById('itemCategory').addEventListener('change', function() {
 
 // Auto-load on page load
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Page loaded, setting up...');
     filterItemCategoriesByWarehouse();
     setupSmartSearch();
     applyFilters();
