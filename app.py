@@ -380,10 +380,42 @@ def save_recount():
     db.session.commit()
     return jsonify({'success': True})
 
+@app.route('/check_recount_status', methods=['GET'])
+@login_required
+def check_recount_status():
+    """Check if there are any pending recounts"""
+    session_id = request.args.get('session_id')
+    if not session_id:
+        return jsonify({'has_pending_recounts': False})
+    
+    pending_count = CountRecord.query.filter_by(
+        session_id=session_id,
+        is_recount_needed=True,
+        recount_completed=False
+    ).count()
+    
+    return jsonify({'has_pending_recounts': pending_count > 0, 'count': pending_count})
+
 @app.route('/complete_counting', methods=['POST'])
 @login_required
 def complete_counting():
     session_id = request.json.get('session_id')
+    if not session_id:
+        return jsonify({'success': False, 'message': 'No session ID provided'}), 400
+    
+    # Check for pending recounts
+    pending_recounts = CountRecord.query.filter_by(
+        session_id=session_id,
+        is_recount_needed=True,
+        recount_completed=False
+    ).count()
+    
+    if pending_recounts > 0:
+        return jsonify({
+            'success': False, 
+            'message': f'Cannot complete session. You have {pending_recounts} pending recount(s) that need to be completed first.'
+        }), 400
+    
     session_obj = CountingSession.query.get(session_id)
     if session_obj:
         session_obj.is_completed = True
@@ -398,8 +430,8 @@ def complete_counting():
         db.session.add(audit)
         db.session.commit()
         
-        return jsonify({'success': True})
-    return jsonify({'success': False}), 400
+        return jsonify({'success': True, 'message': 'Counting session completed successfully!'})
+    return jsonify({'success': False, 'message': 'Session not found'}), 404
 
 @app.route('/admin')
 @login_required
@@ -431,7 +463,7 @@ def admin_dashboard():
 @app.route('/export_counts', methods=['POST'])
 @login_required
 def export_counts():
-    """Export count data with multiple filters - INCLUDES INCOMPLETE SESSIONS"""
+    """Export count data with multiple filters"""
     if current_user.role not in ['admin', 'audit']:
         flash('Access denied', 'error')
         return redirect(url_for('index'))
@@ -487,23 +519,24 @@ def export_counts():
                 if day_category not in sheets_data:
                     sheets_data[day_category] = []
                 
-                sheets_data[day_category].append({
-                    'SKU': sku.sku,
-                    'Description': sku.description,
-                    'Day Category': day_category,
+                row_data = {
+                    'SKU': str(sku.sku),
+                    'Description': str(sku.description) if sku.description else '',
+                    'Day Category': str(day_category),
                     'Initial Count': record.initial_count,
                     'Recount Count': record.recount_count if record.recount_count else '',
                     'Final Count': record.final_count if record.final_count else '',
-                    'Remarks': record.remarks or '',
+                    'Remarks': str(record.remarks) if record.remarks else '',
                     'Date/Time Counted': record.count_time.strftime('%Y-%m-%d %H:%M:%S') if record.count_time else '',
                     'Counter': session_obj.user.full_name if session_obj.user else 'Unknown',
-                    'Warehouse': session_obj.warehouse,
+                    'Warehouse': str(session_obj.warehouse) if session_obj.warehouse else '',
                     'Session Status': 'Completed' if session_obj.is_completed else 'In Progress',
                     'Last Count Reference': sku.last_count,
-                    'Last Count Date': sku.last_count_date,
+                    'Last Count Date': str(sku.last_count_date) if sku.last_count_date else '',
                     'Final Expected Count': sku.final_expected_count,
-                    "Kenneth's Inventory": sku.kenneth_inventory
-                })
+                    'Kenneth Inventory': sku.kenneth_inventory
+                }
+                sheets_data[day_category].append(row_data)
         
         # Create Excel file
         output = BytesIO()
@@ -514,15 +547,6 @@ def export_counts():
                     safe_sheet_name = str(sheet_name)[:31].replace('/', '-').replace('\\', '-').replace('*', '-').replace('?', '-').replace(':', '-')
                     df = pd.DataFrame(data)
                     df.to_excel(writer, sheet_name=safe_sheet_name, index=False)
-                    
-                    # Auto-adjust column widths
-                    worksheet = writer.sheets[safe_sheet_name]
-                    for column in df.columns:
-                        try:
-                            column_width = max(df[column].astype(str).map(len).max(), len(str(column))) + 2
-                            worksheet.column_dimensions[column].width = min(column_width, 50)
-                        except:
-                            pass
             else:
                 df = pd.DataFrame({'Message': ['No counting data found for the selected filters']})
                 df.to_excel(writer, sheet_name='No Data', index=False)
@@ -610,15 +634,6 @@ def export_audit_log():
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df = pd.DataFrame(audit_data)
             df.to_excel(writer, sheet_name='Audit Log', index=False)
-            
-            # Auto-adjust column widths
-            worksheet = writer.sheets['Audit Log']
-            for column in df.columns:
-                try:
-                    column_width = max(df[column].astype(str).map(len).max(), len(str(column))) + 2
-                    worksheet.column_dimensions[column].width = min(column_width, 50)
-                except:
-                    pass
         
         output.seek(0)
         
