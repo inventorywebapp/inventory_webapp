@@ -69,6 +69,22 @@
     </div>
 </div>
 
+<!-- Manual SKU Selection Modal -->
+<div class="modal fade" id="manualSkuModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">⚠️ Multiple SKUs Found</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Multiple SKUs match the scanned code. Please select the correct one:</p>
+                <div id="manualSkuList" class="list-group"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div id="loadingIndicator" style="display: none; text-align: center; padding: 20px;">
     <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Loading...</span>
@@ -222,29 +238,16 @@ function getUrlParameter(name) {
     return urlParams.get(name);
 }
 
-function escapeHtml(text) {
-    if (!text) return '';
-    return text.replace(/[&<>]/g, function(m) {
-        if (m === '&') return '&amp;';
-        if (m === '<') return '&lt;';
-        if (m === '>') return '&gt;';
-        return m;
-    });
+function normalizeString(str) {
+    if (!str) return '';
+    return str.toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/\s+/g, ' ')
+        .replace(/-/g, ' ');
 }
 
-function showToast(message, type = 'info') {
-    const toast = document.createElement('div');
-    toast.className = `alert alert-${type === 'success' ? 'success' : (type === 'error' ? 'danger' : 'info')} alert-dismissible fade show position-fixed`;
-    toast.style.bottom = '20px';
-    toast.style.right = '20px';
-    toast.style.zIndex = '9999';
-    toast.style.minWidth = '300px';
-    toast.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 4000);
-}
-
-// ============ QR/BARCODE SCANNER FUNCTIONS - EXACT MATCH ONLY ============
+// ============ QR/BARCODE SCANNER FUNCTIONS ============
 
 async function startBarcodeScanner() {
     if (isScannerActive) {
@@ -252,7 +255,6 @@ async function startBarcodeScanner() {
         return;
     }
     
-    // Ensure SKUs are loaded
     if (allSkus.length === 0) {
         showToast("Loading SKU data first...", "info");
         const resultContainer = document.getElementById('qr-reader-results');
@@ -265,6 +267,7 @@ async function startBarcodeScanner() {
             const data = await response.json();
             allSkus = data;
             console.log(`✅ Loaded ${allSkus.length} SKUs`);
+            buildSearchIndex();
             
             if (resultContainer) {
                 resultContainer.innerHTML = `<div class="alert alert-success">✓ Loaded ${allSkus.length} SKUs. Starting camera...</div>`;
@@ -285,7 +288,6 @@ async function startBarcodeScanner() {
         resultContainer.innerHTML = '<div class="alert alert-info">📷 Initializing camera... Please allow camera access.</div>';
     }
     
-    // Clean up existing scanner
     if (html5QrCode) {
         try {
             await html5QrCode.stop();
@@ -331,11 +333,8 @@ async function startBarcodeScanner() {
                 }
                 showToast(`Scanned: ${decodedText.substring(0, 50)}`, "success");
                 
-                // Stop scanner immediately
                 stopBarcodeScanner();
-                
-                // Perform EXACT match search only
-                performExactMatchSearch(decodedText);
+                intelligentSkuSearch(decodedText);
             },
             (errorMessage) => {}
         );
@@ -349,6 +348,36 @@ async function startBarcodeScanner() {
         }
         isScannerActive = false;
     }
+}
+
+let skuSearchIndex = {};
+
+function buildSearchIndex() {
+    skuSearchIndex = {
+        exact: new Map(),
+        lower: new Map(),
+        normalized: new Map(),
+        keywords: new Map()
+    };
+    
+    for (const sku of allSkus) {
+        skuSearchIndex.exact.set(sku.sku, sku);
+        skuSearchIndex.lower.set(sku.sku.toLowerCase(), sku);
+        const normalized = normalizeString(sku.sku);
+        skuSearchIndex.normalized.set(normalized, sku);
+        
+        const keywords = sku.sku.split(/[-_\s]+/);
+        for (const kw of keywords) {
+            if (kw.length > 2) {
+                const kwLower = kw.toLowerCase();
+                if (!skuSearchIndex.keywords.has(kwLower)) {
+                    skuSearchIndex.keywords.set(kwLower, []);
+                }
+                skuSearchIndex.keywords.get(kwLower).push(sku);
+            }
+        }
+    }
+    console.log("Search index built with", allSkus.length, "SKUs");
 }
 
 async function stopBarcodeScanner() {
@@ -380,94 +409,232 @@ function manualBarcodeEntry() {
     let barcode = prompt('Enter barcode/QR code value:');
     if (barcode && barcode.trim()) {
         stopBarcodeScanner();
-        performExactMatchSearch(barcode.trim());
+        intelligentSkuSearch(barcode.trim());
     }
 }
 
-// EXACT MATCH ONLY - Same as typing in search box and pressing Enter
-function performExactMatchSearch(scannedText) {
+function intelligentSkuSearch(scannedText) {
     if (allSkus.length === 0) {
         alert("SKU data not loaded. Please refresh the page.");
         return;
     }
     
-    let searchTerm = scannedText.trim();
-    console.log("=== EXACT MATCH SEARCH ===");
-    console.log("Looking for exact SKU:", searchTerm);
+    console.log("=== INTELLIGENT SKU SEARCH ===");
+    console.log("Raw scanned:", scannedText);
     
-    // Find exact match (case-sensitive)
-    let exactMatch = null;
-    for (let i = 0; i < allSkus.length; i++) {
-        if (allSkus[i].sku === searchTerm) {
-            exactMatch = allSkus[i];
-            break;
+    let matches = [];
+    let searchVariations = [];
+    
+    const original = scannedText;
+    const lower = original.toLowerCase();
+    const normalized = normalizeString(original);
+    
+    const skuPatterns = [
+        original, lower, normalized,
+        original.replace(/[^A-Za-z0-9-]/g, ''),
+        original.replace(/[^A-Za-z0-9]/g, ''),
+        original.replace(/https?:\/\//i, '').replace(/www\./i, '').split('/').pop(),
+        original.match(/[A-Z0-9-]{3,}/i)?.[0] || '',
+        original.replace(/\s+/g, '-'),
+        original.replace(/-/g, ' ')
+    ];
+    
+    for (const v of skuPatterns) {
+        if (v && v.length > 2 && !searchVariations.includes(v)) {
+            searchVariations.push(v);
         }
     }
     
-    // If no case-sensitive match, try case-insensitive
-    if (!exactMatch) {
-        for (let i = 0; i < allSkus.length; i++) {
-            if (allSkus[i].sku.toLowerCase() === searchTerm.toLowerCase()) {
-                exactMatch = allSkus[i];
-                console.log("Found case-insensitive match:", exactMatch.sku);
-                break;
+    console.log("Search variations:", searchVariations.slice(0, 5));
+    
+    for (const variant of searchVariations) {
+        if (skuSearchIndex.exact.has(variant)) {
+            matches.push({ sku: skuSearchIndex.exact.get(variant), score: 100, type: 'EXACT' });
+        }
+        if (skuSearchIndex.lower.has(variant.toLowerCase())) {
+            matches.push({ sku: skuSearchIndex.lower.get(variant.toLowerCase()), score: 98, type: 'CASE_INSENSITIVE' });
+        }
+        const normVariant = normalizeString(variant);
+        if (skuSearchIndex.normalized.has(normVariant)) {
+            matches.push({ sku: skuSearchIndex.normalized.get(normVariant), score: 95, type: 'NORMALIZED' });
+        }
+    }
+    
+    if (matches.length === 0) {
+        for (const sku of allSkus) {
+            let bestScore = 0;
+            let matchType = '';
+            
+            for (const variant of searchVariations.slice(0, 3)) {
+                const skuLower = sku.sku.toLowerCase();
+                const variantLower = variant.toLowerCase();
+                
+                if (skuLower === variantLower) {
+                    bestScore = 90;
+                    matchType = 'CASE_INSENSITIVE_CONTAINS';
+                } else if (skuLower.includes(variantLower) && variantLower.length > 3) {
+                    const score = 70 + (variantLower.length / skuLower.length) * 20;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        matchType = 'CONTAINS';
+                    }
+                } else if (variantLower.includes(skuLower) && skuLower.length > 3) {
+                    const score = 60 + (skuLower.length / variantLower.length) * 20;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        matchType = 'PART_OF';
+                    }
+                }
+            }
+            
+            if (bestScore > 0) {
+                matches.push({ sku: sku, score: bestScore, type: matchType });
             }
         }
     }
     
-    if (exactMatch) {
-        console.log("✅ EXACT MATCH FOUND:", exactMatch.sku);
+    if (matches.length === 0) {
+        const keywords = scannedText.split(/[-_\s\/]+/).filter(k => k.length > 2);
+        const matchedSkus = new Set();
         
-        // Set the search input value
-        const searchInput = document.getElementById('searchSku');
-        if (searchInput) {
-            searchInput.value = exactMatch.sku;
+        for (const kw of keywords) {
+            const kwLower = kw.toLowerCase();
+            if (skuSearchIndex.keywords.has(kwLower)) {
+                for (const sku of skuSearchIndex.keywords.get(kwLower)) {
+                    if (!matchedSkus.has(sku.id)) {
+                        matchedSkus.add(sku.id);
+                        let score = 50;
+                        if (sku.sku.toLowerCase().includes(kwLower)) score = 60;
+                        matches.push({ sku: sku, score: score, type: 'KEYWORD' });
+                    }
+                }
+            }
         }
-        
-        // Apply filters - this will reload the SKU list with the search
+    }
+    
+    const uniqueMatches = [];
+    const seenIds = new Set();
+    for (const match of matches.sort((a, b) => b.score - a.score)) {
+        if (!seenIds.has(match.sku.id)) {
+            seenIds.add(match.sku.id);
+            uniqueMatches.push(match);
+        }
+    }
+    
+    console.log(`Found ${uniqueMatches.length} matches`);
+    
+    if (uniqueMatches.length === 0) {
+        const sampleSkus = allSkus.slice(0, 5).map(s => s.sku).join(', ');
+        alert(`❌ "${scannedText}" not found in database.\n\nPossible reasons:\n• QR code may contain different format\n• SKU may not exist in current data\n\nExample SKUs in system:\n${sampleSkus}...\n\nTry searching manually.`);
+        document.getElementById('searchSku').value = scannedText;
         applyFilters();
         
-        showToast(`✓ Found: ${exactMatch.sku}`, "success");
+    } else if (uniqueMatches.length === 1) {
+        const matched = uniqueMatches[0];
+        console.log(`✅ SELECTED: ${matched.sku.sku} (${matched.type})`);
         
-        // Highlight the row after the table loads
+        document.getElementById('searchSku').value = matched.sku.sku;
+        applyFilters();
+        showToast(`✓ Found: ${matched.sku.sku}`, "success");
+        
         setTimeout(() => {
-            const row = document.getElementById(`sku-row-${exactMatch.id}`);
+            const row = document.getElementById(`sku-row-${matched.sku.id}`);
             if (row) {
                 row.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 row.style.backgroundColor = '#90EE90';
                 setTimeout(() => {
                     if (row) row.style.backgroundColor = '';
                 }, 3000);
-            } else {
-                // Retry after longer delay
-                setTimeout(() => {
-                    const rowRetry = document.getElementById(`sku-row-${exactMatch.id}`);
-                    if (rowRetry) {
-                        rowRetry.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        rowRetry.style.backgroundColor = '#90EE90';
-                        setTimeout(() => {
-                            if (rowRetry) rowRetry.style.backgroundColor = '';
-                        }, 3000);
-                    }
-                }, 1000);
             }
-        }, 800);
+        }, 500);
         
     } else {
-        console.log("❌ NO EXACT MATCH found for:", searchTerm);
-        console.log("First 10 SKUs in system:", allSkus.slice(0, 10).map(s => s.sku));
-        
-        // Show sample SKUs for debugging
-        let sampleSkus = allSkus.slice(0, 5).map(s => s.sku).join('\n• ');
-        alert(`"${searchTerm}" not found.\n\nMake sure your QR code contains the EXACT SKU name.\n\nExample SKUs in system:\n• ${sampleSkus}`);
-        
-        // Still set the search input so user can see what was scanned
-        const searchInput = document.getElementById('searchSku');
-        if (searchInput) {
-            searchInput.value = searchTerm;
-        }
-        applyFilters();
+        showSkuSelectionDialog(uniqueMatches, scannedText);
     }
+}
+
+function showSkuSelectionDialog(matches, originalScan) {
+    const modalHtml = `
+        <div class="modal fade" id="selectionModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title">🔍 Select Correct SKU</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Scanned: <strong>${escapeHtml(originalScan)}</strong></p>
+                        <p>Found <strong>${matches.length}</strong> matching SKUs. Please select the correct one:</p>
+                        <div class="list-group">
+                            ${matches.map((m, idx) => `
+                                <button type="button" class="list-group-item list-group-item-action" onclick="selectSkuFromModal(${m.sku.id}, '${escapeHtml(m.sku.sku)}')">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>${escapeHtml(m.sku.sku)}</strong>
+                                            <br><small class="text-muted">${escapeHtml(m.sku.description || 'No description')}</small>
+                                        </div>
+                                        <span class="badge bg-secondary">${m.type} (${Math.round(m.score)}%)</span>
+                                    </div>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const existingModal = document.getElementById('selectionModal');
+    if (existingModal) existingModal.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modal = new bootstrap.Modal(document.getElementById('selectionModal'));
+    modal.show();
+}
+
+function selectSkuFromModal(skuId, skuCode) {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('selectionModal'));
+    if (modal) modal.hide();
+    
+    document.getElementById('searchSku').value = skuCode;
+    applyFilters();
+    showToast(`✓ Selected: ${skuCode}`, "success");
+    
+    setTimeout(() => {
+        const row = document.getElementById(`sku-row-${skuId}`);
+        if (row) {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            row.style.backgroundColor = '#90EE90';
+            setTimeout(() => {
+                if (row) row.style.backgroundColor = '';
+            }, 3000);
+        }
+    }, 500);
+}
+
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type === 'success' ? 'success' : (type === 'error' ? 'danger' : 'info')} alert-dismissible fade show position-fixed`;
+    toast.style.bottom = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '9999';
+    toast.style.minWidth = '300px';
+    toast.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return text.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+    });
 }
 
 // ============ END OF QR SCANNER ============
@@ -907,7 +1074,7 @@ function displaySkus(skus) {
     html += '<th>Last Counted Date</th>';
     html += '<th>Previous Count</th>';
     html += '<th>Status</th>';
-    html += '</table>';
+    html += '</tr>';
     html += '</thead><tbody>';
     
     for (let i = 0; i < skus.length; i++) {
