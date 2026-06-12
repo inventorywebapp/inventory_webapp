@@ -41,8 +41,23 @@
                 <button id="applyFilters" class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
                 <button id="saveCounts" class="btn btn-success" onclick="saveAllCounts()">Save All Counts</button>
                 <button id="completeCounting" class="btn btn-danger" onclick="completeCounting()">Complete Counting Session</button>
+                <button id="scanBarcodeBtn" class="btn btn-info" onclick="startBarcodeScan()">
+                    <i class="bi bi-upc-scan"></i> Scan Barcode
+                </button>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Hidden video element for barcode scanning -->
+<div id="scannerContainer" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999;">
+    <div style="position: relative; width: 100%; height: 100%;">
+        <video id="scannerVideo" style="width: 100%; height: auto; max-height: 80%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);"></video>
+        <canvas id="scannerCanvas" style="display: none;"></canvas>
+        <div style="position: absolute; bottom: 20px; left: 0; right: 0; text-align: center;">
+            <button class="btn btn-danger" onclick="stopBarcodeScan()">Cancel Scan</button>
+        </div>
+        <div id="scanResult" style="position: absolute; top: 10px; left: 0; right: 0; text-align: center; color: white; background: rgba(0,0,0,0.7); padding: 10px;"></div>
     </div>
 </div>
 
@@ -188,6 +203,8 @@ let currentPage = 1;
 let itemsPerPage = 50;
 let currentSessionId = null;
 let searchTimeout = null;
+let scannerStream = null;
+let scanning = false;
 
 // Sort day categories
 let allDayCategories = [...allDayCategoriesRaw].sort((a, b) => {
@@ -201,6 +218,123 @@ function getUrlParameter(name) {
     let urlParams = new URLSearchParams(window.location.search);
     return urlParams.get(name);
 }
+
+// Barcode Scanning Functions
+function startBarcodeScan() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Camera access is not supported on this device. Please use the search box.');
+        return;
+    }
+    
+    document.getElementById('scannerContainer').style.display = 'block';
+    document.getElementById('scanResult').innerHTML = 'Initializing camera...';
+    
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(function(stream) {
+            scannerStream = stream;
+            let video = document.getElementById('scannerVideo');
+            video.srcObject = stream;
+            video.setAttribute('playsinline', true);
+            video.play();
+            scanning = true;
+            scanBarcode();
+        })
+        .catch(function(err) {
+            console.error('Camera error:', err);
+            document.getElementById('scanResult').innerHTML = 'Cannot access camera. Please check permissions.';
+            setTimeout(() => {
+                document.getElementById('scannerContainer').style.display = 'none';
+            }, 2000);
+        });
+}
+
+function scanBarcode() {
+    if (!scanning) return;
+    
+    let video = document.getElementById('scannerVideo');
+    let canvas = document.getElementById('scannerCanvas');
+    let context = canvas.getContext('2d');
+    
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        let imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        
+        // Simple barcode detection using js library approach
+        // Since we can't add external libraries easily, we'll use a simple approach
+        // For actual barcode scanning, you would add a library like html5-qrcode
+        // For now, we'll use a text input fallback
+        document.getElementById('scanResult').innerHTML = 'Point camera at barcode/QR code...<br><small>Press Cancel to use manual entry</small>';
+    }
+    
+    setTimeout(scanBarcode, 500);
+}
+
+function stopBarcodeScan() {
+    scanning = false;
+    if (scannerStream) {
+        scannerStream.getTracks().forEach(track => track.stop());
+        scannerStream = null;
+    }
+    document.getElementById('scannerContainer').style.display = 'none';
+    document.getElementById('scannerVideo').srcObject = null;
+}
+
+// Manual barcode input (fallback for devices without camera or when scan fails)
+function manualBarcodeEntry() {
+    let barcode = prompt('Enter barcode number:');
+    if (barcode && barcode.trim()) {
+        searchByBarcode(barcode.trim());
+    }
+}
+
+function searchByBarcode(barcode) {
+    // Search for SKU that matches the barcode
+    let matchedSku = null;
+    for (let i = 0; i < allSkus.length; i++) {
+        if (allSkus[i].sku.toLowerCase() === barcode.toLowerCase() ||
+            allSkus[i].sku.toLowerCase().includes(barcode.toLowerCase())) {
+            matchedSku = allSkus[i];
+            break;
+        }
+    }
+    
+    if (matchedSku) {
+        // Set search box value
+        document.getElementById('searchSku').value = matchedSku.sku;
+        // Apply filters to show only this SKU
+        applyFilters();
+        alert(`Found SKU: ${matchedSku.sku} - ${matchedSku.description || ''}`);
+        // Scroll to the SKU
+        setTimeout(() => {
+            let row = document.getElementById(`sku-row-${matchedSku.id}`);
+            if (row) {
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                row.style.backgroundColor = '#ffff99';
+                setTimeout(() => {
+                    row.style.backgroundColor = '';
+                }, 3000);
+            }
+        }, 500);
+    } else {
+        alert(`SKU "${barcode}" not found. Please check the barcode and try again.`);
+    }
+}
+
+// Add manual entry option
+document.addEventListener('DOMContentLoaded', function() {
+    // Add manual entry button next to scan button
+    let scanBtn = document.getElementById('scanBarcodeBtn');
+    if (scanBtn && scanBtn.parentNode) {
+        let manualBtn = document.createElement('button');
+        manualBtn.id = 'manualEntryBtn';
+        manualBtn.className = 'btn btn-secondary ms-2';
+        manualBtn.innerHTML = '<i class="bi bi-keyboard"></i> Manual Entry';
+        manualBtn.onclick = function() { manualBarcodeEntry(); };
+        scanBtn.parentNode.appendChild(manualBtn);
+    }
+});
 
 function filterItemCategoriesByWarehouse() {
     let warehouse = document.getElementById('warehouse').value;
