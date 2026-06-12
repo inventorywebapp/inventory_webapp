@@ -500,7 +500,7 @@ def admin_dashboard():
 @app.route('/export_counts', methods=['POST'])
 @login_required
 def export_counts():
-    """Export count data - shows LATEST count from the MOST RECENT session for each SKU"""
+    """Export count data - shows LATEST count from the MOST RECENT session for each SKU (No Version/Session ID)"""
     if current_user.role not in ['admin', 'audit']:
         flash('Access denied', 'error')
         return redirect(url_for('index'))
@@ -540,7 +540,6 @@ def export_counts():
         sessions = session_query.all()
         
         # For each SKU, find the LATEST record from the MOST RECENT session
-        # Group by SKU and find the record with highest session date and highest version
         sku_latest = {}
         
         for sku in all_skus_in_category:
@@ -555,7 +554,6 @@ def export_counts():
                 ).order_by(CountRecord.version.desc()).first()
                 
                 if record:
-                    # Compare session dates to find the most recent
                     if best_session is None or session_obj.session_date > best_session.session_date:
                         best_record = record
                         best_session = session_obj
@@ -591,7 +589,6 @@ def export_counts():
                     'Description': str(sku.description) if sku.description else '',
                     'Day Category': str(day_category),
                     'Count Status': 'COMPLETED',
-                    'Version': count_record.version,
                     'Initial Count': count_record.initial_count,
                     'Recount Count': count_record.recount_count if count_record.recount_count else '',
                     'Final Count': final_count,
@@ -600,7 +597,6 @@ def export_counts():
                     'Counter': session_obj.user.full_name if session_obj.user else 'Unknown',
                     'Warehouse': session_obj.warehouse if session_obj.warehouse else '',
                     'Session Date': session_obj.session_date.strftime('%Y-%m-%d %H:%M:%S') if session_obj.session_date else '',
-                    'Session Status': 'Completed' if session_obj.is_completed else 'In Progress',
                     'Last Count Reference': sku.last_count,
                     'Last Count Date': str(sku.last_count_date) if sku.last_count_date else '',
                     'Final Expected Count': sku.final_expected_count,
@@ -613,7 +609,6 @@ def export_counts():
                     'Description': str(sku.description) if sku.description else '',
                     'Day Category': str(day_category),
                     'Count Status': '⚠️ NOT COUNTED ⚠️',
-                    'Version': 'N/A',
                     'Initial Count': 'NOT COUNTED',
                     'Recount Count': 'N/A',
                     'Final Count': 'PENDING',
@@ -622,7 +617,6 @@ def export_counts():
                     'Counter': 'N/A',
                     'Warehouse': filter_warehouse if filter_warehouse and filter_warehouse != 'All' else 'All Warehouses',
                     'Session Date': 'N/A',
-                    'Session Status': 'MISSING',
                     'Last Count Reference': sku.last_count,
                     'Last Count Date': str(sku.last_count_date) if sku.last_count_date else '',
                     'Final Expected Count': sku.final_expected_count,
@@ -683,7 +677,7 @@ def export_counts():
 @app.route('/export_audit_log', methods=['POST'])
 @login_required
 def export_audit_log():
-    """Export audit log data"""
+    """Export audit log data - INCLUDES session and version info for full history"""
     if current_user.role not in ['admin', 'audit']:
         flash('Access denied', 'error')
         return redirect(url_for('index'))
@@ -804,6 +798,7 @@ def sync_data():
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
+# Debug endpoints (admin only)
 @app.route('/debug_counts/<int:sku_id>')
 @login_required
 def debug_counts(sku_id):
