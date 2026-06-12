@@ -198,6 +198,9 @@ def dashboard():
     item_categories = [c[0] for c in item_categories_raw if c[0] and c[0] != '']
     item_categories.sort()
     
+    # REMOVED THE LIMIT - NOW SHOWS ALL ITEM CATEGORIES
+    # item_categories = item_categories[:10]  <-- DELETED THIS LINE
+    
     warehouses = ['Main Warehouse', '5th Floor Warehouse']
     
     completed_records = db.session.query(CountRecord.sku_id).join(
@@ -236,7 +239,7 @@ def dashboard():
                          active_sessions_count=active_sessions_count,
                          active_session_info=active_session_info,
                          day_categories=day_categories,
-                         item_categories=item_categories[:10],
+                         item_categories=item_categories,  # Now passing ALL categories
                          warehouses=warehouses,
                          day_category_progress=day_category_progress)
 
@@ -1151,7 +1154,7 @@ def debug_counts(sku_id):
     
     result = f"<h2>Count History for SKU: {sku.sku if sku else 'Unknown'}</h2>"
     result += "<table border='1' cellpadding='5'>"
-    result += "<tr><th>Version</th><th>Count</th><th>Recount</th><th>Final</th><th>Time</th><tr>"
+    result += "<tr><th>Version</th><th>Count</th><th>Recount</th><th>Final</th><th>Time</th></tr>"
     
     for r in records:
         result += f"<tr>"
@@ -1162,7 +1165,7 @@ def debug_counts(sku_id):
         result += f"<td>{r.count_time}</td>"
         result += f"</tr>"
     
-    result += "</table>"
+    result += "<tr>"
     result += f"<p><strong>Latest count: {records[-1].initial_count if records else 'None'}</strong></p>"
     result += '<p><a href="/admin">Back to Admin</a></p>'
     
