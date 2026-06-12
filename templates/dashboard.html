@@ -116,29 +116,29 @@
         </div>
     </div>
     <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5>Categories</h5>
-            </div>
-            <div class="card-body">
-                <h6>Day Categories (Mon → Sat)</h6>
-                <ul class="list-group mb-3">
-                    {% for cat in day_categories[:7] %}
+    <div class="card">
+        <div class="card-header">
+            <h5>Categories</h5>
+        </div>
+        <div class="card-body">
+            <h6>Day Categories (Mon → Sat)</h6>
+            <ul class="list-group mb-3">
+                {% for cat in day_categories[:7] %}
+                <li class="list-group-item">{{ cat }}</li>
+                {% endfor %}
+            </ul>
+            <h6>Item Categories (A → Z)</h6>
+            <!-- Scrollable Item Categories - SHOW ALL -->
+            <div style="max-height: 250px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px;">
+                <ul class="list-group list-group-flush">
+                    {% for cat in item_categories %}
                     <li class="list-group-item">{{ cat }}</li>
                     {% endfor %}
                 </ul>
-                <h6>Item Categories (A → Z)</h6>
-                <!-- Scrollable Item Categories -->
-                <div style="max-height: 200px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px;">
-                    <ul class="list-group list-group-flush">
-                        {% for cat in item_categories %}
-                        <li class="list-group-item">{{ cat }}</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                <small class="text-muted">Total: {{ item_categories|length }} categories</small>
             </div>
+            <small class="text-muted">Total: {{ item_categories|length }} categories</small>
         </div>
     </div>
+</div>
 </div>
 {% endblock %}
