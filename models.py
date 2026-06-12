@@ -64,6 +64,7 @@ class CountRecord(db.Model):
     is_recount_needed = db.Column(db.Boolean, default=False)
     recount_completed = db.Column(db.Boolean, default=False)
     count_time = db.Column(db.DateTime, default=get_ph_time)
+    version = db.Column(db.Integer, default=1)
 
     session = db.relationship('CountingSession', backref='count_records')
     sku = db.relationship('SKU', backref='count_records')
