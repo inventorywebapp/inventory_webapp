@@ -445,19 +445,10 @@ function loadInProgressSkus() {
         .then(response => response.json())
         .then(data => {
             if (data.skus && data.skus.length > 0) {
+                // The data already has current_count and count_time from the API
                 allSkus = data.skus;
                 filteredSkus = data.skus;
                 currentPage = 1;
-                
-                let banner = `<div class="col-12 mb-3">
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i> 
-                        <strong>Continuing Session #${currentSessionId}</strong> - Showing ${data.skus.length} SKU(s) that have been counted but not completed.
-                        <br><small>Click "Apply Filters" to see all SKUs or continue counting these.</small>
-                    </div>
-                </div>`;
-                document.getElementById('skusList').innerHTML = banner;
-                
                 displaySkus(data.skus);
                 loadingDiv.style.display = 'none';
             } else {
@@ -582,7 +573,7 @@ function displaySkus(skus) {
     
     let html = '<div class="col-12"><div class="table-responsive"><table class="table table-bordered table-hover table-striped">';
     html += '<thead class="table-dark">';
-    html += '<tr>';
+    html += '</tr>';
     html += '<th>SKU</th>';
     html += '<th>Description (Item Category)</th>';
     html += '<th>Day Category</th>';
@@ -601,6 +592,16 @@ function displaySkus(skus) {
     for (let i = 0; i < skus.length; i++) {
         let sku = skus[i];
         let statusBadge = '';
+        let hasCurrentCount = false;
+        let currentCountValue = '';
+        let countTimeValue = '';
+        
+        // Check if this SKU has a current_count from the API (for continue session)
+        if (sku.current_count !== undefined && sku.current_count !== null) {
+            hasCurrentCount = true;
+            currentCountValue = sku.current_count;
+            countTimeValue = sku.count_time || '';
+        }
         
         if (sku.bypass_recount) {
             statusBadge = '<span class="badge bg-warning">Bypass</span>';
@@ -616,6 +617,8 @@ function displaySkus(skus) {
             lastCountDate = lastCountDate.split(' ')[0];
         }
         
+        let inputPlaceholder = hasCurrentCount ? `Previously: ${currentCountValue}` : 'Enter count';
+        
         html += '<tr id="sku-row-' + sku.id + '">';
         html += '<td><strong>' + escapeHtml(sku.sku) + '</strong></td>';
         html += '<td>' + escapeHtml(sku.description || '-') + '</td>';
@@ -626,8 +629,20 @@ function displaySkus(skus) {
         html += '<td><small>' + escapeHtml(containerDetails) + '</small></td>';
         html += '<td class="fw-bold text-primary">' + (sku.final_expected_count || 0) + '</td>';
         html += '<td class="fw-bold text-success">' + (sku.kenneth_inventory || 0) + '</td>';
-        html += '<td><input type="text" class="form-control initial-count" data-sku-id="' + sku.id + '" style="min-width: 100px; width: 100px;" placeholder="Enter count" inputmode="numeric"></td>';
-        html += '<td><span id="last-counted-' + sku.id + '" class="text-muted">-</span></td>';
+        html += '<td>';
+        html += '<input type="text" class="form-control initial-count" data-sku-id="' + sku.id + '" style="min-width: 100px; width: 100px;" placeholder="' + inputPlaceholder + '" inputmode="numeric"';
+        if (hasCurrentCount) {
+            html += ' value="' + currentCountValue + '" title="Previously counted on: ' + countTimeValue + '\\nCount: ' + currentCountValue + '"';
+        }
+        html += '>';
+        html += '</td>';
+        html += '<td>';
+        if (countTimeValue) {
+            html += '<small class="text-muted" style="color: #0d6efd; font-weight: bold;">' + countTimeValue + '</small>';
+        } else {
+            html += '-';
+        }
+        html += '</td>';
         html += '<td>' + statusBadge + '</td>';
         html += '</tr>';
     }
