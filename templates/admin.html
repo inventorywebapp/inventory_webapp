@@ -80,32 +80,32 @@
     </div>
 
     <div class="tab-pane fade" id="audit">
-        <div class="card">
-            <div class="card-header">
-                <h5>Audit Trail</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-bordered table-sm">
-                        <thead>
-                            <tr><th>Timestamp (PHT)</th><th>User</th><th>Action</th><th>Details</th><th>IP Address</th></tr>
-                        </thead>
-                        <tbody>
-                            {% for log in audit_logs %}
-                            <tr>
-                                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                                <td>{{ log.user.full_name if log.user }}</td>
-                                <td>{{ log.action }}</td>
-                                <td>{{ log.details }}</td>
-                                <td>{{ log.ip_address }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+    <div class="card">
+        <div class="card-header">
+            <h5>Audit Trail</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm">
+                    <thead>
+                        <tr><th>Timestamp (PHT)</th><th>User</th><th>Action</th><th>Details</th><th>IP Address</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for log in audit_logs %}
+                        <tr>
+                            <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                            <td>{{ log.user.full_name if log.user }}</td>
+                            <td>{{ log.action }}</td>
+                            <td>{{ log.details|replace('.0', '') if log.details else '' }}</td>
+                            <td>{{ log.ip_address }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
+</div>
 
     <div class="tab-pane fade" id="export">
         <div class="card">
