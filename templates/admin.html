@@ -1,279 +1,127 @@
-{% extends "base.html" %}
-
-{% block content %}
-<h2>Admin Dashboard</h2>
-
-<ul class="nav nav-tabs mb-3">
-    <li class="nav-item">
-        <a class="nav-link active" data-bs-toggle="tab" href="#users">User Management</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" data-bs-toggle="tab" href="#sessions">Counting Sessions</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" data-bs-toggle="tab" href="#audit">Audit Logs</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" data-bs-toggle="tab" href="#export">Export Data</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" data-bs-toggle="tab" href="#sync">Google Drive Sync</a>
-    </li>
-</ul>
-
-<div class="tab-content">
-    <div class="tab-pane fade show active" id="users">
-        <div class="card">
-            <div class="card-header">
-                <h5>System Users</h5>
+<div class="tab-pane fade" id="export">
+    <div class="card">
+        <div class="card-header">
+            <h5>Export Data</h5>
+        </div>
+        <div class="card-body">
+            
+            <!-- SUMMARY EXPORT -->
+            <div class="alert alert-info">
+                <h6><i class="bi bi-file-excel"></i> Summary Export (One row per SKU)</h6>
+                <p>Shows the LATEST count for each SKU. Best for management reports and current inventory status.</p>
             </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-bordered">
-                        <thead>
-                            <tr><th>Username</th><th>Full Name</th><th>Role</th><th>Status</th><th>Created</th></tr>
-                        </thead>
-                        <tbody>
+            <form action="{{ url_for('export_counts_summary') }}" method="POST">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label>Filter by Date</label>
+                        <input type="date" name="filter_date" class="form-control">
+                        <small class="text-muted">Leave empty for all dates</small>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label>Filter by Warehouse</label>
+                        <select name="filter_warehouse" class="form-control">
+                            <option value="All">-- All Warehouses --</option>
+                            {% for warehouse in warehouses %}
+                            <option value="{{ warehouse }}">{{ warehouse }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label>Filter by Day Category</label>
+                        <select name="filter_day_category" class="form-control">
+                            <option value="All">-- All Day Categories --</option>
+                            {% for cat in day_categories %}
+                            <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label>Filter by Item Category</label>
+                        <select name="filter_item_category" class="form-control">
+                            <option value="All">-- All Item Categories --</option>
+                            {% for cat in item_categories %}
+                            <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Export Summary (Latest Counts)</button>
+            </form>
+            
+            <hr class="my-4">
+            
+            <!-- DETAILED EXPORT -->
+            <div class="alert alert-secondary">
+                <h6><i class="bi bi-file-excel"></i> Detailed Export (All Count History)</h6>
+                <p>Shows EVERY count record including all changes. Best for audit trails and investigation.</p>
+            </div>
+            <form action="{{ url_for('export_counts_detailed') }}" method="POST">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label>Filter by Date</label>
+                        <input type="date" name="filter_date" class="form-control">
+                        <small class="text-muted">Leave empty for all dates</small>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label>Filter by Warehouse</label>
+                        <select name="filter_warehouse" class="form-control">
+                            <option value="All">-- All Warehouses --</option>
+                            {% for warehouse in warehouses %}
+                            <option value="{{ warehouse }}">{{ warehouse }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label>Filter by Day Category</label>
+                        <select name="filter_day_category" class="form-control">
+                            <option value="All">-- All Day Categories --</option>
+                            {% for cat in day_categories %}
+                            <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label>Filter by Item Category</label>
+                        <select name="filter_item_category" class="form-control">
+                            <option value="All">-- All Item Categories --</option>
+                            {% for cat in item_categories %}
+                            <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-secondary">Export Detailed (All Changes)</button>
+            </form>
+            
+            <hr class="my-4">
+            
+            <!-- AUDIT LOG EXPORT -->
+            <div class="alert alert-warning">
+                <h6><i class="bi bi-clock-history"></i> Export Audit Log</h6>
+                <p>Export complete history of all user actions (logins, count changes, etc.)</p>
+            </div>
+            <form action="{{ url_for('export_audit_log') }}" method="POST">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label>Start Date</label>
+                        <input type="date" name="start_date" class="form-control">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label>End Date</label>
+                        <input type="date" name="end_date" class="form-control">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label>Filter by User</label>
+                        <select name="filter_user" class="form-control">
+                            <option value="All">-- All Users --</option>
                             {% for user in users %}
-                            <tr>
-                                <td>{{ user.username }}</td>
-                                <td>{{ user.full_name }}</td>
-                                <td>{{ user.role }}</td>
-                                <td>{% if user.is_active %}Active{% else %}Inactive{% endif %}</td>
-                                <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at }}</td>
-                            </tr>
+                            <option value="{{ user.id }}">{{ user.full_name }}</option>
                             {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="tab-pane fade" id="sessions">
-        <div class="card">
-            <div class="card-header">
-                <h5>Recent Counting Sessions</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-bordered">
-                        <thead>
-                            <tr><th>ID</th><th>User</th><th>Warehouse</th><th>Date</th><th>Status</th><th>Items Counted</th></tr>
-                        </thead>
-                        <tbody>
-                            {% for session in sessions %}
-                            <tr>
-                                <td>{{ session.id }}</td>
-                                <td>{{ session.user.full_name if session.user }}</td>
-                                <td>{{ session.warehouse }}</td>
-                                <td>{{ session.session_date.strftime('%Y-%m-%d %H:%M') }}</td>
-                                <td>{% if session.is_completed %}Completed{% else %}In Progress{% endif %}</td>
-                                <td>{{ session.count_records|length }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="tab-pane fade" id="audit">
-        <div class="card">
-            <div class="card-header">
-                <h5>Audit Trail</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-bordered table-sm">
-                        <thead>
-                            <tr><th>Timestamp (PHT)</th><th>User</th><th>Action</th><th>Details</th><th>IP Address</th></tr>
-                        </thead>
-                        <tbody>
-                            {% for log in audit_logs %}
-                            <tr>
-                                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                                <td>{{ log.user.full_name if log.user }}</td>
-                                <td>{{ log.action }}</td>
-                                <td>{{ log.details }}</td>
-                                <td>{{ log.ip_address }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="tab-pane fade" id="export">
-        <div class="card">
-            <div class="card-header">
-                <h5>Export Data</h5>
-            </div>
-            <div class="card-body">
-                
-                <!-- SECTION 1: Export Current Counts -->
-                <div class="alert alert-info">
-                    <h6><i class="bi bi-file-excel"></i> Export Current Counts</h6>
-                    <p>Export the final counted quantities for each SKU. Organized by Day Category.</p>
-                </div>
-                <form action="{{ url_for('export_counts') }}" method="POST">
-                    <div class="row">
-                        <div class="col-md-3 mb-3">
-                            <label>Filter by Date</label>
-                            <input type="date" name="filter_date" class="form-control">
-                            <small class="text-muted">Leave empty for all dates</small>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <label>Filter by Warehouse</label>
-                            <select name="filter_warehouse" class="form-control">
-                                <option value="All">-- All Warehouses --</option>
-                                {% for warehouse in warehouses %}
-                                <option value="{{ warehouse }}">{{ warehouse }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <label>Filter by Day Category</label>
-                            <select name="filter_day_category" class="form-control">
-                                <option value="All">-- All Day Categories --</option>
-                                {% for cat in day_categories %}
-                                <option value="{{ cat }}">{{ cat }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <label>Filter by Item Category</label>
-                            <select name="filter_item_category" class="form-control">
-                                <option value="All">-- All Item Categories --</option>
-                                {% for cat in item_categories %}
-                                <option value="{{ cat }}">{{ cat }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
+                        </select>
                     </div>
-                    <div class="row">
-                        <div class="col-md-12">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-file-excel"></i> Export Current Counts
-                            </button>
-                        </div>
-                    </div>
-                </form>
-                
-                <hr class="my-4">
-                
-                <!-- SECTION 2: Export Audit Log -->
-                <div class="alert alert-warning">
-                    <h6><i class="bi bi-clock-history"></i> Export Audit Log</h6>
-                    <p>Export complete history of all changes (who changed what, when, and from/to values).</p>
                 </div>
-                <form action="{{ url_for('export_audit_log') }}" method="POST">
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label>Start Date</label>
-                            <input type="date" name="start_date" class="form-control" required>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label>End Date</label>
-                            <input type="date" name="end_date" class="form-control" required>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label>Filter by User</label>
-                            <select name="filter_user" class="form-control">
-                                <option value="All">-- All Users --</option>
-                                {% for user in users %}
-                                <option value="{{ user.id }}">{{ user.full_name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-12">
-                            <button type="submit" class="btn btn-warning">
-                                <i class="bi bi-clock-history"></i> Export Audit Log
-                            </button>
-                        </div>
-                    </div>
-                </form>
-                
-                <hr>
-                <h6>Instructions:</h6>
-                <ul>
-                    <li><strong>Current Counts:</strong> Shows the final counted quantities. Use filters to narrow down.</li>
-                    <li><strong>Audit Log:</strong> Shows complete history of all changes for compliance and investigation.</li>
-                    <li><strong>Current Counts</strong> are organized by Day Category sheets.</li>
-                    <li><strong>Audit Log</strong> is exported as a single sheet with all change history.</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-
-    <div class="tab-pane fade" id="sync">
-        <div class="card">
-            <div class="card-header bg-success text-white">
-                <h5>Google Drive Sync</h5>
-            </div>
-            <div class="card-body">
-                <div class="alert alert-info">
-                    <strong>How it works:</strong>
-                    <ul class="mt-2 mb-0">
-                        <li>Click the button below to import the latest SKU data from your Google Drive folder</li>
-                        <li>The system automatically finds the newest Excel file in your folder</li>
-                        <li>All SKUs, Categories, and Inventory data will be updated</li>
-                        <li>This will NOT delete your existing count records</li>
-                    </ul>
-                </div>
-                
-                <div class="text-center">
-                    <button onclick="syncFromDrive()" class="btn btn-success btn-lg">
-                        <i class="bi bi-cloud-download"></i> Sync Data from Google Drive
-                    </button>
-                </div>
-                
-                <div id="syncResult" class="mt-3"></div>
-                
-                <hr>
-                <h6>Your Google Drive Folder:</h6>
-                <p><a href="https://drive.google.com/drive/folders/1UFxPbXn6onHczoLYUwsCYSsKsYxMg6Cw" target="_blank">
-                    CheckStockTempFile Folder
-                </a></p>
-                <p class="text-muted small">Make sure your Excel file is in this folder and shared with the service account.</p>
-            </div>
+                <button type="submit" class="btn btn-warning">Export Audit Log</button>
+            </form>
         </div>
     </div>
 </div>
-
-<script>
-function syncFromDrive() {
-    if(confirm('Sync SKU data from Google Drive? This will update your inventory with the latest Excel file.')) {
-        $('#syncResult').html('<div class="alert alert-info">Syncing... Please wait up to 30 seconds.</div>');
-        
-        $.ajax({
-            url: '/sync_data',
-            method: 'POST',
-            contentType: 'application/json',
-            success: function(response) {
-                if(response.success) {
-                    $('#syncResult').html('<div class="alert alert-success">✓ ' + response.message + '</div>');
-                    setTimeout(function() { location.reload(); }, 2000);
-                } else {
-                    $('#syncResult').html('<div class="alert alert-danger">✗ ' + response.message + '</div>');
-                }
-            },
-            error: function(xhr) {
-                let errorMsg = 'Sync failed. ';
-                if(xhr.responseJSON && xhr.responseJSON.message) {
-                    errorMsg += xhr.responseJSON.message;
-                } else {
-                    errorMsg += 'Check server logs for details.';
-                }
-                $('#syncResult').html('<div class="alert alert-danger">✗ ' + errorMsg + '</div>');
-            }
-        });
-    }
-}
-</script>
-{% endblock %}
