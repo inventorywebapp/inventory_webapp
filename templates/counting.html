@@ -578,7 +578,7 @@ function displaySkus(skus) {
     
     let html = '<div class="col-12"><div class="table-responsive"><table class="table table-bordered table-hover table-striped">';
     html += '<thead class="table-dark">';
-    html += '<tr>';
+    html += '</tr>';
     html += '<th>SKU</th>';
     html += '<th>Description (Item Category)</th>';
     html += '<th>Day Category</th>';
@@ -602,19 +602,12 @@ function displaySkus(skus) {
         let countTimeValue = '';
         let rowClass = '';
         
-        // Check if this SKU has a current_count from the API (for continue session)
-        if (sku.current_count !== undefined && sku.current_count !== null && sku.current_count !== '') {
+        // Check if this SKU has a count (from any session)
+        if (sku.has_count === true || (sku.current_count !== undefined && sku.current_count !== null && sku.current_count !== '')) {
             hasCurrentCount = true;
             currentCountValue = sku.current_count;
             countTimeValue = sku.count_time || '';
-            rowClass = 'sku-pre-counted';  // BLUE for pre-counted
-        }
-        // Also check if it has a current count from the latest counts (for normal view)
-        else if (sku.has_count) {
-            hasCurrentCount = true;
-            currentCountValue = sku.current_count;
-            countTimeValue = sku.count_time || '';
-            rowClass = 'sku-pre-counted';  // BLUE for pre-counted
+            rowClass = 'sku-pre-counted';  // BLUE for SKUs with existing counts
         }
         
         if (sku.bypass_recount) {
