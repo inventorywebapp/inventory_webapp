@@ -375,13 +375,11 @@ def save_recount():
         record = CountRecord.query.get(recount_data.get('record_id'))
         if record:
             record.recount_count = float(recount_data.get('recount_count', 0))
-            # Final count should be the recount count (the corrected value)
             record.final_count = record.recount_count
             record.remarks = recount_data.get('remarks', '')
             record.recount_completed = True
             record.is_recount_needed = False
             
-            # Log recount change
             audit = AuditLog(
                 user_id=current_user.id,
                 action='Recount Completed',
@@ -396,7 +394,6 @@ def save_recount():
 @app.route('/check_recount_status', methods=['GET'])
 @login_required
 def check_recount_status():
-    """Check if there are any pending recounts"""
     session_id = request.args.get('session_id')
     if not session_id:
         return jsonify({'has_pending_recounts': False})
@@ -412,7 +409,6 @@ def check_recount_status():
 @app.route('/get_latest_counts', methods=['GET'])
 @login_required
 def get_latest_counts():
-    """Get the latest count for each SKU in the current session"""
     sku_ids = request.args.get('sku_ids', '')
     session_id = request.args.get('session_id')
     
@@ -425,7 +421,6 @@ def get_latest_counts():
     for sku_id in sku_id_list:
         if not sku_id:
             continue
-        # Get the record with HIGHEST version number for this SKU in this session
         latest = CountRecord.query.filter_by(
             session_id=session_id,
             sku_id=int(sku_id)
@@ -447,7 +442,6 @@ def complete_counting():
     if not session_id:
         return jsonify({'success': False, 'message': 'No session ID provided'}), 400
     
-    # Check for pending recounts
     pending_recounts = CountRecord.query.filter_by(
         session_id=session_id,
         is_recount_needed=True,
@@ -488,7 +482,6 @@ def admin_dashboard():
     sessions = CountingSession.query.order_by(CountingSession.session_date.desc()).limit(50).all()
     audit_logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(100).all()
     
-    # Get distinct values for export filters
     warehouses = ['Main Warehouse', '5th Floor Warehouse', 'All']
     day_categories = db.session.query(SKU.category).distinct().all()
     item_categories = db.session.query(SKU.description).distinct().all()
@@ -507,7 +500,7 @@ def admin_dashboard():
 @app.route('/export_counts', methods=['POST'])
 @login_required
 def export_counts():
-    """Export count data including uncounted SKUs - shows LATEST version only"""
+    """Export count data - shows LATEST count from the MOST RECENT session for each SKU"""
     if current_user.role not in ['admin', 'audit']:
         flash('Access denied', 'error')
         return redirect(url_for('index'))
@@ -522,7 +515,6 @@ def export_counts():
         # Get all SKUs based on filters
         sku_query = SKU.query
         
-        # Apply category filters to SKUs
         if filter_day_category and filter_day_category != 'All':
             sku_query = sku_query.filter(SKU.category == filter_day_category)
         if filter_item_category and filter_item_category != 'All':
@@ -547,48 +539,52 @@ def export_counts():
         
         sessions = session_query.all()
         
-        # Build a map of the LATEST count for each SKU (across all versions)
-        latest_counts = {}
-        for session_obj in sessions:
-            for record in session_obj.count_records:
-                if record.sku:
-                    key = f"{session_obj.id}_{record.sku_id}"
-                    # Only keep if this is the latest version (highest version number)
-                    if key not in latest_counts or record.version > latest_counts[key]['record'].version:
-                        latest_counts[key] = {
-                            'session': session_obj,
-                            'record': record,
-                            'sku': record.sku
-                        }
+        # For each SKU, find the LATEST record from the MOST RECENT session
+        # Group by SKU and find the record with highest session date and highest version
+        sku_latest = {}
+        
+        for sku in all_skus_in_category:
+            best_record = None
+            best_session = None
+            
+            for session_obj in sessions:
+                # Get the latest version for this SKU in this session
+                record = CountRecord.query.filter_by(
+                    session_id=session_obj.id,
+                    sku_id=sku.id
+                ).order_by(CountRecord.version.desc()).first()
+                
+                if record:
+                    # Compare session dates to find the most recent
+                    if best_session is None or session_obj.session_date > best_session.session_date:
+                        best_record = record
+                        best_session = session_obj
+            
+            sku_latest[sku.id] = {
+                'sku': sku,
+                'record': best_record,
+                'session': best_session
+            }
         
         # Group by day category
         sheets_data = {}
         
-        # Process each SKU (including uncounted)
-        for sku in all_skus_in_category:
-            day_category = sku.category or 'Uncategorized'
+        for sku_id, data in sku_latest.items():
+            sku = data['sku']
+            count_record = data['record']
+            session_obj = data['session']
             
-            # Find if this SKU was counted in any session (latest version only)
-            found = None
-            for key, data in latest_counts.items():
-                if data['sku'].id == sku.id:
-                    found = data
-                    break
+            day_category = sku.category or 'Uncategorized'
             
             if day_category not in sheets_data:
                 sheets_data[day_category] = []
             
-            if found:
-                count_record = found['record']
-                session_obj = found['session']
-                
-                # Determine FINAL COUNT correctly
+            if count_record and session_obj:
+                # SKU was counted
                 if count_record.recount_count and count_record.recount_count > 0:
                     final_count = count_record.recount_count
-                elif count_record.initial_count is not None:
-                    final_count = count_record.initial_count
                 else:
-                    final_count = ''
+                    final_count = count_record.initial_count
                 
                 row_data = {
                     'SKU': str(sku.sku),
@@ -596,14 +592,15 @@ def export_counts():
                     'Day Category': str(day_category),
                     'Count Status': 'COMPLETED',
                     'Version': count_record.version,
-                    'Initial Count': count_record.initial_count if count_record.initial_count is not None else '',
+                    'Initial Count': count_record.initial_count,
                     'Recount Count': count_record.recount_count if count_record.recount_count else '',
                     'Final Count': final_count,
                     'Remarks': str(count_record.remarks) if count_record.remarks else '',
                     'Date/Time Counted': count_record.count_time.strftime('%Y-%m-%d %H:%M:%S') if count_record.count_time else '',
-                    'Counter': session_obj.user.full_name if session_obj and session_obj.user else 'Unknown',
-                    'Warehouse': session_obj.warehouse if session_obj else '',
-                    'Session Status': 'Completed' if session_obj and session_obj.is_completed else 'In Progress',
+                    'Counter': session_obj.user.full_name if session_obj.user else 'Unknown',
+                    'Warehouse': session_obj.warehouse if session_obj.warehouse else '',
+                    'Session Date': session_obj.session_date.strftime('%Y-%m-%d %H:%M:%S') if session_obj.session_date else '',
+                    'Session Status': 'Completed' if session_obj.is_completed else 'In Progress',
                     'Last Count Reference': sku.last_count,
                     'Last Count Date': str(sku.last_count_date) if sku.last_count_date else '',
                     'Final Expected Count': sku.final_expected_count,
@@ -624,6 +621,7 @@ def export_counts():
                     'Date/Time Counted': 'NOT COUNTED',
                     'Counter': 'N/A',
                     'Warehouse': filter_warehouse if filter_warehouse and filter_warehouse != 'All' else 'All Warehouses',
+                    'Session Date': 'N/A',
                     'Session Status': 'MISSING',
                     'Last Count Reference': sku.last_count,
                     'Last Count Date': str(sku.last_count_date) if sku.last_count_date else '',
@@ -642,9 +640,7 @@ def export_counts():
                     df = pd.DataFrame(data)
                     df.to_excel(writer, sheet_name=safe_sheet_name, index=False)
                     
-                    # Color-code the "Count Status" column for uncounted items
                     worksheet = writer.sheets[safe_sheet_name]
-                    
                     status_col = None
                     for idx, col in enumerate(df.columns):
                         if col == 'Count Status':
@@ -795,7 +791,6 @@ def api_cleanup():
 @app.route('/sync_data', methods=['POST'])
 @login_required
 def sync_data():
-    """Manually sync data from Google Drive"""
     if current_user.role != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -812,7 +807,6 @@ def sync_data():
 @app.route('/debug_counts/<int:sku_id>')
 @login_required
 def debug_counts(sku_id):
-    """Debug endpoint to see all versions of a SKU count"""
     if current_user.role != 'admin':
         return "Unauthorized", 403
     
@@ -833,7 +827,7 @@ def debug_counts(sku_id):
     
     for r in records:
         result += f"<tr>"
-        result += f"<td>{r.version}</td>"
+        result += f"日上午{r.version}</td>"
         result += f"<td>{r.initial_count}</td>"
         result += f"<td>{r.recount_count if r.recount_count else '-'}</td>"
         result += f"<td>{r.final_count if r.final_count else '-'}</td>"
@@ -841,15 +835,14 @@ def debug_counts(sku_id):
         result += f"</tr>"
     
     result += "</table>"
-    result += f"<p><strong>Latest count should be: {records[-1].initial_count if records else 'None'}</strong></p>"
-    result += '<p><a href="/counting">Back to Counting</a></p>'
+    result += f"<p><strong>Latest count: {records[-1].initial_count if records else 'None'}</strong></p>"
+    result += '<p><a href="/admin">Back to Admin</a></p>'
     
     return result
 
 @app.route('/debug_session/<int:session_id>')
 @login_required
 def debug_session(session_id):
-    """Debug endpoint to see all counts in a session"""
     if current_user.role != 'admin':
         return "Unauthorized", 403
     
@@ -862,7 +855,7 @@ def debug_session(session_id):
     for r in records:
         result += f"<tr>"
         result += f"<td>{r.sku.sku if r.sku else 'Unknown'}</td>"
-        result += f"<td>{r.version}</td>"
+        result += f"日上午{r.version}</td>"
         result += f"<td>{r.initial_count}</td>"
         result += f"<td>{r.count_time}</td>"
         result += f"<td>{r.recount_count if r.recount_count else '-'}</td>"
