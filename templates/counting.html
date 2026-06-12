@@ -399,6 +399,53 @@ function applyFilters() {
     loadSkus(warehouse, dayCategory, itemCategory, search);
 }
 
+function loadInProgressSkus() {
+    let sessionIdFromUrl = getUrlParameter('session_id');
+    if (!sessionIdFromUrl) {
+        applyFilters();
+        return;
+    }
+    
+    currentSessionId = parseInt(sessionIdFromUrl);
+    
+    let loadingDiv = document.getElementById('loadingIndicator');
+    let skusListDiv = document.getElementById('skusList');
+    
+    loadingDiv.style.display = 'block';
+    skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-info text-center">Loading in-progress SKUs...</div></div>';
+    
+    fetch(`/get_in_progress_skus/${currentSessionId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.skus && data.skus.length > 0) {
+                allSkus = data.skus;
+                filteredSkus = data.skus;
+                currentPage = 1;
+                
+                let banner = `<div class="col-12 mb-3">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> 
+                        <strong>Continuing Session #${currentSessionId}</strong> - Showing ${data.skus.length} SKU(s) that have been counted but not completed.
+                        <br><small>Click "Apply Filters" to see all SKUs or continue counting these.</small>
+                    </div>
+                </div>`;
+                document.getElementById('skusList').innerHTML = banner;
+                
+                displaySkus(data.skus);
+                loadingDiv.style.display = 'none';
+            } else {
+                skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-warning text-center">No in-progress SKUs found. Loading all SKUs...</div></div>';
+                applyFilters();
+                loadingDiv.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading in-progress SKUs:', error);
+            applyFilters();
+            loadingDiv.style.display = 'none';
+        });
+}
+
 function loadSkus(warehouse, dayCategory, itemCategory, search) {
     let loadingDiv = document.getElementById('loadingIndicator');
     let skusListDiv = document.getElementById('skusList');
@@ -479,8 +526,8 @@ function displaySkus(skus) {
     html += '<th>Container Details</th>';
     html += '<th>Final Expected</th>';
     html += '<th>Kenneth\'s Inv</th>';
-    html += '<th>Initial Count</th>';
-    html += '<th>Version</th>';
+    html += '<th>Current Count</th>';
+    html += '<th>Last Counted Date</th>';
     html += '<th>Status</th>';
     html += '</tr>';
     html += '</thead><tbody>';
@@ -488,8 +535,12 @@ function displaySkus(skus) {
     for (let i = 0; i < skus.length; i++) {
         let sku = skus[i];
         let statusBadge = '';
+        let hasCurrentCount = sku.current_count !== undefined && sku.current_count !== null;
+        
         if (sku.bypass_recount) {
             statusBadge = '<span class="badge bg-warning">Bypass</span>';
+        } else if (hasCurrentCount) {
+            statusBadge = '<span class="badge bg-info">Previously Counted</span>';
         }
         
         let containerDetails = sku.container_details || '-';
@@ -502,6 +553,10 @@ function displaySkus(skus) {
             lastCountDate = lastCountDate.split(' ')[0];
         }
         
+        let currentCountValue = (sku.current_count !== undefined && sku.current_count !== null) ? sku.current_count : '';
+        let countTimeValue = sku.count_time || '';
+        let inputPlaceholder = hasCurrentCount ? `Previously: ${sku.current_count}` : 'Enter count';
+        
         html += '<tr id="sku-row-' + sku.id + '">';
         html += '<td><strong>' + escapeHtml(sku.sku) + '</strong></td>';
         html += '<td>' + escapeHtml(sku.description || '-') + '</td>';
@@ -512,26 +567,44 @@ function displaySkus(skus) {
         html += '<td><small>' + escapeHtml(containerDetails) + '</small></td>';
         html += '<td class="fw-bold text-primary">' + (sku.final_expected_count || 0) + '</td>';
         html += '<td class="fw-bold text-success">' + (sku.kenneth_inventory || 0) + '</td>';
-        html += '<td><input type="text" class="form-control initial-count" data-sku-id="' + sku.id + '" style="min-width: 100px; width: 100px;" placeholder="Enter count" inputmode="numeric"></td>';
-        html += '<td><span class="version-badge" id="version-' + sku.id + '" style="font-size: 11px; color: #666;">-</span></td>';
+        html += '<td>';
+        html += '<input type="text" class="form-control initial-count" data-sku-id="' + sku.id + '" style="min-width: 100px; width: 100px;" placeholder="' + inputPlaceholder + '" inputmode="numeric"';
+        if (hasCurrentCount) {
+            html += ' value="' + sku.current_count + '" title="Previously counted on: ' + countTimeValue + '\\nCount: ' + sku.current_count + '"';
+        }
+        html += '>';
+        html += '</td>';
+        html += '<td>';
+        if (countTimeValue) {
+            html += '<small class="text-muted">' + countTimeValue + '</small>';
+        } else {
+            html += '-';
+        }
+        html += '</td>';
         html += '<td>' + statusBadge + '</td>';
         html += '</tr>';
     }
     
     html += '</tbody></table></div></div>';
-    skusListDiv.innerHTML = html;
+    
+    // If this is a continued session, prepend the banner
+    let sessionIdFromUrl = getUrlParameter('session_id');
+    if (sessionIdFromUrl && currentSessionId == sessionIdFromUrl && filteredSkus.length > 0) {
+        let banner = `<div class="col-12 mb-3">
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> 
+                <strong>Continuing Session #${currentSessionId}</strong> - Showing ${filteredSkus.length} SKU(s) that have been counted but not completed.
+                <br><small>Click "Apply Filters" to see all SKUs or continue counting these.</small>
+            </div>
+        </div>`;
+        skusListDiv.innerHTML = banner + html;
+    } else {
+        skusListDiv.innerHTML = html;
+    }
     
     highlightSkusStatus();
     
-    // Check for session continuation
-    let sessionIdFromUrl = getUrlParameter('session_id');
-    if (sessionIdFromUrl && !currentSessionId) {
-        currentSessionId = parseInt(sessionIdFromUrl);
-        loadExistingCountsForSession(currentSessionId);
-    } else {
-        loadLatestCountsForSkus(skus);
-    }
-    
+    // Add event listeners for count inputs
     document.querySelectorAll('.initial-count').forEach(input => {
         input.addEventListener('blur', function() {
             if (this.value !== '' && this.value !== null) {
@@ -560,55 +633,6 @@ function displaySkus(skus) {
             highlightSkusStatus();
         });
     });
-}
-
-function loadExistingCountsForSession(sessionId) {
-    let skuIds = filteredSkus.map(s => s.id).join(',');
-    if (!skuIds) return;
-    
-    fetch(`/get_latest_counts?sku_ids=${skuIds}&session_id=${sessionId}`)
-        .then(response => response.json())
-        .then(latestCounts => {
-            for (let skuId in latestCounts) {
-                let countInput = document.querySelector(`.initial-count[data-sku-id="${skuId}"]`);
-                let versionSpan = document.getElementById(`version-${skuId}`);
-                if (countInput && latestCounts[skuId]) {
-                    countInput.value = latestCounts[skuId].initial_count;
-                    if (versionSpan) {
-                        versionSpan.textContent = `v${latestCounts[skuId].version}`;
-                    }
-                    let row = countInput.closest('tr');
-                    if (row) {
-                        row.classList.add('sku-pre-counted');
-                        let countDate = latestCounts[skuId].count_time;
-                        countInput.setAttribute('title', `Previously counted on: ${countDate}\nCount: ${latestCounts[skuId].initial_count}`);
-                    }
-                }
-            }
-            highlightSkusStatus();
-        });
-}
-
-function loadLatestCountsForSkus(skus) {
-    if (!currentSessionId || !skus || skus.length === 0) return;
-    
-    let skuIds = skus.map(s => s.id).join(',');
-    
-    fetch(`/get_latest_counts?sku_ids=${skuIds}&session_id=${currentSessionId}`)
-        .then(response => response.json())
-        .then(latestCounts => {
-            for (let skuId in latestCounts) {
-                let countInput = document.querySelector(`.initial-count[data-sku-id="${skuId}"]`);
-                let versionSpan = document.getElementById(`version-${skuId}`);
-                if (countInput && latestCounts[skuId]) {
-                    countInput.value = latestCounts[skuId].initial_count;
-                    if (versionSpan) {
-                        versionSpan.textContent = `v${latestCounts[skuId].version}`;
-                    }
-                }
-            }
-            highlightSkusStatus();
-        });
 }
 
 function previousPage() {
@@ -794,7 +818,7 @@ function showRecountModal(recountItems) {
     html += '<th>Kenneth\'s Inventory</th>';
     html += '<th>Recount Count</th>';
     html += '<th>Remarks (Optional)</th>';
-    html += '</tr></thead><tbody>';
+    html += '</table></thead><tbody>';
     
     for (let i = 0; i < recountItems.length; i++) {
         let item = recountItems[i];
@@ -1026,7 +1050,14 @@ document.getElementById('itemCategory').addEventListener('change', function() {
 document.addEventListener('DOMContentLoaded', function() {
     filterItemCategoriesByWarehouse();
     setupSmartSearch();
-    applyFilters();
+    
+    // Check if we're continuing a session
+    let sessionIdFromUrl = getUrlParameter('session_id');
+    if (sessionIdFromUrl) {
+        loadInProgressSkus();
+    } else {
+        applyFilters();
+    }
 });
 </script>
 {% endblock %}
