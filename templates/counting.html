@@ -161,33 +161,6 @@ function getUrlParameter(name) {
     return urlParams.get(name);
 }
 
-// Function to check and set active session
-function checkAndSetActiveSession() {
-    // First check URL param
-    let sessionIdFromUrl = getUrlParameter('session_id');
-    if (sessionIdFromUrl) {
-        currentSessionId = parseInt(sessionIdFromUrl);
-        return currentSessionId;
-    }
-    
-    // If no session in URL, check if there's an active session from previous save
-    if (!currentSessionId) {
-        fetch('/api/active_session')
-            .then(response => response.json())
-            .then(data => {
-                if (data.session_id) {
-                    currentSessionId = data.session_id;
-                    // Reload current view to show pre-counted SKUs
-                    if (filteredSkus.length > 0) {
-                        loadExistingCountsForSkus();
-                    }
-                }
-            })
-            .catch(error => console.error('Error checking active session:', error));
-    }
-    return currentSessionId;
-}
-
 function filterItemCategoriesByWarehouse() {
     let warehouse = document.getElementById('warehouse').value;
     let itemCategorySelect = document.getElementById('itemCategory');
@@ -445,7 +418,6 @@ function loadInProgressSkus() {
         .then(response => response.json())
         .then(data => {
             if (data.skus && data.skus.length > 0) {
-                // Mark each SKU as having a current count
                 for (let i = 0; i < data.skus.length; i++) {
                     data.skus[i].has_count = true;
                     data.skus[i].current_count = data.skus[i].current_count;
@@ -528,8 +500,6 @@ function displaySkusWithPagination() {
         paginationDiv.style.display = 'none';
     }
     
-    // After displaying SKUs, load existing counts for this session (if any)
-    // This runs for BOTH continue session AND normal view
     if (currentSessionId && filteredSkus.length > 0) {
         loadExistingCountsForSkus();
     }
@@ -546,18 +516,15 @@ function loadExistingCountsForSkus() {
                 let countInput = document.querySelector(`.initial-count[data-sku-id="${skuId}"]`);
                 let lastCountedSpan = document.getElementById(`last-counted-${skuId}`);
                 if (countInput && latestCounts[skuId]) {
-                    // Update the input field with existing count
                     countInput.value = latestCounts[skuId].initial_count;
                     countInput.setAttribute('title', `Previously counted on: ${latestCounts[skuId].count_time}\nCount: ${latestCounts[skuId].initial_count}`);
                     
-                    // Update the Last Counted Date column
                     if (lastCountedSpan) {
                         lastCountedSpan.innerHTML = latestCounts[skuId].count_time;
                         lastCountedSpan.style.color = '#0d6efd';
                         lastCountedSpan.style.fontWeight = 'bold';
                     }
                     
-                    // Add pre-counted class to row
                     let row = countInput.closest('tr');
                     if (row) {
                         row.classList.add('sku-pre-counted');
@@ -602,12 +569,11 @@ function displaySkus(skus) {
         let countTimeValue = '';
         let rowClass = '';
         
-        // Check if this SKU has a count (from any session)
         if (sku.has_count === true || (sku.current_count !== undefined && sku.current_count !== null && sku.current_count !== '')) {
             hasCurrentCount = true;
             currentCountValue = sku.current_count;
             countTimeValue = sku.count_time || '';
-            rowClass = 'sku-pre-counted';  // BLUE for SKUs with existing counts
+            rowClass = 'sku-pre-counted';
         }
         
         if (sku.bypass_recount) {
@@ -656,7 +622,6 @@ function displaySkus(skus) {
     
     html += '</tbody></table></div></div>';
     
-    // If this is a continued session, prepend the banner
     let sessionIdFromUrl = getUrlParameter('session_id');
     if (sessionIdFromUrl && currentSessionId == sessionIdFromUrl && filteredSkus.length > 0) {
         let banner = `<div class="col-12 mb-3">
@@ -673,7 +638,6 @@ function displaySkus(skus) {
     
     highlightSkusStatus();
     
-    // Add event listeners for count inputs
     document.querySelectorAll('.initial-count').forEach(input => {
         input.addEventListener('blur', function() {
             if (this.value !== '' && this.value !== null) {
@@ -902,7 +866,7 @@ function showRecountModal(recountItems) {
         html += '</td>';
     }
     
-    html += '</tbody></table></div>';
+    html += '</tbody><table></div>';
     html += '<div class="mt-3 d-flex justify-content-between">';
     html += '<button class="btn btn-secondary" onclick="closeRecountModal()">Close</button>';
     html += '<button class="btn btn-success" onclick="saveRecounts()">Save Recounts & Complete Session</button>';
@@ -1106,23 +1070,6 @@ function completeCounting() {
         });
 }
 
-// Also add this endpoint to app.py for active session check
-function checkActiveSession() {
-    if (!currentSessionId) {
-        fetch('/api/active_session')
-            .then(response => response.json())
-            .then(data => {
-                if (data.session_id) {
-                    currentSessionId = data.session_id;
-                    if (filteredSkus.length > 0) {
-                        loadExistingCountsForSkus();
-                    }
-                }
-            })
-            .catch(error => console.error('Error:', error));
-    }
-}
-
 document.getElementById('warehouse').addEventListener('change', function() {
     filterItemCategoriesByWarehouse();
     applyFilters();
@@ -1137,13 +1084,11 @@ document.addEventListener('DOMContentLoaded', function() {
     filterItemCategoriesByWarehouse();
     setupSmartSearch();
     
-    // Check if we're continuing a session
     let sessionIdFromUrl = getUrlParameter('session_id');
     if (sessionIdFromUrl) {
         currentSessionId = parseInt(sessionIdFromUrl);
         loadInProgressSkus();
     } else {
-        // No session in URL, check if there's an active session
         fetch('/api/active_session')
             .then(response => response.json())
             .then(data => {
