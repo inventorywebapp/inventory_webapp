@@ -279,6 +279,7 @@ def counting():
                 existing_record = CountRecord(session_id=session_obj.id, sku_id=int(sku_id))
                 db.session.add(existing_record)
             
+            # ALWAYS update with the latest count (this is the fix)
             existing_record.initial_count = initial_count
             existing_record.is_recount_needed = recount_needed
             existing_record.count_time = get_ph_time()
@@ -286,15 +287,14 @@ def counting():
             if recount_needed:
                 recount_needed_skus.append(sku.sku)
             
-            # Log changes in AuditLog
-            if old_value is not None and old_value != initial_count:
-                audit = AuditLog(
-                    user_id=current_user.id,
-                    action='Count Changed',
-                    details=f'SKU {sku.sku}: count changed from {old_value} to {initial_count}',
-                    ip_address=request.remote_addr
-                )
-                db.session.add(audit)
+            # Log changes in AuditLog (tracks ALL changes)
+            audit = AuditLog(
+                user_id=current_user.id,
+                action='Count ' + ('Updated' if old_value is not None else 'Added'),
+                details=f'SKU {sku.sku}: count changed from {old_value if old_value is not None else "0"} to {initial_count}',
+                ip_address=request.remote_addr
+            )
+            db.session.add(audit)
         
         db.session.commit()
         
@@ -302,7 +302,7 @@ def counting():
         audit = AuditLog(
             user_id=current_user.id,
             action='Initial Count Saved',
-            details=f'Saved counts for {len(counts)} SKUs in session {session_obj.id}. Recount needed for {len(recount_needed_skus)} SKUs',
+            details=f'Saved/Updated counts for {len(counts)} SKUs in session {session_obj.id}. Recount needed for {len(recount_needed_skus)} SKUs',
             ip_address=request.remote_addr
         )
         db.session.add(audit)
@@ -362,11 +362,13 @@ def save_recount():
     for recount_data in data.get('recounts', []):
         record = CountRecord.query.get(recount_data.get('record_id'))
         if record:
+            old_value = record.recount_count if record.recount_count else None
             record.recount_count = float(recount_data.get('recount_count', 0))
             record.final_count = record.recount_count
             record.remarks = recount_data.get('remarks', '')
             record.recount_completed = True
             record.is_recount_needed = False  # Mark as resolved
+            record.count_time = get_ph_time()  # Update timestamp
             
             # Log recount change
             audit = AuditLog(
@@ -463,7 +465,7 @@ def admin_dashboard():
 @app.route('/export_counts', methods=['POST'])
 @login_required
 def export_counts():
-    """Export count data including uncounted SKUs"""
+    """Export count data - shows LATEST counts per SKU per session"""
     if current_user.role not in ['admin', 'audit']:
         flash('Access denied', 'error')
         return redirect(url_for('index'))
@@ -478,7 +480,6 @@ def export_counts():
         # Get all SKUs based on filters
         sku_query = SKU.query
         
-        # Apply category filters to SKUs
         if filter_day_category and filter_day_category != 'All':
             sku_query = sku_query.filter(SKU.category == filter_day_category)
         if filter_item_category and filter_item_category != 'All':
@@ -503,65 +504,61 @@ def export_counts():
         
         sessions = session_query.all()
         
-        # Build a map of counted SKUs per session
-        counted_skus_map = {}
+        # Build a map of the LATEST count for each SKU (most recent count_time)
+        latest_counts = {}
         for session_obj in sessions:
             for record in session_obj.count_records:
                 if record.sku:
                     key = f"{session_obj.id}_{record.sku_id}"
-                    counted_skus_map[key] = {
-                        'session': session_obj,
-                        'record': record,
-                        'sku': record.sku
-                    }
+                    # Always take the record with the most recent count_time
+                    if key not in latest_counts or record.count_time > latest_counts[key]['record'].count_time:
+                        latest_counts[key] = {
+                            'session': session_obj,
+                            'record': record,
+                            'sku': record.sku
+                        }
         
         # Group by day category
         sheets_data = {}
         
-        # Process each SKU (including uncounted)
+        # Process each SKU
         for sku in all_skus_in_category:
             day_category = sku.category or 'Uncategorized'
             
-            # Find if this SKU was counted in any session
-            counted_in_session = None
-            count_record = None
-            session_obj = None
-            
-            for session_obj_temp in sessions:
-                for record in session_obj_temp.count_records:
-                    if record.sku_id == sku.id:
-                        counted_in_session = session_obj_temp
-                        count_record = record
-                        session_obj = session_obj_temp
-                        break
-                if counted_in_session:
+            # Find the latest count for this SKU
+            latest = None
+            for key, value in latest_counts.items():
+                if value['sku'].id == sku.id:
+                    latest = value
                     break
             
             if day_category not in sheets_data:
                 sheets_data[day_category] = []
             
-            if count_record:
-                # SKU was counted
+            if latest:
+                # SKU was counted - show LATEST count
+                record = latest['record']
+                session_obj = latest['session']
                 row_data = {
                     'SKU': str(sku.sku),
                     'Description': str(sku.description) if sku.description else '',
                     'Day Category': str(day_category),
                     'Count Status': 'COMPLETED',
-                    'Initial Count': count_record.initial_count,
-                    'Recount Count': count_record.recount_count if count_record.recount_count else '',
-                    'Final Count': count_record.final_count if count_record.final_count else '',
-                    'Remarks': str(count_record.remarks) if count_record.remarks else '',
-                    'Date/Time Counted': count_record.count_time.strftime('%Y-%m-%d %H:%M:%S') if count_record.count_time else '',
-                    'Counter': session_obj.user.full_name if session_obj and session_obj.user else 'Unknown',
-                    'Warehouse': session_obj.warehouse if session_obj else '',
-                    'Session Status': 'Completed' if session_obj and session_obj.is_completed else 'In Progress',
+                    'Initial Count': record.initial_count,
+                    'Recount Count': record.recount_count if record.recount_count else '',
+                    'Final Count': record.final_count if record.final_count else '',
+                    'Remarks': str(record.remarks) if record.remarks else '',
+                    'Date/Time Counted': record.count_time.strftime('%Y-%m-%d %H:%M:%S') if record.count_time else '',
+                    'Counter': session_obj.user.full_name if session_obj.user else 'Unknown',
+                    'Warehouse': session_obj.warehouse if session_obj.warehouse else '',
+                    'Session Status': 'Completed' if session_obj.is_completed else 'In Progress',
                     'Last Count Reference': sku.last_count,
                     'Last Count Date': str(sku.last_count_date) if sku.last_count_date else '',
                     'Final Expected Count': sku.final_expected_count,
                     'Kenneth Inventory': sku.kenneth_inventory
                 }
             else:
-                # SKU was NOT counted - highlight this
+                # SKU was NOT counted
                 row_data = {
                     'SKU': str(sku.sku),
                     'Description': str(sku.description) if sku.description else '',
@@ -588,26 +585,23 @@ def export_counts():
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             if sheets_data:
                 for sheet_name, data in sheets_data.items():
-                    # Sanitize sheet name
                     safe_sheet_name = str(sheet_name)[:31].replace('/', '-').replace('\\', '-').replace('*', '-').replace('?', '-').replace(':', '-')
                     df = pd.DataFrame(data)
                     df.to_excel(writer, sheet_name=safe_sheet_name, index=False)
                     
-                    # Color-code the "Count Status" column for uncounted items
+                    # Color-code the "Count Status" column
                     worksheet = writer.sheets[safe_sheet_name]
-                    
-                    # Find the "Count Status" column index
                     status_col = None
                     for idx, col in enumerate(df.columns):
                         if col == 'Count Status':
-                            status_col = idx + 1  # Excel columns are 1-indexed
+                            status_col = idx + 1
                             break
                     
                     if status_col:
                         from openpyxl.styles import PatternFill
                         yellow_fill = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
                         
-                        for row_idx in range(2, len(data) + 2):  # Start from row 2 (after header)
+                        for row_idx in range(2, len(data) + 2):
                             cell = worksheet.cell(row=row_idx, column=status_col)
                             if cell.value and 'NOT COUNTED' in str(cell.value):
                                 cell.fill = yellow_fill
@@ -617,7 +611,6 @@ def export_counts():
         
         output.seek(0)
         
-        # Create filename with filter info
         filename_parts = ['inventory_export']
         if filter_date:
             filename_parts.append(filter_date)
@@ -640,7 +633,7 @@ def export_counts():
 @app.route('/export_audit_log', methods=['POST'])
 @login_required
 def export_audit_log():
-    """Export audit log data"""
+    """Export audit log data - shows ALL changes history"""
     if current_user.role not in ['admin', 'audit']:
         flash('Access denied', 'error')
         return redirect(url_for('index'))
