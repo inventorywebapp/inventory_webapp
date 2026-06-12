@@ -17,9 +17,21 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
     full_name = db.Column(db.String(100), nullable=False)
-    role = db.Column(db.String(20), nullable=False)  # admin, staff, audit
+    role = db.Column(db.String(25), nullable=False, default='inventory_staff')  # admin, inventory_staff, inventory_supervisor, auditor, manager
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=get_ph_time)
+    
+    def has_permission(self, permission):
+        """Check if user has specific permission"""
+        if self.role == 'admin':
+            return True
+        permissions = {
+            'manager': ['count', 'recount', 'export_counts', 'export_audit', 'view_dashboard'],
+            'inventory_supervisor': ['count', 'recount', 'export_counts', 'export_audit', 'view_dashboard'],
+            'inventory_staff': ['count', 'recount', 'view_dashboard'],
+            'auditor': ['export_counts', 'export_audit']
+        }
+        return permission in permissions.get(self.role, [])
 
 
 class SKU(db.Model):
