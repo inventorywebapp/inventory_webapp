@@ -258,6 +258,9 @@ def counting():
         recount_needed_skus = []
         for sku_id, count_data in counts.items():
             sku = SKU.query.get(int(sku_id))
+            if not sku:
+                continue
+                
             initial_count = float(count_data.get('initial_count', 0))
             
             # Get existing record to track changes
@@ -299,7 +302,7 @@ def counting():
         audit = AuditLog(
             user_id=current_user.id,
             action='Initial Count Saved',
-            details=f'Saved counts for {len(counts)} SKUs in session {session_obj.id}. Recount needed for {len(recount_needed_skus)} SKUs: {", ".join(recount_needed_skus[:5])}',
+            details=f'Saved counts for {len(counts)} SKUs in session {session_obj.id}. Recount needed for {len(recount_needed_skus)} SKUs',
             ip_address=request.remote_addr
         )
         db.session.add(audit)
@@ -359,11 +362,11 @@ def save_recount():
     for recount_data in data.get('recounts', []):
         record = CountRecord.query.get(recount_data.get('record_id'))
         if record:
-            old_value = record.recount_count if record.recount_count else None
             record.recount_count = float(recount_data.get('recount_count', 0))
             record.final_count = record.recount_count
             record.remarks = recount_data.get('remarks', '')
             record.recount_completed = True
+            record.is_recount_needed = False  # Mark as resolved
             
             # Log recount change
             audit = AuditLog(
@@ -433,105 +436,118 @@ def export_counts():
         flash('Access denied', 'error')
         return redirect(url_for('index'))
     
-    # Get filter parameters
-    filter_date = request.form.get('filter_date')
-    filter_warehouse = request.form.get('filter_warehouse')
-    filter_day_category = request.form.get('filter_day_category')
-    filter_item_category = request.form.get('filter_item_category')
-    
-    # Get ALL sessions (both completed AND in progress)
-    query = CountingSession.query
-    
-    # Apply date filter
-    if filter_date:
-        target_date = datetime.strptime(filter_date, '%Y-%m-%d')
-        start_date = target_date.replace(hour=0, minute=0, second=0)
-        end_date = target_date.replace(hour=23, minute=59, second=59)
-        query = query.filter(CountingSession.session_date.between(start_date, end_date))
-    
-    # Apply warehouse filter
-    if filter_warehouse and filter_warehouse != 'All':
-        query = query.filter(CountingSession.warehouse == filter_warehouse)
-    
-    sessions = query.all()
-    
-    if not sessions:
-        flash('No counting sessions found for the selected filters', 'warning')
-        return redirect(url_for('admin_dashboard'))
-    
-    # Group by day category from SKU
-    sheets_data = {}
-    
-    for session_obj in sessions:
-        for record in session_obj.count_records:
-            sku = record.sku
-            day_category = sku.category or 'Uncategorized'
-            
-            # Apply day category filter
-            if filter_day_category and filter_day_category != 'All' and day_category != filter_day_category:
-                continue
-            
-            # Apply item category filter
-            if filter_item_category and filter_item_category != 'All' and sku.description != filter_item_category:
-                continue
-            
-            if day_category not in sheets_data:
-                sheets_data[day_category] = []
-            
-            sheets_data[day_category].append({
-                'SKU': sku.sku,
-                'Description': sku.description,
-                'Day Category': day_category,
-                'Initial Count': record.initial_count,
-                'Recount Count': record.recount_count if record.recount_count else '',
-                'Final Count': record.final_count if record.final_count else '',
-                'Remarks': record.remarks or '',
-                'Date/Time Counted': record.count_time.strftime('%Y-%m-%d %H:%M:%S') if record.count_time else '',
-                'Counter': session_obj.user.full_name if session_obj.user else 'Unknown',
-                'Warehouse': session_obj.warehouse,
-                'Session Status': 'Completed' if session_obj.is_completed else 'In Progress',
-                'Last Count Reference': sku.last_count,
-                'Last Count Date': sku.last_count_date,
-                'Final Expected Count': sku.final_expected_count,
-                "Kenneth's Inventory": sku.kenneth_inventory
-            })
-    
-    # Create Excel file
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        if sheets_data:
-            for sheet_name, data in sheets_data.items():
-                # Sanitize sheet name
-                sheet_name = str(sheet_name)[:31].replace('/', '-').replace('\\', '-').replace('*', '-').replace('?', '-').replace(':', '-')
-                df = pd.DataFrame(data)
-                df.to_excel(writer, sheet_name=sheet_name, index=False)
+    try:
+        # Get filter parameters
+        filter_date = request.form.get('filter_date')
+        filter_warehouse = request.form.get('filter_warehouse')
+        filter_day_category = request.form.get('filter_day_category')
+        filter_item_category = request.form.get('filter_item_category')
+        
+        # Start with all sessions
+        query = CountingSession.query
+        
+        # Apply date filter
+        if filter_date and filter_date.strip():
+            try:
+                target_date = datetime.strptime(filter_date, '%Y-%m-%d')
+                start_date = target_date.replace(hour=0, minute=0, second=0)
+                end_date = target_date.replace(hour=23, minute=59, second=59)
+                query = query.filter(CountingSession.session_date.between(start_date, end_date))
+            except ValueError:
+                pass
+        
+        # Apply warehouse filter
+        if filter_warehouse and filter_warehouse != 'All':
+            query = query.filter(CountingSession.warehouse == filter_warehouse)
+        
+        sessions = query.all()
+        
+        if not sessions:
+            flash('No counting sessions found for the selected filters', 'warning')
+            return redirect(url_for('admin_dashboard'))
+        
+        # Group by day category from SKU
+        sheets_data = {}
+        
+        for session_obj in sessions:
+            for record in session_obj.count_records:
+                if not record.sku:
+                    continue
+                sku = record.sku
+                day_category = sku.category or 'Uncategorized'
                 
-                # Auto-adjust column widths
-                worksheet = writer.sheets[sheet_name]
-                for column in df.columns:
-                    column_width = max(df[column].astype(str).map(len).max(), len(str(column))) + 2
-                    worksheet.column_dimensions[column].width = min(column_width, 50)
-        else:
-            df = pd.DataFrame({'Message': ['No counting data found for the selected filters']})
-            df.to_excel(writer, sheet_name='No Data', index=False)
-    
-    output.seek(0)
-    
-    # Create filename with filter info
-    filename_parts = ['inventory_export']
-    if filter_date:
-        filename_parts.append(filter_date)
-    if filter_warehouse and filter_warehouse != 'All':
-        filename_parts.append(filter_warehouse.replace(' ', '_'))
-    
-    filename = '_'.join(filename_parts) + f'_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
-    
-    return send_file(
-        output,
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        as_attachment=True,
-        download_name=filename
-    )
+                # Apply day category filter
+                if filter_day_category and filter_day_category != 'All' and day_category != filter_day_category:
+                    continue
+                
+                # Apply item category filter
+                if filter_item_category and filter_item_category != 'All' and sku.description != filter_item_category:
+                    continue
+                
+                if day_category not in sheets_data:
+                    sheets_data[day_category] = []
+                
+                sheets_data[day_category].append({
+                    'SKU': sku.sku,
+                    'Description': sku.description,
+                    'Day Category': day_category,
+                    'Initial Count': record.initial_count,
+                    'Recount Count': record.recount_count if record.recount_count else '',
+                    'Final Count': record.final_count if record.final_count else '',
+                    'Remarks': record.remarks or '',
+                    'Date/Time Counted': record.count_time.strftime('%Y-%m-%d %H:%M:%S') if record.count_time else '',
+                    'Counter': session_obj.user.full_name if session_obj.user else 'Unknown',
+                    'Warehouse': session_obj.warehouse,
+                    'Session Status': 'Completed' if session_obj.is_completed else 'In Progress',
+                    'Last Count Reference': sku.last_count,
+                    'Last Count Date': sku.last_count_date,
+                    'Final Expected Count': sku.final_expected_count,
+                    "Kenneth's Inventory": sku.kenneth_inventory
+                })
+        
+        # Create Excel file
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            if sheets_data:
+                for sheet_name, data in sheets_data.items():
+                    # Sanitize sheet name
+                    safe_sheet_name = str(sheet_name)[:31].replace('/', '-').replace('\\', '-').replace('*', '-').replace('?', '-').replace(':', '-')
+                    df = pd.DataFrame(data)
+                    df.to_excel(writer, sheet_name=safe_sheet_name, index=False)
+                    
+                    # Auto-adjust column widths
+                    worksheet = writer.sheets[safe_sheet_name]
+                    for column in df.columns:
+                        try:
+                            column_width = max(df[column].astype(str).map(len).max(), len(str(column))) + 2
+                            worksheet.column_dimensions[column].width = min(column_width, 50)
+                        except:
+                            pass
+            else:
+                df = pd.DataFrame({'Message': ['No counting data found for the selected filters']})
+                df.to_excel(writer, sheet_name='No Data', index=False)
+        
+        output.seek(0)
+        
+        # Create filename with filter info
+        filename_parts = ['inventory_export']
+        if filter_date:
+            filename_parts.append(filter_date)
+        if filter_warehouse and filter_warehouse != 'All':
+            filename_parts.append(filter_warehouse.replace(' ', '_'))
+        
+        filename = '_'.join(filename_parts) + f'_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as e:
+        print(f"Export error: {e}", file=sys.stderr)
+        flash(f'Export failed: {str(e)}', 'error')
+        return redirect(url_for('admin_dashboard'))
 
 @app.route('/export_audit_log', methods=['POST'])
 @login_required
@@ -541,70 +557,83 @@ def export_audit_log():
         flash('Access denied', 'error')
         return redirect(url_for('index'))
     
-    # Get filter parameters
-    start_date = request.form.get('start_date')
-    end_date = request.form.get('end_date')
-    filter_user = request.form.get('filter_user')
-    
-    query = AuditLog.query
-    
-    # Apply date filters
-    if start_date:
-        start = datetime.strptime(start_date, '%Y-%m-%d')
-        query = query.filter(AuditLog.timestamp >= start)
-    
-    if end_date:
-        end = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
-        query = query.filter(AuditLog.timestamp < end)
-    
-    # Apply user filter
-    if filter_user and filter_user != 'All':
-        query = query.filter(AuditLog.user_id == int(filter_user))
-    
-    # Order by timestamp
-    logs = query.order_by(AuditLog.timestamp.desc()).all()
-    
-    if not logs:
-        flash('No audit log data found for the selected filters', 'warning')
-        return redirect(url_for('admin_dashboard'))
-    
-    # Prepare data for export
-    audit_data = []
-    for log in logs:
-        audit_data.append({
-            'Timestamp (PHT)': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-            'User': log.user.full_name if log.user else 'System',
-            'Action': log.action,
-            'Details': log.details,
-            'IP Address': log.ip_address
-        })
-    
-    # Create Excel file
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        if audit_data:
+    try:
+        # Get filter parameters
+        start_date = request.form.get('start_date')
+        end_date = request.form.get('end_date')
+        filter_user = request.form.get('filter_user')
+        
+        query = AuditLog.query
+        
+        # Apply date filters
+        if start_date and start_date.strip():
+            try:
+                start = datetime.strptime(start_date, '%Y-%m-%d')
+                query = query.filter(AuditLog.timestamp >= start)
+            except ValueError:
+                pass
+        
+        if end_date and end_date.strip():
+            try:
+                end = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+                query = query.filter(AuditLog.timestamp < end)
+            except ValueError:
+                pass
+        
+        # Apply user filter
+        if filter_user and filter_user != 'All':
+            try:
+                query = query.filter(AuditLog.user_id == int(filter_user))
+            except ValueError:
+                pass
+        
+        # Order by timestamp
+        logs = query.order_by(AuditLog.timestamp.desc()).all()
+        
+        if not logs:
+            flash('No audit log data found for the selected filters', 'warning')
+            return redirect(url_for('admin_dashboard'))
+        
+        # Prepare data for export
+        audit_data = []
+        for log in logs:
+            audit_data.append({
+                'Timestamp (PHT)': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                'User': log.user.full_name if log.user else 'System',
+                'Action': log.action,
+                'Details': log.details,
+                'IP Address': log.ip_address
+            })
+        
+        # Create Excel file
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df = pd.DataFrame(audit_data)
             df.to_excel(writer, sheet_name='Audit Log', index=False)
             
             # Auto-adjust column widths
             worksheet = writer.sheets['Audit Log']
             for column in df.columns:
-                column_width = max(df[column].astype(str).map(len).max(), len(str(column))) + 2
-                worksheet.column_dimensions[column].width = min(column_width, 50)
-        else:
-            df = pd.DataFrame({'Message': ['No audit log data found for the selected filters']})
-            df.to_excel(writer, sheet_name='No Data', index=False)
-    
-    output.seek(0)
-    
-    filename = f"audit_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    
-    return send_file(
-        output,
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        as_attachment=True,
-        download_name=filename
-    )
+                try:
+                    column_width = max(df[column].astype(str).map(len).max(), len(str(column))) + 2
+                    worksheet.column_dimensions[column].width = min(column_width, 50)
+                except:
+                    pass
+        
+        output.seek(0)
+        
+        filename = f"audit_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as e:
+        print(f"Audit export error: {e}", file=sys.stderr)
+        flash(f'Audit export failed: {str(e)}', 'error')
+        return redirect(url_for('admin_dashboard'))
 
 @app.route('/audit')
 @login_required
