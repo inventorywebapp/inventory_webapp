@@ -1141,6 +1141,54 @@ def debug_session(session_id):
     
     return result
 
+@app.route('/get_in_progress_skus/<int:session_id>')
+@login_required
+def get_in_progress_skus(session_id):
+    """Get SKUs that have been counted but session not completed"""
+    session_obj = CountingSession.query.get(session_id)
+    if not session_obj:
+        return jsonify({'error': 'Session not found'}), 404
+    
+    # Get all SKUs that have count records in this session
+    counted_sku_ids = db.session.query(CountRecord.sku_id).filter(
+        CountRecord.session_id == session_id
+    ).distinct().all()
+    
+    counted_ids = [c[0] for c in counted_sku_ids]
+    
+    if not counted_ids:
+        return jsonify({'skus': [], 'message': 'No SKUs have been counted yet'})
+    
+    # Get the latest version for each counted SKU
+    skus_data = []
+    for sku_id in counted_ids:
+        sku = SKU.query.get(sku_id)
+        latest_record = CountRecord.query.filter_by(
+            session_id=session_id,
+            sku_id=sku_id
+        ).order_by(CountRecord.version.desc()).first()
+        
+        if sku and latest_record:
+            skus_data.append({
+                'id': sku.id,
+                'sku': sku.sku,
+                'description': sku.description,
+                'category': sku.category,
+                'last_count_date': sku.last_count_date,
+                'last_count': sku.last_count,
+                'total_container_qty': sku.total_container_qty,
+                'container_details': sku.container_details,
+                'final_expected_count': sku.final_expected_count,
+                'kenneth_inventory': sku.kenneth_inventory,
+                'stock_status': sku.stock_status,
+                'bypass_recount': sku.bypass_recount,
+                'current_count': latest_record.initial_count,
+                'count_time': latest_record.count_time.strftime('%Y-%m-%d %H:%M:%S') if latest_record.count_time else '',
+                'version': latest_record.version
+            })
+    
+    return jsonify({'skus': skus_data, 'count': len(skus_data)})
+
 # Health check endpoint for Render
 @app.route('/health')
 def health_check():
