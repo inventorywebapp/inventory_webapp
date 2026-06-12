@@ -128,14 +128,15 @@
                     {% endfor %}
                 </ul>
                 <h6>Item Categories (A → Z)</h6>
-                <ul class="list-group">
-                    {% for cat in item_categories[:10] %}
-                    <li class="list-group-item">{{ cat }}</li>
-                    {% endfor %}
-                    {% if item_categories|length > 10 %}
-                    <li class="list-group-item text-muted">... and {{ item_categories|length - 10 }} more</li>
-                    {% endif %}
-                </ul>
+                <!-- Scrollable Item Categories -->
+                <div style="max-height: 200px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px;">
+                    <ul class="list-group list-group-flush">
+                        {% for cat in item_categories %}
+                        <li class="list-group-item">{{ cat }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <small class="text-muted">Total: {{ item_categories|length }} categories</small>
             </div>
         </div>
     </div>
