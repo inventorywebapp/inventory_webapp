@@ -84,6 +84,13 @@
     background-color: #d1e7dd !important;
     border-left: 3px solid #198754;
 }
+.sku-pre-counted {
+    background-color: #cfe2ff !important;
+    border-left: 3px solid #0d6efd;
+}
+.sku-pre-counted:hover {
+    background-color: #b6d4fe !important;
+}
 .uncounted-badge {
     display: inline-block;
     background-color: #ffc107;
@@ -147,6 +154,12 @@ let allDayCategories = [...allDayCategoriesRaw].sort((a, b) => {
     let orderB = DAY_ORDER[b] || 999;
     return orderA - orderB;
 });
+
+// Get URL parameter for session continuation
+function getUrlParameter(name) {
+    let urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(name);
+}
 
 function filterItemCategoriesByWarehouse() {
     let warehouse = document.getElementById('warehouse').value;
@@ -236,6 +249,7 @@ function highlightSkusStatus() {
             if (row) {
                 row.classList.add('sku-uncounted');
                 row.classList.remove('sku-counted');
+                row.classList.remove('sku-pre-counted');
             }
             uncountedCount++;
         } else {
@@ -272,28 +286,23 @@ function highlightSkusStatus() {
     }
 }
 
-// Validate integer input - show error, don't auto-correct
 function validateCountInput(input) {
     let value = input.value;
     let errorMessage = '';
     
     if (value === '' || value === null) {
-        return true; // Empty is allowed (not counted yet)
+        return true;
     }
     
-    // Check if it's a valid number
     if (isNaN(value)) {
         errorMessage = 'Please enter a valid number';
     }
-    // Check for decimal point
     else if (value.includes('.')) {
         errorMessage = 'Decimal numbers are not allowed. Please enter a whole number (e.g., 5, 10, 25)';
     }
-    // Check for negative
     else if (parseFloat(value) < 0) {
         errorMessage = 'Negative numbers are not allowed. Please enter 0 or a positive number';
     }
-    // Check if it's a whole number
     else if (!Number.isInteger(parseFloat(value))) {
         errorMessage = 'Please enter a whole number (no decimals)';
     }
@@ -514,10 +523,15 @@ function displaySkus(skus) {
     
     highlightSkusStatus();
     
-    // Load latest counts for all SKUs
-    loadLatestCountsForSkus(skus);
+    // Check for session continuation
+    let sessionIdFromUrl = getUrlParameter('session_id');
+    if (sessionIdFromUrl && !currentSessionId) {
+        currentSessionId = parseInt(sessionIdFromUrl);
+        loadExistingCountsForSession(currentSessionId);
+    } else {
+        loadLatestCountsForSkus(skus);
+    }
     
-    // Add validation to all count inputs
     document.querySelectorAll('.initial-count').forEach(input => {
         input.addEventListener('blur', function() {
             if (this.value !== '' && this.value !== null) {
@@ -548,6 +562,55 @@ function displaySkus(skus) {
     });
 }
 
+function loadExistingCountsForSession(sessionId) {
+    let skuIds = filteredSkus.map(s => s.id).join(',');
+    if (!skuIds) return;
+    
+    fetch(`/get_latest_counts?sku_ids=${skuIds}&session_id=${sessionId}`)
+        .then(response => response.json())
+        .then(latestCounts => {
+            for (let skuId in latestCounts) {
+                let countInput = document.querySelector(`.initial-count[data-sku-id="${skuId}"]`);
+                let versionSpan = document.getElementById(`version-${skuId}`);
+                if (countInput && latestCounts[skuId]) {
+                    countInput.value = latestCounts[skuId].initial_count;
+                    if (versionSpan) {
+                        versionSpan.textContent = `v${latestCounts[skuId].version}`;
+                    }
+                    let row = countInput.closest('tr');
+                    if (row) {
+                        row.classList.add('sku-pre-counted');
+                        let countDate = latestCounts[skuId].count_time;
+                        countInput.setAttribute('title', `Previously counted on: ${countDate}\nCount: ${latestCounts[skuId].initial_count}`);
+                    }
+                }
+            }
+            highlightSkusStatus();
+        });
+}
+
+function loadLatestCountsForSkus(skus) {
+    if (!currentSessionId || !skus || skus.length === 0) return;
+    
+    let skuIds = skus.map(s => s.id).join(',');
+    
+    fetch(`/get_latest_counts?sku_ids=${skuIds}&session_id=${currentSessionId}`)
+        .then(response => response.json())
+        .then(latestCounts => {
+            for (let skuId in latestCounts) {
+                let countInput = document.querySelector(`.initial-count[data-sku-id="${skuId}"]`);
+                let versionSpan = document.getElementById(`version-${skuId}`);
+                if (countInput && latestCounts[skuId]) {
+                    countInput.value = latestCounts[skuId].initial_count;
+                    if (versionSpan) {
+                        versionSpan.textContent = `v${latestCounts[skuId].version}`;
+                    }
+                }
+            }
+            highlightSkusStatus();
+        });
+}
+
 function previousPage() {
     if (currentPage > 1) {
         currentPage--;
@@ -575,28 +638,6 @@ function escapeHtml(text) {
     });
 }
 
-function loadLatestCountsForSkus(skus) {
-    if (!currentSessionId || !skus || skus.length === 0) return;
-    
-    let skuIds = skus.map(s => s.id).join(',');
-    
-    fetch(`/get_latest_counts?sku_ids=${skuIds}&session_id=${currentSessionId}`)
-        .then(response => response.json())
-        .then(latestCounts => {
-            for (let skuId in latestCounts) {
-                let countInput = document.querySelector(`.initial-count[data-sku-id="${skuId}"]`);
-                let versionSpan = document.getElementById(`version-${skuId}`);
-                if (countInput && latestCounts[skuId]) {
-                    countInput.value = latestCounts[skuId].initial_count;
-                    if (versionSpan) {
-                        versionSpan.textContent = `v${latestCounts[skuId].version}`;
-                    }
-                }
-            }
-            highlightSkusStatus();
-        });
-}
-
 function saveAllCounts() {
     let warehouse = document.getElementById('warehouse').value;
     let warehouseDisplay = warehouse === '5thFloor' ? '5th Floor Warehouse' : (warehouse === 'Main' ? 'Main Warehouse' : 'All Warehouses');
@@ -608,7 +649,6 @@ function saveAllCounts() {
     let invalidSkus = [];
     let blankSkuNames = [];
     
-    // First validate all inputs
     let hasInvalid = false;
     for (let i = 0; i < countInputs.length; i++) {
         let input = countInputs[i];
@@ -742,7 +782,7 @@ function checkForRecounts() {
 }
 
 function showRecountModal(recountItems) {
-    console.log("Recount items:", recountItems); // Debug log
+    console.log("Recount items:", recountItems);
     
     let html = '<div class="table-responsive"><table class="table table-bordered">';
     html += '<thead class="table-dark">';
@@ -802,7 +842,6 @@ function showRecountModal(recountItems) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
-    // Add validation to recount inputs (count required, remarks optional)
     document.querySelectorAll('.recount-count').forEach(input => {
         input.addEventListener('blur', function() {
             let value = this.value;
@@ -865,7 +904,6 @@ function saveRecounts() {
         let row = input.closest('tr');
         let skuName = row ? row.cells[0].innerText : 'Unknown';
         
-        // Validate recount count (REQUIRED)
         if (!recountCount || recountCount === '') {
             hasError = true;
             errorMessage += `• Please enter recount count for ${skuName}\n`;
@@ -878,7 +916,6 @@ function saveRecounts() {
             input.style.border = '';
         }
         
-        // Remarks are OPTIONAL - no validation needed
         let remarksInput = document.querySelector('.recount-remarks[data-record-id="' + recordId + '"]');
         remarksInput.style.border = '';
         
@@ -976,7 +1013,6 @@ function completeCounting() {
         });
 }
 
-// Event listeners
 document.getElementById('warehouse').addEventListener('change', function() {
     filterItemCategoriesByWarehouse();
     applyFilters();
@@ -987,7 +1023,6 @@ document.getElementById('itemCategory').addEventListener('change', function() {
     applyFilters();
 });
 
-// Auto-load on page load
 document.addEventListener('DOMContentLoaded', function() {
     filterItemCategoriesByWarehouse();
     setupSmartSearch();
