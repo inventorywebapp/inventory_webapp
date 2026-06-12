@@ -225,7 +225,6 @@ let itemsPerPage = 50;
 let currentSessionId = null;
 let searchTimeout = null;
 let html5QrCode = null;
-let isScanning = false;
 
 // Sort day categories
 let allDayCategories = [...allDayCategoriesRaw].sort((a, b) => {
@@ -240,41 +239,24 @@ function getUrlParameter(name) {
     return urlParams.get(name);
 }
 
-// Normalize string for comparison (remove spaces, dashes, special characters, convert to lowercase)
-function normalizeString(str) {
-    if (!str) return '';
-    return str.toLowerCase()
-        .trim()
-        .replace(/[^\w]/g, '')  // Remove all non-word characters (spaces, dashes, punctuation)
-        .replace(/\s+/g, '');    // Remove any remaining spaces
-}
-
 // Barcode/QR Code Scanner Functions
-async function startBarcodeScanner() {
-    if (isScanning) {
-        console.log("Scanner already running");
-        return;
-    }
-    
+function startBarcodeScanner() {
     const scannerModal = new bootstrap.Modal(document.getElementById('scannerModal'));
     scannerModal.show();
     
     const resultContainer = document.getElementById('qr-reader-results');
     resultContainer.innerHTML = '<div class="alert alert-info">Initializing camera... Please wait.</div>';
     
+    // Clean up any existing scanner
     if (html5QrCode) {
         try {
-            await html5QrCode.stop();
-        } catch(e) {
-            console.log("Error stopping existing scanner:", e);
-        }
+            html5QrCode.stop().catch(() => {});
+        } catch(e) {}
         html5QrCode = null;
     }
     
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
+    // Create new scanner
     html5QrCode = new Html5Qrcode("qr-reader");
-    isScanning = true;
     
     const config = {
         fps: 10,
@@ -283,43 +265,38 @@ async function startBarcodeScanner() {
         showTorchButtonIfSupported: true
     };
     
-    try {
-        await html5QrCode.start(
-            { facingMode: "environment" },
-            config,
-            (decodedText, decodedResult) => {
-                console.log(`Scanned: "${decodedText}"`);
-                resultContainer.innerHTML = `<div class="alert alert-success">✓ Scanned: ${decodedText}</div>`;
-                stopBarcodeScanner();
-                searchByBarcode(decodedText);
-            },
-            (errorMessage) => {
-                // Silent ignore
-            }
-        );
-    } catch (err) {
+    html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        (decodedText, decodedResult) => {
+            // Success callback - found a code
+            console.log(`Scanned: ${decodedText}`);
+            resultContainer.innerHTML = `<div class="alert alert-success">✓ Scanned: ${decodedText}</div>`;
+            
+            // Stop scanner after successful scan
+            stopBarcodeScanner();
+            
+            // Search for the scanned code
+            searchByBarcode(decodedText);
+        },
+        (errorMessage) => {
+            // Error callback - ignore, just keep scanning
+            // Don't show errors to user
+        }
+    ).catch((err) => {
         console.error(`Error starting scanner: ${err}`);
         resultContainer.innerHTML = `<div class="alert alert-danger">Cannot access camera: ${err.message || err}. Please check camera permissions.</div>`;
-        isScanning = false;
-    }
+    });
 }
 
-async function stopBarcodeScanner() {
-    isScanning = false;
-    
+function stopBarcodeScanner() {
     if (html5QrCode) {
-        try {
-            await html5QrCode.stop();
-            console.log("Scanner stopped successfully");
-        } catch (err) {
+        html5QrCode.stop().then(() => {
+            console.log("Scanner stopped");
+        }).catch((err) => {
             console.error("Error stopping scanner:", err);
-        }
+        });
         html5QrCode = null;
-    }
-    
-    const readerElement = document.getElementById('qr-reader');
-    if (readerElement) {
-        readerElement.innerHTML = '';
     }
     
     const scannerModal = bootstrap.Modal.getInstance(document.getElementById('scannerModal'));
@@ -338,6 +315,7 @@ function manualBarcodeEntry() {
 }
 
 function searchByBarcode(barcode) {
+    // First, ensure SKUs are loaded
     if (allSkus.length === 0) {
         fetch('/get_skus?day_category=All&item_category=All&search=')
             .then(response => response.json())
@@ -356,49 +334,48 @@ function searchByBarcode(barcode) {
 
 function performBarcodeSearch(barcode) {
     let searchTerm = barcode.trim();
-    let normalizedSearch = normalizeString(searchTerm);
+    let matchedSku = null;
+    let partialMatches = [];
+    let exactMatches = [];
     
-    console.log("Searching for:", searchTerm);
-    console.log("Normalized search:", normalizedSearch);
-    console.log("Available SKUs:", allSkus.map(s => s.sku));
-    
-    let matches = [];
-    
-    // Try multiple matching strategies
+    // First, look for exact match (case insensitive)
     for (let i = 0; i < allSkus.length; i++) {
         const sku = allSkus[i];
-        const normalizedSku = normalizeString(sku.sku);
-        
-        // Strategy 1: Exact match (case insensitive)
         if (sku.sku.toLowerCase() === searchTerm.toLowerCase()) {
-            matches.push({ sku: sku, type: 'exact', score: 100 });
-        }
-        // Strategy 2: Normalized match (ignoring spaces, dashes, special chars)
-        else if (normalizedSku === normalizedSearch) {
-            matches.push({ sku: sku, type: 'normalized', score: 90 });
-        }
-        // Strategy 3: SKU contains search term
-        else if (sku.sku.toLowerCase().includes(searchTerm.toLowerCase())) {
-            matches.push({ sku: sku, type: 'contains', score: 70 });
-        }
-        // Strategy 4: Normalized SKU contains normalized search
-        else if (normalizedSku.includes(normalizedSearch)) {
-            matches.push({ sku: sku, type: 'normalized_contains', score: 60 });
-        }
-        // Strategy 5: Search term contains SKU (partial)
-        else if (searchTerm.toLowerCase().includes(sku.sku.toLowerCase())) {
-            matches.push({ sku: sku, type: 'reverse_contains', score: 50 });
+            exactMatches.push(sku);
+        } else if (sku.sku.toLowerCase().includes(searchTerm.toLowerCase())) {
+            partialMatches.push(sku);
         }
     }
     
-    // Sort by score (highest first)
-    matches.sort((a, b) => b.score - a.score);
-    
-    console.log("Matches found:", matches.map(m => ({ sku: m.sku.sku, type: m.type, score: m.score })));
-    
-    if (matches.length === 1) {
-        // Single match - perfect
-        const matchedSku = matches[0].sku;
+    // Prioritize exact match
+    if (exactMatches.length === 1) {
+        matchedSku = exactMatches[0];
+        document.getElementById('searchSku').value = matchedSku.sku;
+        applyFilters();
+        showToast(`✓ Found SKU: ${matchedSku.sku}`, 'success');
+        
+        // Highlight and scroll to the SKU
+        setTimeout(() => {
+            let row = document.getElementById(`sku-row-${matchedSku.id}`);
+            if (row) {
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                row.style.backgroundColor = '#a8d5ff';
+                setTimeout(() => {
+                    row.style.backgroundColor = '';
+                }, 3000);
+            }
+        }, 500);
+    }
+    else if (exactMatches.length > 1) {
+        // Multiple exact matches - shouldn't happen with SKU, but handle
+        let matchList = exactMatches.map(s => `• ${s.sku} - ${s.description || ''}`).join('\n');
+        alert(`Multiple SKUs match "${searchTerm}":\n\n${matchList}\n\nPlease select from the search results.`);
+        document.getElementById('searchSku').value = searchTerm;
+        applyFilters();
+    }
+    else if (partialMatches.length === 1) {
+        matchedSku = partialMatches[0];
         document.getElementById('searchSku').value = matchedSku.sku;
         applyFilters();
         showToast(`✓ Found SKU: ${matchedSku.sku}`, 'success');
@@ -414,27 +391,22 @@ function performBarcodeSearch(barcode) {
             }
         }, 500);
     }
-    else if (matches.length > 1) {
-        // Multiple matches - show selection
-        let matchList = matches.slice(0, 5).map(m => `• ${m.sku.sku} - ${m.sku.description || ''}`).join('\n');
-        alert(`Multiple matches found for "${searchTerm}":\n\n${matchList}\n\nPlease select from the search results.`);
+    else if (partialMatches.length > 1) {
+        let matchList = partialMatches.slice(0, 5).map(s => `• ${s.sku} - ${s.description || ''}`).join('\n');
+        let remaining = partialMatches.length - 5;
+        if (remaining > 0) matchList += `\n• ... and ${remaining} more`;
+        alert(`Multiple SKUs found for "${searchTerm}":\n\n${matchList}\n\nPlease select from the search results.`);
         document.getElementById('searchSku').value = searchTerm;
         applyFilters();
     }
     else {
-        // No match - show debug info
-        console.log("NO MATCH FOUND!");
-        console.log("Scanned value:", searchTerm);
-        console.log("Normalized:", normalizedSearch);
-        console.log("Sample SKUs (normalized):", allSkus.slice(0, 10).map(s => ({ sku: s.sku, normalized: normalizeString(s.sku) })));
-        
-        let sampleSkus = allSkus.slice(0, 5).map(s => s.sku).join(', ');
-        alert(`SKU "${searchTerm}" not found.\n\nTip: Try using manual search or check the QR code value.\n\nExample SKUs in system:\n${sampleSkus}...`);
-        document.getElementById('searchSku').value = searchTerm;
+        // No match found - show helpful message
+        showToast(`SKU "${searchTerm}" not found. Try scanning again or use manual search.`, 'warning');
     }
 }
 
 function showToast(message, type = 'info') {
+    // Create temporary toast notification
     let toast = document.createElement('div');
     toast.className = `alert alert-${type === 'success' ? 'success' : (type === 'warning' ? 'warning' : 'info')} alert-dismissible fade show position-fixed`;
     toast.style.bottom = '20px';
@@ -972,7 +944,7 @@ function displaySkus(skus) {
         html += '</tr>';
     }
     
-    html += '</tbody><tr></div></div>';
+    html += '</tbody></table></div></div>';
     
     let sessionIdFromUrl = getUrlParameter('session_id');
     if (sessionIdFromUrl && currentSessionId == sessionIdFromUrl && filteredSkus.length > 0) {
@@ -1206,7 +1178,7 @@ function showRecountModal(recountItems) {
     html += '<th>Kenneth\'s Inventory</th>';
     html += '<th>Recount Count</th>';
     html += '<th>Remarks (Optional)</th>';
-    html += '</td></thead><tbody>';
+    html += '</tr></thead><tbody>';
     
     for (let i = 0; i < recountItems.length; i++) {
         let item = recountItems[i];
