@@ -471,6 +471,7 @@ function displaySkus(skus) {
     html += '<th>Final Expected</th>';
     html += '<th>Kenneth\'s Inv</th>';
     html += '<th>Initial Count</th>';
+    html += '<th>Version</th>';
     html += '<th>Status</th>';
     html += '</tr>';
     html += '</thead><tbody>';
@@ -503,12 +504,33 @@ function displaySkus(skus) {
         html += '<td class="fw-bold text-primary">' + (sku.final_expected_count || 0) + '</td>';
         html += '<td class="fw-bold text-success">' + (sku.kenneth_inventory || 0) + '</td>';
         html += '<td><input type="text" class="form-control initial-count" data-sku-id="' + sku.id + '" style="min-width: 100px; width: 100px;" placeholder="Enter count" inputmode="numeric"></td>';
+        html += '<td><span class="version-badge" id="version-' + sku.id + '" style="font-size: 11px; color: #666;">-</span></td>';
         html += '<td>' + statusBadge + '</td>';
-        html += '<tr>';
+        html += '</tr>';
     }
     
-    html += '</tbody></tr></div></div>';
+    html += '</tbody></table></div></div>';
     skusListDiv.innerHTML = html;
+    
+    // Load latest counts for all SKUs
+    let skuIds = skus.map(s => s.id).join(',');
+    if (skuIds && currentSessionId) {
+        fetch(`/get_latest_counts?sku_ids=${skuIds}&session_id=${currentSessionId}`)
+            .then(response => response.json())
+            .then(latestCounts => {
+                for (let skuId in latestCounts) {
+                    let countInput = document.querySelector(`.initial-count[data-sku-id="${skuId}"]`);
+                    let versionSpan = document.getElementById(`version-${skuId}`);
+                    if (countInput && latestCounts[skuId]) {
+                        countInput.value = latestCounts[skuId].initial_count;
+                        if (versionSpan) {
+                            versionSpan.textContent = `v${latestCounts[skuId].version}`;
+                        }
+                    }
+                }
+                highlightSkusStatus();
+            });
+    }
     
     highlightSkusStatus();
     
@@ -522,7 +544,6 @@ function displaySkus(skus) {
         });
         
         input.addEventListener('keypress', function(e) {
-            // Allow only numbers (0-9) and backspace, delete, enter, tab
             if (e.key === 'Enter') {
                 this.blur();
                 return;
