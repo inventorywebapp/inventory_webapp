@@ -26,26 +26,68 @@
         <div class="card">
             <div class="card-header">
                 <h5>System Users</h5>
+                <a href="{{ url_for('admin_users') }}" class="btn btn-primary btn-sm">Manage Users</a>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-bordered">
                         <thead>
-                            <tr><th>Username</th><th>Full Name</th><th>Role</th><th>Status</th><th>Created</th></tr>
+                            <tr>
+                                <th>Username</th>
+                                <th>Full Name</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                            </tr>
                         </thead>
                         <tbody>
                             {% for user in users %}
                             <tr>
                                 <td>{{ user.username }}</td>
                                 <td>{{ user.full_name }}</td>
-                                <td>{{ user.role }}</td>
-                                <td>{% if user.is_active %}Active{% else %}Inactive{% endif %}</td>
-                                <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at }}</td>
+                                <td>
+                                    <span class="badge {% if user.role == 'admin' %}bg-danger{% elif user.role == 'manager' %}bg-primary{% elif user.role == 'inventory_supervisor' %}bg-info{% elif user.role == 'inventory_staff' %}bg-success{% else %}bg-secondary{% endif %}">
+                                        {{ user.role|replace('_', ' ')|title }}
+                                    </span>
+                                </div>
+                                <td>
+                                    {% if user.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Inactive</span>
+                                    {% endif %}
+                                </div>
+                                <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at }}</div>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
+                <hr>
+                <h6>Role Permissions:</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Role</th>
+                                <th>Count</th>
+                                <th>Recount</th>
+                                <th>Export Counts</th>
+                                <th>Export Audit Logs</th>
+                                <th>Dashboard</th>
+                                <th>Manage Users</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Admin</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
+                            <tr><td>Manager</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td></tr>
+                            <tr><td>Inventory Supervisor</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td></tr>
+                            <tr><td>Inventory Staff</td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>✅</td><td>❌</td></tr>
+                            <tr><td>Auditor</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td><td>❌</td><td>❌</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-muted mt-2">Click "Manage Users" to create, edit, or delete user accounts.</p>
             </div>
         </div>
     </div>
@@ -59,17 +101,30 @@
                 <div class="table-responsive">
                     <table class="table table-bordered">
                         <thead>
-                            <tr><th>ID</th><th>User</th><th>Warehouse</th><th>Date</th><th>Status</th><th>Items Counted</th></tr>
+                            <tr>
+                                <th>ID</th>
+                                <th>User</th>
+                                <th>Warehouse</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Items Counted</th>
+                            </tr>
                         </thead>
                         <tbody>
                             {% for session in sessions %}
                             <tr>
-                                <td>{{ session.id }}</td>
-                                <td>{{ session.user.full_name if session.user }}</td>
-                                <td>{{ session.warehouse }}</td>
-                                <td>{{ session.session_date.strftime('%Y-%m-%d %H:%M') }}</td>
-                                <td>{% if session.is_completed %}Completed{% else %}In Progress{% endif %}</td>
-                                <td>{{ session.count_records|length }}</td>
+                                <td>{{ session.id }}</div>
+                                <td>{{ session.user.full_name if session.user }}</div>
+                                <td>{{ session.warehouse }}</div>
+                                <td>{{ session.session_date.strftime('%Y-%m-%d %H:%M') }}</div>
+                                <td>
+                                    {% if session.is_completed %}
+                                    <span class="badge bg-success">Completed</span>
+                                    {% else %}
+                                    <span class="badge bg-warning">In Progress</span>
+                                    {% endif %}
+                                </div>
+                                <td>{{ session.count_records|length }}</div>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -88,16 +143,22 @@
                 <div class="table-responsive">
                     <table class="table table-bordered table-sm" id="auditTable">
                         <thead>
-                            <tr><th>Timestamp (PHT)</th><th>User</th><th>Action</th><th>Details</th><th>IP Address</th></tr>
+                            <tr>
+                                <th>Timestamp (PHT)</th>
+                                <th>User</th>
+                                <th>Action</th>
+                                <th>Details</th>
+                                <th>IP Address</th>
+                            </tr>
                         </thead>
                         <tbody id="auditLogsBody">
                             {% for log in audit_logs %}
                             <tr>
-                                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                                <td>{{ log.user.full_name if log.user }}</td>
-                                <td>{{ log.action }}</td>
-                                <td>{{ log.details|replace('.0', '') if log.details else '' }}</td>
-                                <td>{{ log.ip_address }}</td>
+                                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+                                <td>{{ log.user.full_name if log.user }}</div>
+                                <td>{{ log.action }}</div>
+                                <td>{{ log.details|replace('.0', '') if log.details else '' }}</div>
+                                <td>{{ log.ip_address }}</div>
                             </tr>
                             {% endfor %}
                         </tbody>
