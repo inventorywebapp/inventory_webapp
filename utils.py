@@ -122,9 +122,9 @@ def detect_column_mapping(df):
     return mapping
 
 def sync_data_from_drive():
-    """Sync data from Google Drive using service account - PRESERVES existing data"""
+    """Sync data from Google Drive - Hybrid approach: Update/Add new, Mark inactive for removed"""
     try:
-        print("=== STARTING SYNC PROCESS ===", file=sys.stderr)
+        print("=== STARTING SYNC PROCESS (Hybrid Mode) ===", file=sys.stderr)
         
         # Get credentials from environment variable
         creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
@@ -217,13 +217,16 @@ def sync_data_from_drive():
         
         print(f"Using column mapping: {column_mapping}", file=sys.stderr)
         
+        # Track SKUs found in Excel
+        skus_found_in_excel = set()
+        
         # Track statistics
         skus_updated = 0
         skus_added = 0
-        skus_unchanged = 0
+        skus_reactivated = 0
         errors = []
         
-        # Process each row - UPDATE instead of DELETE
+        # Process each row - UPDATE existing or ADD new
         for index, row in df.iterrows():
             try:
                 # Get SKU value
@@ -233,17 +236,26 @@ def sync_data_from_drive():
                     print(f"Warning: Empty SKU at row {index}, skipping", file=sys.stderr)
                     continue
                 
+                # Add to found set
+                skus_found_in_excel.add(sku_value)
+                
                 # Check if SKU exists
                 existing_sku = SKU.query.filter_by(sku=sku_value).first()
                 
                 if existing_sku:
                     # Update existing SKU
                     sku = existing_sku
+                    if not sku.is_active:
+                        sku.is_active = True
+                        skus_reactivated += 1
+                        print(f"Reactivated SKU: {sku_value}", file=sys.stderr)
                     skus_updated += 1
                 else:
                     # Create new SKU
                     sku = SKU()
+                    sku.is_active = True
                     skus_added += 1
+                    print(f"Adding new SKU: {sku_value}", file=sys.stderr)
                 
                 # Update SKU fields based on detected mapping
                 sku.sku = sku_value
@@ -320,9 +332,9 @@ def sync_data_from_drive():
                 db.session.add(sku)
                 
                 # Commit every 500 rows to avoid memory issues
-                if (skus_updated + skus_added) % 500 == 0:
+                if (skus_updated + skus_added + skus_reactivated) % 500 == 0:
                     db.session.commit()
-                    print(f"Progress: {skus_added} new, {skus_updated} updated SKUs so far", file=sys.stderr)
+                    print(f"Progress: {skus_added} new, {skus_updated} updated, {skus_reactivated} reactivated so far", file=sys.stderr)
                 
             except Exception as row_error:
                 error_msg = f"Error processing row {index}: {row_error}"
@@ -330,30 +342,50 @@ def sync_data_from_drive():
                 errors.append(error_msg)
                 continue
         
+        # MARK INACTIVE: SKUs in database but NOT in Excel
+        print("Checking for SKUs to mark as inactive...", file=sys.stderr)
+        all_db_skus = SKU.query.filter_by(is_active=True).all()
+        skus_marked_inactive = 0
+        inactive_sku_list = []
+        
+        for db_sku in all_db_skus:
+            if db_sku.sku not in skus_found_in_excel:
+                db_sku.is_active = False
+                skus_marked_inactive += 1
+                inactive_sku_list.append(db_sku.sku)
+                print(f"Marked as inactive (removed from Excel): {db_sku.sku}", file=sys.stderr)
+        
         # Final commit
         db.session.commit()
         
-        # Log the sync action if we have user context (optional)
+        # Log the sync action
         try:
             from flask import has_request_context
             if has_request_context():
                 from flask_login import current_user
                 if current_user and current_user.is_authenticated:
+                    audit_details = f"Synced from {file_name}: +{skus_added} new, ~{skus_updated} updated, -{skus_marked_inactive} inactive, 🔄{skus_reactivated} reactivated"
+                    if errors:
+                        audit_details += f", {len(errors)} errors"
+                    
                     audit = AuditLog(
                         user_id=current_user.id,
                         action='Google Drive Sync',
-                        details=f"Synced from {file_name}: {skus_added} new SKUs, {skus_updated} updated, {len(errors)} errors",
+                        details=audit_details,
                         ip_address='SYSTEM'
                     )
                     db.session.add(audit)
                     db.session.commit()
         except:
-            pass  # Skip audit if no request context
+            pass
         
-        print(f"=== SYNC COMPLETE ===", file=sys.stderr)
+        print(f"=== SYNC COMPLETE (Hybrid Mode) ===", file=sys.stderr)
         print(f"New SKUs added: {skus_added}", file=sys.stderr)
         print(f"Existing SKUs updated: {skus_updated}", file=sys.stderr)
-        print(f"Total SKUs in database: {SKU.query.count()}", file=sys.stderr)
+        print(f"SKUs reactivated: {skus_reactivated}", file=sys.stderr)
+        print(f"SKUs marked inactive (removed from Excel): {skus_marked_inactive}", file=sys.stderr)
+        print(f"Total ACTIVE SKUs in database: {SKU.query.filter_by(is_active=True).count()}", file=sys.stderr)
+        print(f"Total ALL SKUs (including inactive): {SKU.query.count()}", file=sys.stderr)
         
         if errors:
             print(f"Errors encountered: {len(errors)}", file=sys.stderr)
@@ -378,8 +410,11 @@ def import_excel_data(file_path):
             print("ERROR: Could not find SKU column", file=sys.stderr)
             return False
         
+        # Track SKUs found in Excel
+        skus_found_in_excel = set()
         skus_updated = 0
         skus_added = 0
+        skus_reactivated = 0
         
         for _, row in df.iterrows():
             sku_value = str(row[column_mapping.get('sku')]) if pd.notna(row[column_mapping.get('sku')]) else ''
@@ -387,12 +422,18 @@ def import_excel_data(file_path):
             if not sku_value:
                 continue
             
+            skus_found_in_excel.add(sku_value)
+            
             # Check if SKU exists
             sku = SKU.query.filter_by(sku=sku_value).first()
             if not sku:
                 sku = SKU()
+                sku.is_active = True
                 skus_added += 1
             else:
+                if not sku.is_active:
+                    sku.is_active = True
+                    skus_reactivated += 1
                 skus_updated += 1
             
             # Update fields
@@ -463,8 +504,17 @@ def import_excel_data(file_path):
             
             db.session.add(sku)
         
+        # Mark inactive SKUs
+        all_db_skus = SKU.query.filter_by(is_active=True).all()
+        skus_marked_inactive = 0
+        
+        for db_sku in all_db_skus:
+            if db_sku.sku not in skus_found_in_excel:
+                db_sku.is_active = False
+                skus_marked_inactive += 1
+        
         db.session.commit()
-        print(f"Import complete: {skus_added} added, {skus_updated} updated", file=sys.stderr)
+        print(f"Import complete: +{skus_added} new, ~{skus_updated} updated, -{skus_marked_inactive} inactive, 🔄{skus_reactivated} reactivated", file=sys.stderr)
         return True
         
     except Exception as e:
@@ -476,13 +526,16 @@ def import_excel_data(file_path):
 def get_sync_status():
     """Get information about the current sync state"""
     try:
-        total_skus = SKU.query.count()
+        total_active_skus = SKU.query.filter_by(is_active=True).count()
+        total_all_skus = SKU.query.count()
         last_updated = db.session.query(db.func.max(SKU.updated_at)).scalar()
         
         return {
-            'total_skus': total_skus,
+            'active_skus': total_active_skus,
+            'inactive_skus': total_all_skus - total_active_skus,
+            'total_skus': total_all_skus,
             'last_sync': last_updated.strftime('%Y-%m-%d %H:%M:%S') if last_updated else 'Never',
             'status': 'ok'
         }
     except:
-        return {'total_skus': 0, 'last_sync': 'Never', 'status': 'error'}
+        return {'active_skus': 0, 'inactive_skus': 0, 'total_skus': 0, 'last_sync': 'Never', 'status': 'error'}
