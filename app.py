@@ -250,7 +250,7 @@ def get_skus():
     item_category = request.args.get('item_category')
     search = request.args.get('search', '')
     
-    query = SKU.query
+    query = SKU.query.filter_by(is_active=True)
     
     is_filtered = False
     
@@ -351,7 +351,7 @@ def search_suggestions():
     if len(search_term) < 2:
         return jsonify([])
     
-    skus = SKU.query.filter(
+    skus = SKU.query.filter_by(is_active=True).filter(
         or_(
             SKU.sku.contains(search_term), 
             SKU.description.contains(search_term)
@@ -484,6 +484,10 @@ def counting():
     
     item_categories = [c[0] for c in item_categories_raw if c[0] and c[0] != '']
     item_categories.sort()
+
+    # Only show active SKUs in counting page
+    active_skus_count = SKU.query.filter_by(is_active=True).count()
+    print(f"Active SKUs available for counting: {active_skus_count}", file=sys.stderr)
     
     return render_template('counting.html',
                          warehouses=warehouses,
@@ -1377,6 +1381,226 @@ def debug_force_refresh():
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# ============ SKU MERGE TOOL ENDPOINTS ============
+
+@app.route('/admin/merge_skus')
+@login_required
+def admin_merge_skus():
+    """Admin tool to merge/transfer SKU history"""
+    if current_user.role != 'admin':
+        flash('Admin access required', 'error')
+        return redirect(url_for('dashboard'))
+    
+    from models import SKUMergeHistory
+    
+    # Get all inactive SKUs (potential old codes)
+    inactive_skus = SKU.query.filter_by(is_active=False).order_by(SKU.sku).all()
+    
+    # Get all active SKUs (potential new codes)
+    active_skus = SKU.query.filter_by(is_active=True).order_by(SKU.sku).all()
+    
+    # Get merge history
+    merge_history = SKUMergeHistory.query.order_by(SKUMergeHistory.merged_at.desc()).limit(50).all()
+    
+    return render_template('admin_merge_skus.html', 
+                         inactive_skus=inactive_skus,
+                         active_skus=active_skus,
+                         merge_history=merge_history)
+
+
+@app.route('/admin/transfer_history', methods=['POST'])
+@login_required
+def transfer_history():
+    """Transfer count history from old SKU to new SKU"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 403
+    
+    from models import SKUMergeHistory
+    
+    old_sku_id = request.form.get('old_sku_id')
+    new_sku_id = request.form.get('new_sku_id')
+    reason = request.form.get('reason', 'SKU code renamed/updated')
+    
+    old_sku = SKU.query.get(old_sku_id)
+    new_sku = SKU.query.get(new_sku_id)
+    
+    if not old_sku or not new_sku:
+        return jsonify({'success': False, 'message': 'SKU not found'}), 404
+    
+    if old_sku.id == new_sku.id:
+        return jsonify({'success': False, 'message': 'Cannot transfer to the same SKU'}), 400
+    
+    try:
+        # 1. Transfer all CountRecords from old SKU to new SKU
+        count_records = CountRecord.query.filter_by(sku_id=old_sku.id).all()
+        transferred_count = 0
+        
+        for record in count_records:
+            # Check if new SKU already has a record for this session/version
+            existing = CountRecord.query.filter_by(
+                session_id=record.session_id,
+                sku_id=new_sku.id,
+                version=record.version
+            ).first()
+            
+            if not existing:
+                # Create new record for new SKU
+                new_record = CountRecord(
+                    session_id=record.session_id,
+                    sku_id=new_sku.id,
+                    initial_count=record.initial_count,
+                    recount_count=record.recount_count,
+                    final_count=record.final_count,
+                    remarks=f"[TRANSFERRED FROM {old_sku.sku}] {record.remarks if record.remarks else ''}",
+                    is_recount_needed=record.is_recount_needed,
+                    recount_completed=record.recount_completed,
+                    count_time=record.count_time,
+                    version=record.version
+                )
+                db.session.add(new_record)
+                transferred_count += 1
+        
+        # 2. Mark old SKU as inactive (if not already)
+        old_sku.is_active = False
+        
+        # 3. Record the merge
+        merge_record = SKUMergeHistory(
+            old_sku_id=old_sku.id,
+            new_sku_id=new_sku.id,
+            merged_by=current_user.id,
+            reason=reason,
+            records_transferred=transferred_count
+        )
+        db.session.add(merge_record)
+        
+        db.session.commit()
+        
+        # 4. Audit log
+        audit = AuditLog(
+            user_id=current_user.id,
+            action='SKU History Transferred',
+            details=f"Transferred {transferred_count} count records from {old_sku.sku} to {new_sku.sku}. Reason: {reason}",
+            ip_address=request.remote_addr
+        )
+        db.session.add(audit)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Successfully transferred {transferred_count} count records from {old_sku.sku} to {new_sku.sku}',
+            'transferred_count': transferred_count
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+
+
+@app.route('/admin/sku_details/<int:sku_id>')
+@login_required
+def sku_details(sku_id):
+    """View detailed history of a SKU"""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    sku = SKU.query.get(sku_id)
+    if not sku:
+        return jsonify({'error': 'SKU not found'}), 404
+    
+    # Get all count records
+    count_records = CountRecord.query.filter_by(sku_id=sku.id).order_by(CountRecord.count_time.desc()).limit(50).all()
+    
+    records_data = []
+    for record in count_records:
+        session = CountingSession.query.get(record.session_id)
+        records_data.append({
+            'session_id': record.session_id,
+            'date': record.count_time.strftime('%Y-%m-%d %H:%M:%S') if record.count_time else 'Unknown',
+            'initial_count': record.initial_count,
+            'recount_count': record.recount_count,
+            'final_count': record.final_count,
+            'completed': session.is_completed if session else False,
+            'counter': session.user.full_name if session and session.user else 'Unknown'
+        })
+    
+    return jsonify({
+        'sku': sku.sku,
+        'description': sku.description,
+        'category': sku.category,
+        'is_active': sku.is_active,
+        'total_counts': len(count_records),
+        'count_records': records_data
+    })
+
+
+@app.route('/admin/suggest_sku_match')
+@login_required
+def suggest_sku_match():
+    """Suggest which active SKU might match an inactive SKU"""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    inactive_sku_id = request.args.get('sku_id')
+    if not inactive_sku_id:
+        return jsonify([])
+    
+    inactive_sku = SKU.query.get(inactive_sku_id)
+    if not inactive_sku:
+        return jsonify([])
+    
+    # Find similar active SKUs based on name similarity
+    active_skus = SKU.query.filter_by(is_active=True).all()
+    
+    suggestions = []
+    for active in active_skus:
+        # Calculate similarity
+        similarity = 0
+        
+        # Check if SKU codes share common parts
+        inactive_parts = set(inactive_sku.sku.lower().replace('-', ' ').split())
+        active_parts = set(active.sku.lower().replace('-', ' ').split())
+        
+        common_parts = inactive_parts.intersection(active_parts)
+        if common_parts:
+            similarity += len(common_parts) * 20
+        
+        # Check description similarity
+        if inactive_sku.description and active.description:
+            if inactive_sku.description.lower() == active.description.lower():
+                similarity += 50
+            elif inactive_sku.description.lower() in active.description.lower() or active.description.lower() in inactive_sku.description.lower():
+                similarity += 30
+        
+        # Check category match
+        if inactive_sku.category and active.category and inactive_sku.category == active.category:
+            similarity += 15
+        
+        if similarity > 0:
+            suggestions.append({
+                'id': active.id,
+                'sku': active.sku,
+                'description': active.description,
+                'category': active.category,
+                'similarity': similarity
+            })
+    
+    # Sort by similarity (highest first)
+    suggestions.sort(key=lambda x: x['similarity'], reverse=True)
+    
+    return jsonify(suggestions[:5])
+
+
+@app.route('/admin/inactive_skus')
+@login_required
+def admin_inactive_skus():
+    """View all inactive SKUs"""
+    if current_user.role != 'admin':
+        flash('Admin access required', 'error')
+        return redirect(url_for('dashboard'))
+    
+    inactive_skus = SKU.query.filter_by(is_active=False).order_by(SKU.sku).all()
+    return render_template('admin_inactive_skus.html', inactive_skus=inactive_skus)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
