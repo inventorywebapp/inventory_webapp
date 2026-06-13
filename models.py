@@ -63,6 +63,7 @@ class SKU(db.Model):
     inventory_remark = db.Column(db.Text)
     sku_status = db.Column(db.String(20))
     bypass_recount = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)
     updated_at = db.Column(db.DateTime, default=get_ph_time, onupdate=get_ph_time)
 
 
@@ -102,3 +103,19 @@ class AuditLog(db.Model):
     timestamp = db.Column(db.DateTime, default=get_ph_time)
 
     user = db.relationship('User', backref='audit_logs')
+
+
+class SKUMergeHistory(db.Model):
+    """Track when SKUs are merged/renamed"""
+    __tablename__ = 'sku_merge_history'
+    id = db.Column(db.Integer, primary_key=True)
+    old_sku_id = db.Column(db.Integer, db.ForeignKey('skus.id'))
+    new_sku_id = db.Column(db.Integer, db.ForeignKey('skus.id'))
+    merged_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    merged_at = db.Column(db.DateTime, default=get_ph_time)
+    reason = db.Column(db.String(500))
+    records_transferred = db.Column(db.Integer, default=0)
+    
+    old_sku = db.relationship('SKU', foreign_keys=[old_sku_id])
+    new_sku = db.relationship('SKU', foreign_keys=[new_sku_id])
+    user = db.relationship('User')
