@@ -22,8 +22,9 @@ app.config.from_object(Config)
 # Initialize extensions
 db.init_app(app)
 
-# Add this function right after app = Flask(__name__)
-
+# ============================================
+# ADD THIS FUNCTION HERE
+# ============================================
 def ensure_database_schema():
     """Auto-create missing columns/tables without shell access"""
     try:
@@ -73,15 +74,13 @@ def ensure_database_schema():
     except Exception as e:
         print(f"⚠️ Schema check warning: {e}", file=sys.stderr)
 
-# Call it right after db init
-app = Flask(__name__)
-app.config.from_object(Config)
+# CALL THE FUNCTION HERE (ONCE!)
+ensure_database_schema()
 
-# Initialize extensions
-db.init_app(app)
-ensure_database_schema()  # ← ADD THIS LINE
+# Initialize migrate
 migrate = Migrate(app, db)
 
+# Setup login manager
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -169,6 +168,8 @@ auto_sync_if_empty()
 def shutdown_session(exception=None):
     """Close database session after each request"""
     db.session.remove()
+
+# ... REST OF YOUR CODE CONTINUES (all your routes) ...
 
 @app.route('/')
 @login_required
