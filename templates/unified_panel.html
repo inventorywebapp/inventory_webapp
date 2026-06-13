@@ -85,23 +85,17 @@
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-bordered">
+                    <table class="table table-bordered" id="sessionsTable">
                         <thead>
                             <tr><th>ID</th><th>User</th><th>Warehouse</th><th>Date</th><th>Status</th><th>Items Counted</th></tr>
                         </thead>
-                        <tbody>
-                            {% for session in sessions %}
-                            <tr>
-                                <td>{{ session.id }}</div>
-                                <td>{{ session.user.full_name if session.user }}</div>
-                                <td>{{ session.warehouse }}</div>
-                                <td>{{ session.session_date.strftime('%Y-%m-%d %H:%M') }}</div>
-                                <td>{% if session.is_completed %}Completed{% else %}In Progress{% endif %}</div>
-                                <td>{{ session.count_records|length }}</div>
-                            </tr>
-                            {% endfor %}
+                        <tbody id="sessionsTableBody">
+                            <tr><td colspan="6" class="text-center">Loading sessions...<\/td></tr>
                         </tbody>
                     </table>
+                </div>
+                <div class="text-center mt-2">
+                    <button id="loadMoreSessionsBtn" class="btn btn-sm btn-secondary" style="display: none;" onclick="loadMoreSessions()">Load More Sessions</button>
                 </div>
             </div>
         </div>
@@ -120,23 +114,13 @@
                         <thead>
                             <tr><th>Timestamp (PHT)</th><th>User</th><th>Action</th><th>Details</th><th>IP Address</th></tr>
                         </thead>
-                        <tbody id="auditLogsBody">
-                            {% for log in audit_logs %}
-                            <tr>
-                                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</div>
-                                <td>{{ log.user.full_name if log.user }}</div>
-                                <td>{{ log.action }}</div>
-                                <td>{{ log.details|replace('.0', '') if log.details else '' }}</div>
-                                <td>{{ log.ip_address }}</div>
-                            </tr>
-                            {% endfor %}
+                        <tbody id="auditLogsTableBody">
+                            <tr><td colspan="5" class="text-center">Loading audit logs...<\/td></tr>
                         </tbody>
                     </table>
                 </div>
                 <div class="text-end mt-2">
-                    <button class="btn btn-sm btn-secondary" onclick="refreshAuditLogs()">
-                        <i class="bi bi-arrow-repeat"></i> Refresh Audit Logs
-                    </button>
+                    <button id="loadMoreAuditBtn" class="btn btn-sm btn-secondary" style="display: none;" onclick="loadMoreAuditLogs()">Load More Audit Logs</button>
                 </div>
             </div>
         </div>
@@ -339,30 +323,110 @@
 </div>
 
 <script>
+// Pagination variables
+let sessionsOffset = 0;
+const sessionsLimit = 50;
+let auditOffset = 0;
+const auditLimit = 50;
+let isLoadingSessions = false;
+let isLoadingAudit = false;
+let hasMoreSessions = true;
+let hasMoreAudit = true;
+
 function formatDetails(details) {
     if (!details) return '';
     return details.replace(/(\d+)\.0/g, '$1');
 }
 
-function refreshAuditLogs() {
-    fetch('/get_audit_logs')
+// Load sessions with pagination
+function loadSessions(reset = true) {
+    if (isLoadingSessions) return;
+    if (reset) {
+        sessionsOffset = 0;
+        hasMoreSessions = true;
+        document.getElementById('sessionsTableBody').innerHTML = '<tr><td colspan="6" class="text-center">Loading sessions...</td></tr>';
+    }
+    if (!hasMoreSessions && !reset) return;
+    
+    isLoadingSessions = true;
+    fetch(`/api/get_sessions?offset=${sessionsOffset}&limit=${sessionsLimit}`)
         .then(response => response.json())
-        .then(logs => {
-            let tbody = document.getElementById('auditLogsBody');
-            if (!tbody) return;
+        .then(data => {
+            const tbody = document.getElementById('sessionsTableBody');
+            if (reset) tbody.innerHTML = '';
             
-            tbody.innerHTML = '';
-            logs.forEach(log => {
-                let row = tbody.insertRow();
-                row.insertCell(0).textContent = log.timestamp;
-                row.insertCell(1).textContent = log.user;
-                row.insertCell(2).textContent = log.action;
-                row.insertCell(3).textContent = formatDetails(log.details);
-                row.insertCell(4).textContent = log.ip_address;
-            });
+            if (data.sessions.length === 0) {
+                if (reset) tbody.innerHTML = '<tr><td colspan="6" class="text-center">No sessions found</td></tr>';
+                hasMoreSessions = false;
+            } else {
+                data.sessions.forEach(session => {
+                    const row = tbody.insertRow();
+                    row.insertCell(0).textContent = session.id;
+                    row.insertCell(1).textContent = session.user;
+                    row.insertCell(2).textContent = session.warehouse;
+                    row.insertCell(3).textContent = session.date;
+                    row.insertCell(4).innerHTML = session.status === 'Completed' ? '<span class="badge bg-success">Completed</span>' : '<span class="badge bg-warning">In Progress</span>';
+                    row.insertCell(5).textContent = session.items_counted;
+                });
+                sessionsOffset += data.sessions.length;
+                hasMoreSessions = data.has_more;
+            }
+            
+            const loadMoreBtn = document.getElementById('loadMoreSessionsBtn');
+            if (loadMoreBtn) loadMoreBtn.style.display = hasMoreSessions ? 'inline-block' : 'none';
+            isLoadingSessions = false;
         })
-        .catch(error => console.error('Error loading audit logs:', error));
+        .catch(error => {
+            console.error('Error loading sessions:', error);
+            isLoadingSessions = false;
+        });
 }
+
+// Load audit logs with pagination
+function loadAuditLogs(reset = true) {
+    if (isLoadingAudit) return;
+    if (reset) {
+        auditOffset = 0;
+        hasMoreAudit = true;
+        document.getElementById('auditLogsTableBody').innerHTML = '<tr><td colspan="5" class="text-center">Loading audit logs...</td></tr>';
+    }
+    if (!hasMoreAudit && !reset) return;
+    
+    isLoadingAudit = true;
+    fetch(`/api/get_audit_logs_paginated?offset=${auditOffset}&limit=${auditLimit}`)
+        .then(response => response.json())
+        .then(data => {
+            const tbody = document.getElementById('auditLogsTableBody');
+            if (reset) tbody.innerHTML = '';
+            
+            if (data.logs.length === 0) {
+                if (reset) tbody.innerHTML = '<tr><td colspan="5" class="text-center">No audit logs found</td></tr>';
+                hasMoreAudit = false;
+            } else {
+                data.logs.forEach(log => {
+                    const row = tbody.insertRow();
+                    row.insertCell(0).textContent = log.timestamp;
+                    row.insertCell(1).textContent = log.user;
+                    row.insertCell(2).textContent = log.action;
+                    row.insertCell(3).textContent = formatDetails(log.details);
+                    row.insertCell(4).textContent = log.ip_address;
+                });
+                auditOffset += data.logs.length;
+                hasMoreAudit = data.has_more;
+            }
+            
+            const loadMoreBtn = document.getElementById('loadMoreAuditBtn');
+            if (loadMoreBtn) loadMoreBtn.style.display = hasMoreAudit ? 'inline-block' : 'none';
+            isLoadingAudit = false;
+        })
+        .catch(error => {
+            console.error('Error loading audit logs:', error);
+            isLoadingAudit = false;
+        });
+}
+
+function loadMoreSessions() { loadSessions(false); }
+function loadMoreAuditLogs() { loadAuditLogs(false); }
 
 function syncFromDrive() {
     if(confirm('Sync SKU data from Google Drive? This will update your inventory with the latest Excel file.')) {
@@ -472,9 +536,9 @@ function loadMergeHistory() {
                             ${data.map(m => `
                                 <tr>
                                     <td><small>${m.date}</small></td>
-                                    <td><span class="badge bg-danger">${m.old_sku}</span> → <span class="badge bg-success">${m.new_sku}</span></div>
+                                    <td><span class="badge bg-danger">${m.old_sku}</span> → <span class="badge bg-success">${m.new_sku}</span></td>
                                     <td>${m.records}</div>
-                                    <td><small>${m.by}</small></div>
+                                    <td><small>${m.by}</small></td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -532,50 +596,28 @@ function transferHistory() {
         transferBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Transfer History & Mark Old as Inactive';
     });
 }
-
 // ============ END SKU MERGE TOOL FUNCTIONS ============
 
-let refreshInterval = null;
-
 document.addEventListener('DOMContentLoaded', function() {
-    refreshAuditLogs();
+    // Load data when tabs are shown
+    const sessionsTab = document.querySelector('a[href="#sessions"]');
+    if (sessionsTab) {
+        sessionsTab.addEventListener('shown.bs.tab', function() { loadSessions(true); });
+    }
     
     const auditTab = document.querySelector('a[href="#audit"]');
-    
-    function startRefresh() {
-        if (refreshInterval) clearInterval(refreshInterval);
-        refreshInterval = setInterval(function() {
-            const auditPane = document.getElementById('audit');
-            if (auditPane && auditPane.classList.contains('show', 'active')) {
-                refreshAuditLogs();
-            }
-        }, 30000);
-    }
-    
-    function stopRefresh() {
-        if (refreshInterval) {
-            clearInterval(refreshInterval);
-            refreshInterval = null;
-        }
-    }
-    
     if (auditTab) {
-        auditTab.addEventListener('shown.bs.tab', startRefresh);
-        auditTab.addEventListener('hidden.bs.tab', stopRefresh);
+        auditTab.addEventListener('shown.bs.tab', function() { loadAuditLogs(true); });
     }
     
-    const auditPane = document.getElementById('audit');
-    if (auditPane && auditPane.classList.contains('show', 'active')) {
-        startRefresh();
-    }
-    
-    // Load merge tool data when its tab is shown
     const mergeTab = document.querySelector('a[href="#mergetool"]');
     if (mergeTab) {
-        mergeTab.addEventListener('shown.bs.tab', function() {
-            loadMergeSkus();
-        });
+        mergeTab.addEventListener('shown.bs.tab', function() { loadMergeSkus(); });
     }
+    
+    // Load active tab data
+    if (document.querySelector('#sessions.show, #sessions.active')) loadSessions(true);
+    if (document.querySelector('#audit.show, #audit.active')) loadAuditLogs(true);
 });
 </script>
 {% endblock %}
