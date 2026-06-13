@@ -21,6 +21,65 @@ app.config.from_object(Config)
 
 # Initialize extensions
 db.init_app(app)
+
+# Add this function right after app = Flask(__name__)
+
+def ensure_database_schema():
+    """Auto-create missing columns/tables without shell access"""
+    try:
+        import sqlite3
+        db_path = app.config.get('SQLALCHEMY_DATABASE_URI', '').replace('sqlite:///', '')
+        
+        # For in-memory or relative path
+        if db_path == '' or db_path == ':memory:':
+            db_path = 'instance/inventory.db'
+        
+        # Create instance folder if needed
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        
+        # Connect and add missing schema
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Add is_active column to skus if missing
+        cursor.execute("PRAGMA table_info(skus)")
+        existing_columns = [col[1] for col in cursor.fetchall()]
+        
+        if 'is_active' not in existing_columns:
+            print("🔧 Adding is_active column to skus...", file=sys.stderr)
+            cursor.execute("ALTER TABLE skus ADD COLUMN is_active BOOLEAN DEFAULT 1")
+            print("✅ is_active column added", file=sys.stderr)
+        
+        # Create merge history table if missing
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sku_merge_history'")
+        if not cursor.fetchone():
+            print("🔧 Creating sku_merge_history table...", file=sys.stderr)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS sku_merge_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    old_sku_id INTEGER REFERENCES skus(id),
+                    new_sku_id INTEGER REFERENCES skus(id),
+                    merged_by INTEGER REFERENCES user(id),
+                    merged_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    reason VARCHAR(500),
+                    records_transferred INTEGER DEFAULT 0
+                )
+            """)
+            print("✅ sku_merge_history table created", file=sys.stderr)
+        
+        conn.commit()
+        conn.close()
+        
+    except Exception as e:
+        print(f"⚠️ Schema check warning: {e}", file=sys.stderr)
+
+# Call it right after db init
+app = Flask(__name__)
+app.config.from_object(Config)
+
+# Initialize extensions
+db.init_app(app)
+ensure_database_schema()  # ← ADD THIS LINE
 migrate = Migrate(app, db)
 
 login_manager = LoginManager()
