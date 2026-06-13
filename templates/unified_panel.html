@@ -37,6 +37,11 @@
     <li class="nav-item">
         <a class="nav-link" data-bs-toggle="tab" href="#sync">Google Drive Sync</a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#mergetool">
+            <i class="bi bi-shuffle"></i> SKU Merge Tool
+        </a>
+    </li>
     {% endif %}
 </ul>
 
@@ -57,11 +62,11 @@
                         <tbody>
                             {% for user in users %}
                             <tr>
-                                <td>{{ user.username }}</td>
-                                <td>{{ user.full_name }}</td>
-                                <td>{{ user.role|replace('_', ' ')|title }}</td>
-                                <td>{% if user.is_active %}Active{% else %}Inactive{% endif %}</td>
-                                <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at }}</td>
+                                <td>{{ user.username }}</div>
+                                <td>{{ user.full_name }}</div>
+                                <td>{{ user.role|replace('_', ' ')|title }}</div>
+                                <td>{% if user.is_active %}Active{% else %}Inactive{% endif %}</div>
+                                <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at }}</div>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -87,12 +92,12 @@
                         <tbody>
                             {% for session in sessions %}
                             <tr>
-                                <td>{{ session.id }}</td>
-                                <td>{{ session.user.full_name if session.user }}</td>
-                                <td>{{ session.warehouse }}</td>
-                                <td>{{ session.session_date.strftime('%Y-%m-%d %H:%M') }}</td>
-                                <td>{% if session.is_completed %}Completed{% else %}In Progress{% endif %}</td>
-                                <td>{{ session.count_records|length }}</td>
+                                <td>{{ session.id }}</div>
+                                <td>{{ session.user.full_name if session.user }}</div>
+                                <td>{{ session.warehouse }}</div>
+                                <td>{{ session.session_date.strftime('%Y-%m-%d %H:%M') }}</div>
+                                <td>{% if session.is_completed %}Completed{% else %}In Progress{% endif %}</div>
+                                <td>{{ session.count_records|length }}</div>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -118,11 +123,11 @@
                         <tbody id="auditLogsBody">
                             {% for log in audit_logs %}
                             <tr>
-                                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                                <td>{{ log.user.full_name if log.user }}</td>
-                                <td>{{ log.action }}</td>
-                                <td>{{ log.details|replace('.0', '') if log.details else '' }}</td>
-                                <td>{{ log.ip_address }}</td>
+                                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+                                <td>{{ log.user.full_name if log.user }}</div>
+                                <td>{{ log.action }}</div>
+                                <td>{{ log.details|replace('.0', '') if log.details else '' }}</div>
+                                <td>{{ log.ip_address }}</div>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -265,6 +270,71 @@
             </div>
         </div>
     </div>
+    
+    <!-- SKU MERGE TOOL TAB -->
+    <div class="tab-pane fade" id="mergetool">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5><i class="bi bi-shuffle"></i> SKU Merge Tool - Transfer History from Old to New SKU</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <strong>When to use this tool:</strong>
+                    <ul class="mt-2 mb-0">
+                        <li>When a SKU code has been <strong>renamed/changed</strong> in the Excel file</li>
+                        <li>The old SKU becomes <strong>inactive</strong> after sync, the new SKU has <strong>zero history</strong></li>
+                        <li>Use this tool to <strong>transfer all count history</strong> from the old SKU to the new SKU</li>
+                        <li>After transfer, the new SKU will have <strong>complete count history</strong> preserved</li>
+                    </ul>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="old_sku_select" class="form-label">Old/Inactive SKU (Code being replaced)</label>
+                        <select id="old_sku_select" class="form-select" onchange="loadSkuSuggestions()">
+                            <option value="">-- Select Old SKU --</option>
+                        </select>
+                        <small class="text-muted">These SKUs are no longer in the current Excel file</small>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="new_sku_select" class="form-label">New/Active SKU (New code)</label>
+                        <select id="new_sku_select" class="form-select">
+                            <option value="">-- Select New SKU --</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="suggestionsBox" class="mb-3" style="display: none;">
+                    <div class="card border-info">
+                        <div class="card-header bg-info text-white">
+                            <small>💡 Suggested Matches</small>
+                        </div>
+                        <div class="card-body" id="suggestionsList"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="mergeReason" class="form-label">Reason for change</label>
+                    <textarea id="mergeReason" class="form-control" rows="2" placeholder="e.g., SKU code changed from 05-15 to 08-15"></textarea>
+                </div>
+                
+                <button onclick="transferHistory()" class="btn btn-success" id="transferBtn">
+                    <i class="bi bi-arrow-repeat"></i> Transfer History & Mark Old as Inactive
+                </button>
+                
+                <div id="transferResult" class="mt-3"></div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header bg-secondary text-white">
+                <h6><i class="bi bi-clock-history"></i> Recent Transfer History</h6>
+            </div>
+            <div class="card-body" id="mergeHistoryList" style="max-height: 300px; overflow-y: auto;">
+                <p class="text-muted">Loading transfer history...</p>
+            </div>
+        </div>
+    </div>
     {% endif %}
 </div>
 
@@ -317,6 +387,154 @@ function syncFromDrive() {
     }
 }
 
+// ============ SKU MERGE TOOL FUNCTIONS ============
+
+function loadMergeSkus() {
+    fetch('/api/get_inactive_skus')
+        .then(response => response.json())
+        .then(data => {
+            const oldSelect = document.getElementById('old_sku_select');
+            if (oldSelect) {
+                oldSelect.innerHTML = '<option value="">-- Select Old SKU --</option>';
+                data.forEach(sku => {
+                    oldSelect.innerHTML += `<option value="${sku.id}">${sku.sku} - ${sku.description || ''}</option>`;
+                });
+            }
+        });
+    
+    fetch('/api/get_active_skus')
+        .then(response => response.json())
+        .then(data => {
+            const newSelect = document.getElementById('new_sku_select');
+            if (newSelect) {
+                newSelect.innerHTML = '<option value="">-- Select New SKU --</option>';
+                data.forEach(sku => {
+                    newSelect.innerHTML += `<option value="${sku.id}">${sku.sku} - ${sku.description || ''}</option>`;
+                });
+            }
+        });
+    
+    loadMergeHistory();
+}
+
+function loadSkuSuggestions() {
+    const oldSkuId = document.getElementById('old_sku_select')?.value;
+    if (!oldSkuId) {
+        document.getElementById('suggestionsBox').style.display = 'none';
+        return;
+    }
+    
+    fetch(`/admin/suggest_sku_match?sku_id=${oldSkuId}`)
+        .then(response => response.json())
+        .then(suggestions => {
+            if (suggestions.length > 0) {
+                const suggestionsList = document.getElementById('suggestionsList');
+                suggestionsList.innerHTML = suggestions.map(s => `
+                    <div class="alert alert-light border mb-2">
+                        <strong>${s.sku}</strong><br>
+                        <small>${s.description}</small><br>
+                        <small class="text-muted">Category: ${s.category}</small><br>
+                        <button class="btn btn-sm btn-primary mt-2" onclick="selectSuggestedSku(${s.id})">
+                            Use this SKU
+                        </button>
+                    </div>
+                `).join('');
+                document.getElementById('suggestionsBox').style.display = 'block';
+            } else {
+                document.getElementById('suggestionsBox').style.display = 'none';
+            }
+        });
+}
+
+function selectSuggestedSku(skuId) {
+    document.getElementById('new_sku_select').value = skuId;
+    document.getElementById('suggestionsBox').style.display = 'none';
+}
+
+function loadMergeHistory() {
+    fetch('/api/get_merge_history')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('mergeHistoryList');
+            if (!container) return;
+            
+            if (data.length === 0) {
+                container.innerHTML = '<p class="text-muted">No transfers yet</p>';
+                return;
+            }
+            container.innerHTML = `
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr><th>Date</th><th>Old SKU → New SKU</th><th>Records</th><th>By</th></tr>
+                        </thead>
+                        <tbody>
+                            ${data.map(m => `
+                                <tr>
+                                    <td><small>${m.date}</small></td>
+                                    <td><span class="badge bg-danger">${m.old_sku}</span> → <span class="badge bg-success">${m.new_sku}</span></div>
+                                    <td>${m.records}</div>
+                                    <td><small>${m.by}</small></div>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        });
+}
+
+function transferHistory() {
+    const oldSkuId = document.getElementById('old_sku_select')?.value;
+    const newSkuId = document.getElementById('new_sku_select')?.value;
+    const reason = document.getElementById('mergeReason')?.value;
+    const transferBtn = document.getElementById('transferBtn');
+    const resultDiv = document.getElementById('transferResult');
+    
+    if (!oldSkuId || !newSkuId) {
+        resultDiv.innerHTML = '<div class="alert alert-warning">Please select both old and new SKU</div>';
+        return;
+    }
+    
+    if (oldSkuId === newSkuId) {
+        resultDiv.innerHTML = '<div class="alert alert-warning">Cannot transfer to the same SKU</div>';
+        return;
+    }
+    
+    transferBtn.disabled = true;
+    transferBtn.innerHTML = 'Transferring...';
+    resultDiv.innerHTML = '<div class="alert alert-info">Transferring history... This may take a moment.</div>';
+    
+    const formData = new FormData();
+    formData.append('old_sku_id', oldSkuId);
+    formData.append('new_sku_id', newSkuId);
+    formData.append('reason', reason);
+    
+    fetch('/admin/transfer_history', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            resultDiv.innerHTML = `<div class="alert alert-success">✅ ${data.message}</div>`;
+            loadMergeSkus();
+            document.getElementById('mergeReason').value = '';
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger">❌ ${data.message}</div>`;
+        }
+        transferBtn.disabled = false;
+        transferBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Transfer History & Mark Old as Inactive';
+    })
+    .catch(error => {
+        resultDiv.innerHTML = `<div class="alert alert-danger">Error: ${error}</div>`;
+        transferBtn.disabled = false;
+        transferBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Transfer History & Mark Old as Inactive';
+    });
+}
+
+// ============ END SKU MERGE TOOL FUNCTIONS ============
+
 let refreshInterval = null;
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -349,6 +567,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const auditPane = document.getElementById('audit');
     if (auditPane && auditPane.classList.contains('show', 'active')) {
         startRefresh();
+    }
+    
+    // Load merge tool data when its tab is shown
+    const mergeTab = document.querySelector('a[href="#mergetool"]');
+    if (mergeTab) {
+        mergeTab.addEventListener('shown.bs.tab', function() {
+            loadMergeSkus();
+        });
     }
 });
 </script>
