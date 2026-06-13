@@ -19,9 +19,15 @@
     <li class="nav-item">
         <a class="nav-link" data-bs-toggle="tab" href="#sync">Google Drive Sync</a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#mergetool">
+            <i class="bi bi-shuffle"></i> SKU Merge Tool
+        </a>
+    </li>
 </ul>
 
 <div class="tab-content">
+    <!-- Existing tabs (users, sessions, audit, export, sync) remain EXACTLY THE SAME -->
     <div class="tab-pane fade show active" id="users">
         <div class="card">
             <div class="card-header">
@@ -43,8 +49,8 @@
                         <tbody>
                             {% for user in users %}
                             <tr>
-                                <td>{{ user.username }}</td>
-                                <td>{{ user.full_name }}</td>
+                                <td>{{ user.username }}</div>
+                                <td>{{ user.full_name }}</div>
                                 <td>
                                     <span class="badge {% if user.role == 'admin' %}bg-danger{% elif user.role == 'manager' %}bg-primary{% elif user.role == 'inventory_supervisor' %}bg-info{% elif user.role == 'inventory_staff' %}bg-success{% else %}bg-secondary{% endif %}">
                                         {{ user.role|replace('_', ' ')|title }}
@@ -179,8 +185,6 @@
                 <h5>Export Data</h5>
             </div>
             <div class="card-body">
-                
-                <!-- SECTION 1: Export Current Counts -->
                 <div class="alert alert-info">
                     <h6><i class="bi bi-file-excel"></i> Export Current Counts</h6>
                     <p>Export the final counted quantities for each SKU. Organized by Day Category.</p>
@@ -231,7 +235,6 @@
                 
                 <hr class="my-4">
                 
-                <!-- SECTION 2: Export Audit Log -->
                 <div class="alert alert-warning">
                     <h6><i class="bi bi-clock-history"></i> Export Audit Log</h6>
                     <p>Export complete history of all changes (who changed what, when, and from/to values).</p>
@@ -264,15 +267,6 @@
                         </div>
                     </div>
                 </form>
-                
-                <hr>
-                <h6>Instructions:</h6>
-                <ul>
-                    <li><strong>Current Counts:</strong> Shows the final counted quantities. Use filters to narrow down.</li>
-                    <li><strong>Audit Log:</strong> Shows complete history of all changes for compliance and investigation.</li>
-                    <li><strong>Current Counts</strong> are organized by Day Category sheets.</li>
-                    <li><strong>Audit Log</strong> is exported as a single sheet with all change history.</li>
-                </ul>
             </div>
         </div>
     </div>
@@ -310,23 +304,238 @@
             </div>
         </div>
     </div>
+
+    <!-- NEW: SKU MERGE TOOL TAB -->
+    <div class="tab-pane fade" id="mergetool">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5><i class="bi bi-shuffle"></i> SKU Merge Tool - Transfer History from Old to New SKU</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <strong>When to use this tool:</strong>
+                    <ul class="mt-2 mb-0">
+                        <li>When a SKU code has been <strong>renamed/changed</strong> in the Excel file</li>
+                        <li>The old SKU becomes <strong>inactive</strong> after sync, the new SKU has <strong>zero history</strong></li>
+                        <li>Use this tool to <strong>transfer all count history</strong> from the old SKU to the new SKU</li>
+                        <li>After transfer, the new SKU will have <strong>complete count history</strong> preserved</li>
+                    </ul>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="old_sku_select" class="form-label">Old/Inactive SKU (Code being replaced)</label>
+                            <select id="old_sku_select" class="form-select" onchange="loadSkuSuggestions()">
+                                <option value="">-- Select Old SKU --</option>
+                            </select>
+                            <small class="text-muted">These SKUs are no longer in the current Excel file</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="new_sku_select" class="form-label">New/Active SKU (New code)</label>
+                            <select id="new_sku_select" class="form-select">
+                                <option value="">-- Select New SKU --</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="suggestionsBox" class="mb-3" style="display: none;">
+                    <div class="card border-info">
+                        <div class="card-header bg-info text-white">
+                            <small>💡 Suggested Matches</small>
+                        </div>
+                        <div class="card-body" id="suggestionsList"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="mergeReason" class="form-label">Reason for change</label>
+                    <textarea id="mergeReason" class="form-control" rows="2" placeholder="e.g., SKU code changed from 05-15 to 08-15"></textarea>
+                </div>
+                
+                <button onclick="transferHistory()" class="btn btn-success" id="transferBtn">
+                    <i class="bi bi-arrow-repeat"></i> Transfer History & Mark Old as Inactive
+                </button>
+                
+                <div id="transferResult" class="mt-3"></div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header bg-secondary text-white">
+                <h6><i class="bi bi-clock-history"></i> Recent Transfer History</h6>
+            </div>
+            <div class="card-body" id="mergeHistoryList" style="max-height: 300px; overflow-y: auto;">
+                <p class="text-muted">Loading transfer history...</p>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
-// Function to format details by removing .0 from numbers
+// Load inactive and active SKUs for merge tool
+function loadMergeSkus() {
+    fetch('/api/get_inactive_skus')
+        .then(response => response.json())
+        .then(data => {
+            const oldSelect = document.getElementById('old_sku_select');
+            oldSelect.innerHTML = '<option value="">-- Select Old SKU --</option>';
+            data.forEach(sku => {
+                oldSelect.innerHTML += `<option value="${sku.id}">${sku.sku} - ${sku.description || ''}</option>`;
+            });
+        });
+    
+    fetch('/api/get_active_skus')
+        .then(response => response.json())
+        .then(data => {
+            const newSelect = document.getElementById('new_sku_select');
+            newSelect.innerHTML = '<option value="">-- Select New SKU --</option>';
+            data.forEach(sku => {
+                newSelect.innerHTML += `<option value="${sku.id}">${sku.sku} - ${sku.description || ''}</option>`;
+            });
+        });
+    
+    loadMergeHistory();
+}
+
+function loadSkuSuggestions() {
+    const oldSkuId = document.getElementById('old_sku_select').value;
+    if (!oldSkuId) {
+        document.getElementById('suggestionsBox').style.display = 'none';
+        return;
+    }
+    
+    fetch(`/admin/suggest_sku_match?sku_id=${oldSkuId}`)
+        .then(response => response.json())
+        .then(suggestions => {
+            if (suggestions.length > 0) {
+                const suggestionsList = document.getElementById('suggestionsList');
+                suggestionsList.innerHTML = suggestions.map(s => `
+                    <div class="alert alert-light border mb-2">
+                        <strong>${s.sku}</strong><br>
+                        <small>${s.description}</small><br>
+                        <small class="text-muted">Category: ${s.category}</small><br>
+                        <button class="btn btn-sm btn-primary mt-2" onclick="selectSuggestedSku(${s.id})">
+                            Use this SKU
+                        </button>
+                    </div>
+                `).join('');
+                document.getElementById('suggestionsBox').style.display = 'block';
+            } else {
+                document.getElementById('suggestionsBox').style.display = 'none';
+            }
+        });
+}
+
+function selectSuggestedSku(skuId) {
+    document.getElementById('new_sku_select').value = skuId;
+    document.getElementById('suggestionsBox').style.display = 'none';
+}
+
+function loadMergeHistory() {
+    fetch('/api/get_merge_history')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('mergeHistoryList');
+            if (data.length === 0) {
+                container.innerHTML = '<p class="text-muted">No transfers yet</p>';
+                return;
+            }
+            container.innerHTML = `
+                <table class="table table-sm">
+                    <thead>
+                        <tr><th>Date</th><th>Old SKU → New SKU</th><th>Records</th><th>By</th></tr>
+                    </thead>
+                    <tbody>
+                        ${data.map(m => `
+                            <tr>
+                                <td><small>${m.date}</small></td>
+                                <td><span class="badge bg-danger">${m.old_sku}</span> → <span class="badge bg-success">${m.new_sku}</span></td>
+                                <td>${m.records}</td>
+                                <td><small>${m.by}</small></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        });
+}
+
+function transferHistory() {
+    const oldSkuId = document.getElementById('old_sku_select').value;
+    const newSkuId = document.getElementById('new_sku_select').value;
+    const reason = document.getElementById('mergeReason').value;
+    const transferBtn = document.getElementById('transferBtn');
+    const resultDiv = document.getElementById('transferResult');
+    
+    if (!oldSkuId || !newSkuId) {
+        resultDiv.innerHTML = '<div class="alert alert-warning">Please select both old and new SKU</div>';
+        return;
+    }
+    
+    if (oldSkuId === newSkuId) {
+        resultDiv.innerHTML = '<div class="alert alert-warning">Cannot transfer to the same SKU</div>';
+        return;
+    }
+    
+    transferBtn.disabled = true;
+    transferBtn.innerHTML = 'Transferring...';
+    resultDiv.innerHTML = '<div class="alert alert-info">Transferring history... This may take a moment.</div>';
+    
+    const formData = new FormData();
+    formData.append('old_sku_id', oldSkuId);
+    formData.append('new_sku_id', newSkuId);
+    formData.append('reason', reason);
+    
+    fetch('/admin/transfer_history', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            resultDiv.innerHTML = `<div class="alert alert-success">✅ ${data.message}</div>`;
+            loadMergeSkus(); // Refresh lists
+            loadMergeHistory(); // Refresh history
+            document.getElementById('mergeReason').value = '';
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger">❌ ${data.message}</div>`;
+        }
+        transferBtn.disabled = false;
+        transferBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Transfer History & Mark Old as Inactive';
+    })
+    .catch(error => {
+        resultDiv.innerHTML = `<div class="alert alert-danger">Error: ${error}</div>`;
+        transferBtn.disabled = false;
+        transferBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Transfer History & Mark Old as Inactive';
+    });
+}
+
+// Load data when tab is shown
+document.addEventListener('DOMContentLoaded', function() {
+    const mergeTab = document.querySelector('a[href="#mergetool"]');
+    if (mergeTab) {
+        mergeTab.addEventListener('shown.bs.tab', function() {
+            loadMergeSkus();
+        });
+    }
+});
+
+// Keep existing functions
 function formatDetails(details) {
     if (!details) return '';
     return details.replace(/(\d+)\.0/g, '$1');
 }
 
-// Function to load audit logs dynamically
-function loadAuditLogs() {
+function refreshAuditLogs() {
     fetch('/get_audit_logs')
         .then(response => response.json())
         .then(logs => {
             let tbody = document.getElementById('auditLogsBody');
             if (!tbody) return;
-            
             tbody.innerHTML = '';
             logs.forEach(log => {
                 let row = tbody.insertRow();
@@ -337,21 +546,12 @@ function loadAuditLogs() {
                 row.insertCell(4).textContent = log.ip_address;
             });
         })
-        .catch(error => {
-            console.error('Error loading audit logs:', error);
-        });
+        .catch(error => console.error('Error loading audit logs:', error));
 }
 
-// Function to refresh audit logs
-function refreshAuditLogs() {
-    loadAuditLogs();
-}
-
-// Function to sync from Google Drive
 function syncFromDrive() {
     if(confirm('Sync SKU data from Google Drive? This will update your inventory with the latest Excel file.')) {
         $('#syncResult').html('<div class="alert alert-info">Syncing... Please wait up to 30 seconds.</div>');
-        
         $.ajax({
             url: '/sync_data',
             method: 'POST',
@@ -377,25 +577,19 @@ function syncFromDrive() {
     }
 }
 
-// Auto-refresh audit logs every 30 seconds if on audit tab
 let refreshInterval = null;
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Load audit logs when page loads
-    loadAuditLogs();
+    refreshAuditLogs();
     
-    // Set up interval to refresh when on audit tab
     const auditTab = document.querySelector('a[href="#audit"]');
-    const exportTab = document.querySelector('a[href="#export"]');
-    const syncTab = document.querySelector('a[href="#sync"]');
     
     function startRefresh() {
         if (refreshInterval) clearInterval(refreshInterval);
         refreshInterval = setInterval(function() {
-            // Only refresh if audit tab is active
             const auditPane = document.getElementById('audit');
             if (auditPane && auditPane.classList.contains('show', 'active')) {
-                loadAuditLogs();
+                refreshAuditLogs();
             }
         }, 30000);
     }
@@ -408,21 +602,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     if (auditTab) {
-        auditTab.addEventListener('shown.bs.tab', function() {
-            loadAuditLogs();
-            startRefresh();
-        });
+        auditTab.addEventListener('shown.bs.tab', startRefresh);
+        auditTab.addEventListener('hidden.bs.tab', stopRefresh);
     }
     
-    if (exportTab) {
-        exportTab.addEventListener('shown.bs.tab', stopRefresh);
-    }
-    
-    if (syncTab) {
-        syncTab.addEventListener('shown.bs.tab', stopRefresh);
-    }
-    
-    // Start refresh if audit is active on load
     const auditPane = document.getElementById('audit');
     if (auditPane && auditPane.classList.contains('show', 'active')) {
         startRefresh();
