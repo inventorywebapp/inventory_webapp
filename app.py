@@ -24,7 +24,7 @@ app.config.from_object(Config)
 db.init_app(app)
 
 # ============================================
-# ADD THIS FUNCTION HERE
+# DATABASE SCHEMA FIX (Auto-add missing columns)
 # ============================================
 def ensure_database_schema():
     """Auto-create missing columns/tables without shell access"""
@@ -32,18 +32,14 @@ def ensure_database_schema():
         import sqlite3
         db_path = app.config.get('SQLALCHEMY_DATABASE_URI', '').replace('sqlite:///', '')
         
-        # For in-memory or relative path
         if db_path == '' or db_path == ':memory:':
             db_path = 'instance/inventory.db'
         
-        # Create instance folder if needed
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         
-        # Connect and add missing schema
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
-        # Add is_active column to skus if missing
         cursor.execute("PRAGMA table_info(skus)")
         existing_columns = [col[1] for col in cursor.fetchall()]
         
@@ -52,7 +48,6 @@ def ensure_database_schema():
             cursor.execute("ALTER TABLE skus ADD COLUMN is_active BOOLEAN DEFAULT 1")
             print("✅ is_active column added", file=sys.stderr)
         
-        # Create merge history table if missing
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sku_merge_history'")
         if not cursor.fetchone():
             print("🔧 Creating sku_merge_history table...", file=sys.stderr)
@@ -75,7 +70,6 @@ def ensure_database_schema():
     except Exception as e:
         print(f"⚠️ Schema check warning: {e}", file=sys.stderr)
 
-# CALL THE FUNCTION HERE (ONCE!)
 ensure_database_schema()
 
 # Initialize migrate
@@ -91,7 +85,9 @@ login_manager.session_protection = "strong"
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# Create default users
+# ============================================
+# DEFAULT USERS & AUTO SYNC
+# ============================================
 def create_default_users():
     with app.app_context():
         db.create_all()
@@ -148,7 +144,6 @@ def create_default_users():
             print(f"Database already has {User.query.count()} users", file=sys.stderr)
 
 def auto_sync_if_empty():
-    """Automatically sync if database is empty"""
     with app.app_context():
         if SKU.query.count() == 0:
             print("Database empty, auto-syncing from Google Drive...", file=sys.stderr)
@@ -161,17 +156,16 @@ def auto_sync_if_empty():
             except Exception as e:
                 print(f"Auto-sync error: {e}", file=sys.stderr)
 
-# Call the functions
 create_default_users()
 auto_sync_if_empty()
 
 @app.teardown_appcontext
 def shutdown_session(exception=None):
-    """Close database session after each request"""
     db.session.remove()
 
-# ... REST OF YOUR CODE CONTINUES (all your routes) ...
-
+# ============================================
+# AUTHENTICATION ROUTES
+# ============================================
 @app.route('/')
 @login_required
 def index():
@@ -233,6 +227,9 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
+# ============================================
+# DASHBOARD & COUNTING ROUTES
+# ============================================
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -258,9 +255,6 @@ def dashboard():
     item_categories_raw = db.session.query(SKU.description).distinct().all()
     item_categories = [c[0] for c in item_categories_raw if c[0] and c[0] != '']
     item_categories.sort()
-    
-    # REMOVED THE LIMIT - NOW SHOWS ALL ITEM CATEGORIES
-    # item_categories = item_categories[:10]  <-- DELETED THIS LINE
     
     warehouses = ['Main Warehouse', '5th Floor Warehouse']
     
@@ -300,7 +294,7 @@ def dashboard():
                          active_sessions_count=active_sessions_count,
                          active_session_info=active_session_info,
                          day_categories=day_categories,
-                         item_categories=item_categories,  # Now passing ALL categories
+                         item_categories=item_categories,
                          warehouses=warehouses,
                          day_category_progress=day_category_progress)
 
@@ -312,7 +306,6 @@ def get_skus():
     search = request.args.get('search', '')
     
     query = SKU.query.filter_by(is_active=True)
-    
     is_filtered = False
     
     if day_category and day_category != 'All' and day_category != '-- All Day Categories --':
@@ -337,10 +330,8 @@ def get_skus():
     else:
         skus = query.limit(1000).all()
     
-    # Calculate expiration cutoff date (timezone-naive for comparison)
     now = get_ph_time()
     expiration_cutoff = now - timedelta(days=COUNT_EXPIRATION_DAYS)
-    # Make it timezone-naive for comparison with database times
     expiration_cutoff_naive = expiration_cutoff.replace(tzinfo=None)
     
     result = []
@@ -357,14 +348,12 @@ def get_skus():
         
         if latest_record:
             has_count = True
-            # Make count_time timezone-naive for comparison
             if latest_record.count_time:
                 count_time_naive = latest_record.count_time.replace(tzinfo=None) if hasattr(latest_record.count_time, 'replace') else latest_record.count_time
                 count_time = latest_record.count_time.strftime('%Y-%m-%d %H:%M:%S')
             else:
                 count_time_naive = None
             
-            # Determine the FINAL validated count
             if latest_record.recount_count and latest_record.recount_count > 0:
                 final_count = latest_record.recount_count
             elif latest_record.final_count and latest_record.final_count > 0:
@@ -372,15 +361,13 @@ def get_skus():
             else:
                 final_count = latest_record.initial_count
             
-            # Check if the session is completed
             session = CountingSession.query.get(latest_record.session_id)
             if session and session.is_completed:
                 is_completed = True
             
-            # Check if the count has expired (> 14 days old)
             if count_time_naive and count_time_naive < expiration_cutoff_naive:
                 is_expired = True
-                has_count = False  # Treat as not counted for UI purposes
+                has_count = False
                 is_completed = False
         
         result.append({
@@ -546,7 +533,6 @@ def counting():
     item_categories = [c[0] for c in item_categories_raw if c[0] and c[0] != '']
     item_categories.sort()
 
-    # Only show active SKUs in counting page
     active_skus_count = SKU.query.filter_by(is_active=True).count()
     print(f"Active SKUs available for counting: {active_skus_count}", file=sys.stderr)
     
@@ -688,10 +674,12 @@ def complete_counting():
         return jsonify({'success': True, 'message': 'Counting session completed successfully!'})
     return jsonify({'success': False, 'message': 'Session not found'}), 404
 
+# ============================================
+# ADMIN & UNIFIED PANEL ROUTES
+# ============================================
 @app.route('/unified_panel')
 @login_required
 def unified_panel():
-    """Unified panel with role-based tab visibility"""
     users = User.query.all() if current_user.role == 'admin' else []
     sessions = CountingSession.query.order_by(CountingSession.session_date.desc()).limit(50).all()
     audit_logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(100).all()
@@ -718,7 +706,6 @@ def unified_panel():
 @app.route('/continue_session/<int:session_id>')
 @login_required
 def continue_session(session_id):
-    """Continue an active counting session with previously counted SKUs"""
     session_obj = CountingSession.query.get(session_id)
     if not session_obj:
         flash('Session not found', 'error')
@@ -895,6 +882,9 @@ def delete_user():
     
     return jsonify({'success': True, 'message': 'User deleted successfully'})
 
+# ============================================
+# EXPORT ROUTES
+# ============================================
 @app.route('/export_counts', methods=['POST'])
 @login_required
 def export_counts():
@@ -1136,6 +1126,9 @@ def export_audit_log():
         flash(f'Audit export failed: {str(e)}', 'error')
         return redirect(url_for('admin_dashboard'))
 
+# ============================================
+# AUDIT & CLEANUP ROUTES
+# ============================================
 @app.route('/audit')
 @login_required
 def audit_dashboard():
@@ -1199,7 +1192,9 @@ def sync_data():
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
-# Debug endpoints (admin only)
+# ============================================
+# DEBUG ENDPOINTS (Admin Only)
+# ============================================
 @app.route('/debug_counts/<int:sku_id>')
 @login_required
 def debug_counts(sku_id):
@@ -1219,7 +1214,7 @@ def debug_counts(sku_id):
     
     result = f"<h2>Count History for SKU: {sku.sku if sku else 'Unknown'}</h2>"
     result += "<table border='1' cellpadding='5'>"
-    result += "<tr><th>Version</th><th>Count</th><th>Recount</th><th>Final</th><th>Time</th></tr>"
+    result += "<table><th>Version</th><th>Count</th><th>Recount</th><th>Final</th><th>Time</th></tr>"
     
     for r in records:
         result += f"<tr>"
@@ -1230,7 +1225,7 @@ def debug_counts(sku_id):
         result += f"<td>{r.count_time}</td>"
         result += f"</tr>"
     
-    result += "<tr>"
+    result += "</table>"
     result += f"<p><strong>Latest count: {records[-1].initial_count if records else 'None'}</strong></p>"
     result += '<p><a href="/admin">Back to Admin</a></p>'
     
@@ -1266,7 +1261,6 @@ def debug_session(session_id):
 @app.route('/get_in_progress_skus/<int:session_id>')
 @login_required
 def get_in_progress_skus(session_id):
-    """Get SKUs that have been counted but session not completed"""
     session_obj = CountingSession.query.get(session_id)
     if not session_obj:
         return jsonify({'error': 'Session not found'}), 404
@@ -1289,7 +1283,6 @@ def get_in_progress_skus(session_id):
         ).order_by(CountRecord.version.desc()).first()
         
         if sku and latest_record:
-            # Get the final count (recount if exists)
             if latest_record.recount_count and latest_record.recount_count > 0:
                 final_count = latest_record.recount_count
             elif latest_record.final_count and latest_record.final_count > 0:
@@ -1320,11 +1313,9 @@ def get_in_progress_skus(session_id):
     
     return jsonify({'skus': skus_data, 'count': len(skus_data)})
 
-# Add this endpoint after your existing routes and before the health check
 @app.route('/api/active_session')
 @login_required
 def get_active_session():
-    """Get the current active session for the user"""
     session = CountingSession.query.filter_by(
         user_id=current_user.id,
         is_completed=False
@@ -1334,7 +1325,6 @@ def get_active_session():
         return jsonify({'session_id': session.id})
     return jsonify({'session_id': None})
 
-# Health check endpoint for Render
 @app.route('/health')
 def health_check():
     return jsonify({'status': 'healthy'}), 200
@@ -1342,7 +1332,6 @@ def health_check():
 @app.route('/debug/sync_info')
 @login_required
 def debug_sync_info():
-    """Debug endpoint to check sync status and column mapping"""
     if current_user.role != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -1363,7 +1352,6 @@ def debug_sync_info():
         'column_mapping': {}
     }
     
-    # Get sample SKUs
     sample = SKU.query.limit(5).all()
     for sku in sample:
         result['database_stats']['sample_skus'].append({
@@ -1372,7 +1360,6 @@ def debug_sync_info():
             'category': sku.category
         })
     
-    # Try to read Excel to check columns
     try:
         creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
         folder_id = os.environ.get('GOOGLE_DRIVE_FOLDER_ID')
@@ -1398,7 +1385,6 @@ def debug_sync_info():
                 result['excel_info']['file_id'] = latest_file['id']
                 result['excel_info']['created'] = latest_file.get('createdTime')
                 
-                # Download and read first few rows
                 request = drive_service.files().get_media(fileId=latest_file['id'])
                 file_stream = io.BytesIO()
                 downloader = MediaIoBaseDownload(file_stream, request)
@@ -1413,7 +1399,6 @@ def debug_sync_info():
                 result['excel_info']['columns'] = list(df.columns)
                 result['excel_info']['sample_data'] = df.head(3).to_dict('records')
                 
-                # Detect column mapping
                 result['column_mapping'] = detect_column_mapping(df)
     except Exception as e:
         result['error'] = str(e)
@@ -1423,15 +1408,11 @@ def debug_sync_info():
 @app.route('/debug/force_refresh')
 @login_required
 def debug_force_refresh():
-    """Force refresh database connection and clear any cache"""
     if current_user.role != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
     
     try:
-        # Force a database commit to ensure all changes are persisted
         db.session.commit()
-        
-        # Get current count
         sku_count = SKU.query.count()
         
         return jsonify({
@@ -1443,25 +1424,20 @@ def debug_force_refresh():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-# ============ SKU MERGE TOOL ENDPOINTS ============
-
+# ============================================
+# SKU MERGE TOOL ENDPOINTS
+# ============================================
 @app.route('/admin/merge_skus')
 @login_required
 def admin_merge_skus():
-    """Admin tool to merge/transfer SKU history"""
     if current_user.role != 'admin':
         flash('Admin access required', 'error')
         return redirect(url_for('dashboard'))
     
     from models import SKUMergeHistory
     
-    # Get all inactive SKUs (potential old codes)
     inactive_skus = SKU.query.filter_by(is_active=False).order_by(SKU.sku).all()
-    
-    # Get all active SKUs (potential new codes)
     active_skus = SKU.query.filter_by(is_active=True).order_by(SKU.sku).all()
-    
-    # Get merge history
     merge_history = SKUMergeHistory.query.order_by(SKUMergeHistory.merged_at.desc()).limit(50).all()
     
     return render_template('admin_merge_skus.html', 
@@ -1469,11 +1445,9 @@ def admin_merge_skus():
                          active_skus=active_skus,
                          merge_history=merge_history)
 
-
 @app.route('/admin/transfer_history', methods=['POST'])
 @login_required
 def transfer_history():
-    """Transfer count history from old SKU to new SKU"""
     if current_user.role != 'admin':
         return jsonify({'success': False, 'message': 'Unauthorized'}), 403
     
@@ -1493,12 +1467,10 @@ def transfer_history():
         return jsonify({'success': False, 'message': 'Cannot transfer to the same SKU'}), 400
     
     try:
-        # 1. Transfer all CountRecords from old SKU to new SKU
         count_records = CountRecord.query.filter_by(sku_id=old_sku.id).all()
         transferred_count = 0
         
         for record in count_records:
-            # Check if new SKU already has a record for this session/version
             existing = CountRecord.query.filter_by(
                 session_id=record.session_id,
                 sku_id=new_sku.id,
@@ -1506,7 +1478,6 @@ def transfer_history():
             ).first()
             
             if not existing:
-                # Create new record for new SKU
                 new_record = CountRecord(
                     session_id=record.session_id,
                     sku_id=new_sku.id,
@@ -1522,10 +1493,8 @@ def transfer_history():
                 db.session.add(new_record)
                 transferred_count += 1
         
-        # 2. Mark old SKU as inactive (if not already)
         old_sku.is_active = False
         
-        # 3. Record the merge
         merge_record = SKUMergeHistory(
             old_sku_id=old_sku.id,
             new_sku_id=new_sku.id,
@@ -1537,7 +1506,6 @@ def transfer_history():
         
         db.session.commit()
         
-        # 4. Audit log
         audit = AuditLog(
             user_id=current_user.id,
             action='SKU History Transferred',
@@ -1557,11 +1525,9 @@ def transfer_history():
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
-
 @app.route('/admin/sku_details/<int:sku_id>')
 @login_required
 def sku_details(sku_id):
-    """View detailed history of a SKU"""
     if current_user.role != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -1569,7 +1535,6 @@ def sku_details(sku_id):
     if not sku:
         return jsonify({'error': 'SKU not found'}), 404
     
-    # Get all count records
     count_records = CountRecord.query.filter_by(sku_id=sku.id).order_by(CountRecord.count_time.desc()).limit(50).all()
     
     records_data = []
@@ -1594,11 +1559,9 @@ def sku_details(sku_id):
         'count_records': records_data
     })
 
-
 @app.route('/admin/suggest_sku_match')
 @login_required
 def suggest_sku_match():
-    """Suggest which active SKU might match an inactive SKU"""
     if current_user.role != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -1610,15 +1573,12 @@ def suggest_sku_match():
     if not inactive_sku:
         return jsonify([])
     
-    # Find similar active SKUs based on name similarity
     active_skus = SKU.query.filter_by(is_active=True).all()
     
     suggestions = []
     for active in active_skus:
-        # Calculate similarity
         similarity = 0
         
-        # Check if SKU codes share common parts
         inactive_parts = set(inactive_sku.sku.lower().replace('-', ' ').split())
         active_parts = set(active.sku.lower().replace('-', ' ').split())
         
@@ -1626,14 +1586,12 @@ def suggest_sku_match():
         if common_parts:
             similarity += len(common_parts) * 20
         
-        # Check description similarity
         if inactive_sku.description and active.description:
             if inactive_sku.description.lower() == active.description.lower():
                 similarity += 50
             elif inactive_sku.description.lower() in active.description.lower() or active.description.lower() in inactive_sku.description.lower():
                 similarity += 30
         
-        # Check category match
         if inactive_sku.category and active.category and inactive_sku.category == active.category:
             similarity += 15
         
@@ -1646,16 +1604,13 @@ def suggest_sku_match():
                 'similarity': similarity
             })
     
-    # Sort by similarity (highest first)
     suggestions.sort(key=lambda x: x['similarity'], reverse=True)
     
     return jsonify(suggestions[:5])
 
-
 @app.route('/admin/inactive_skus')
 @login_required
 def admin_inactive_skus():
-    """View all inactive SKUs"""
     if current_user.role != 'admin':
         flash('Admin access required', 'error')
         return redirect(url_for('dashboard'))
@@ -1663,10 +1618,12 @@ def admin_inactive_skus():
     inactive_skus = SKU.query.filter_by(is_active=False).order_by(SKU.sku).all()
     return render_template('admin_inactive_skus.html', inactive_skus=inactive_skus)
 
+# ============================================
+# API ENDPOINTS FOR UNIFIED PANEL (Pagination)
+# ============================================
 @app.route('/api/get_inactive_skus')
 @login_required
 def api_get_inactive_skus():
-    """API endpoint to get inactive SKUs for merge tool dropdown"""
     if current_user.role != 'admin':
         return jsonify([])
     skus = SKU.query.filter_by(is_active=False).order_by(SKU.sku).all()
@@ -1675,7 +1632,6 @@ def api_get_inactive_skus():
 @app.route('/api/get_active_skus')
 @login_required
 def api_get_active_skus():
-    """API endpoint to get active SKUs for merge tool dropdown"""
     if current_user.role != 'admin':
         return jsonify([])
     skus = SKU.query.filter_by(is_active=True).order_by(SKU.sku).all()
@@ -1684,7 +1640,6 @@ def api_get_active_skus():
 @app.route('/api/get_merge_history')
 @login_required
 def api_get_merge_history():
-    """API endpoint to get merge history"""
     if current_user.role != 'admin':
         return jsonify([])
     from models import SKUMergeHistory
@@ -1700,7 +1655,6 @@ def api_get_merge_history():
 @app.route('/api/get_sessions')
 @login_required
 def api_get_sessions():
-    """Get counting sessions with pagination"""
     offset = int(request.args.get('offset', 0))
     limit = int(request.args.get('limit', 50))
     
@@ -1725,11 +1679,9 @@ def api_get_sessions():
         'total': total
     })
 
-
 @app.route('/api/get_audit_logs_paginated')
 @login_required
 def api_get_audit_logs_paginated():
-    """Get audit logs with pagination"""
     if current_user.role not in ['admin', 'auditor'] and not current_user.has_permission('export_audit'):
         return jsonify({'logs': [], 'has_more': False})
     
@@ -1756,43 +1708,9 @@ def api_get_audit_logs_paginated():
         'total': total
     })
 
-
-@app.route('/api/get_inactive_skus')
-@login_required
-def api_get_inactive_skus():
-    """API endpoint to get inactive SKUs for merge tool dropdown"""
-    if current_user.role != 'admin':
-        return jsonify([])
-    skus = SKU.query.filter_by(is_active=False).order_by(SKU.sku).all()
-    return jsonify([{'id': s.id, 'sku': s.sku, 'description': s.description} for s in skus])
-
-
-@app.route('/api/get_active_skus')
-@login_required
-def api_get_active_skus():
-    """API endpoint to get active SKUs for merge tool dropdown"""
-    if current_user.role != 'admin':
-        return jsonify([])
-    skus = SKU.query.filter_by(is_active=True).order_by(SKU.sku).all()
-    return jsonify([{'id': s.id, 'sku': s.sku, 'description': s.description} for s in skus])
-
-
-@app.route('/api/get_merge_history')
-@login_required
-def api_get_merge_history():
-    """API endpoint to get merge history"""
-    if current_user.role != 'admin':
-        return jsonify([])
-    from models import SKUMergeHistory
-    history = SKUMergeHistory.query.order_by(SKUMergeHistory.merged_at.desc()).limit(50).all()
-    return jsonify([{
-        'date': h.merged_at.strftime('%Y-%m-%d %H:%M'),
-        'old_sku': h.old_sku.sku if h.old_sku else 'Unknown',
-        'new_sku': h.new_sku.sku if h.new_sku else 'Unknown',
-        'records': h.records_transferred,
-        'by': h.user.full_name if h.user else 'System'
-    } for h in history])
-
+# ============================================
+# MAIN ENTRY POINT
+# ============================================
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
