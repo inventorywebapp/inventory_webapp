@@ -1697,6 +1697,102 @@ def api_get_merge_history():
         'by': h.user.full_name if h.user else 'System'
     } for h in history])
 
+@app.route('/api/get_sessions')
+@login_required
+def api_get_sessions():
+    """Get counting sessions with pagination"""
+    offset = int(request.args.get('offset', 0))
+    limit = int(request.args.get('limit', 50))
+    
+    query = CountingSession.query.order_by(CountingSession.session_date.desc())
+    total = query.count()
+    sessions = query.offset(offset).limit(limit + 1).all()
+    
+    has_more = len(sessions) > limit
+    if has_more:
+        sessions = sessions[:-1]
+    
+    return jsonify({
+        'sessions': [{
+            'id': s.id,
+            'user': s.user.full_name if s.user else 'Unknown',
+            'warehouse': s.warehouse,
+            'date': s.session_date.strftime('%Y-%m-%d %H:%M'),
+            'status': 'Completed' if s.is_completed else 'In Progress',
+            'items_counted': len(s.count_records)
+        } for s in sessions],
+        'has_more': has_more,
+        'total': total
+    })
+
+
+@app.route('/api/get_audit_logs_paginated')
+@login_required
+def api_get_audit_logs_paginated():
+    """Get audit logs with pagination"""
+    if current_user.role not in ['admin', 'auditor'] and not current_user.has_permission('export_audit'):
+        return jsonify({'logs': [], 'has_more': False})
+    
+    offset = int(request.args.get('offset', 0))
+    limit = int(request.args.get('limit', 50))
+    
+    query = AuditLog.query.order_by(AuditLog.timestamp.desc())
+    total = query.count()
+    logs = query.offset(offset).limit(limit + 1).all()
+    
+    has_more = len(logs) > limit
+    if has_more:
+        logs = logs[:-1]
+    
+    return jsonify({
+        'logs': [{
+            'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            'user': log.user.full_name if log.user else 'System',
+            'action': log.action,
+            'details': log.details.replace('.0', '') if log.details else '',
+            'ip_address': log.ip_address
+        } for log in logs],
+        'has_more': has_more,
+        'total': total
+    })
+
+
+@app.route('/api/get_inactive_skus')
+@login_required
+def api_get_inactive_skus():
+    """API endpoint to get inactive SKUs for merge tool dropdown"""
+    if current_user.role != 'admin':
+        return jsonify([])
+    skus = SKU.query.filter_by(is_active=False).order_by(SKU.sku).all()
+    return jsonify([{'id': s.id, 'sku': s.sku, 'description': s.description} for s in skus])
+
+
+@app.route('/api/get_active_skus')
+@login_required
+def api_get_active_skus():
+    """API endpoint to get active SKUs for merge tool dropdown"""
+    if current_user.role != 'admin':
+        return jsonify([])
+    skus = SKU.query.filter_by(is_active=True).order_by(SKU.sku).all()
+    return jsonify([{'id': s.id, 'sku': s.sku, 'description': s.description} for s in skus])
+
+
+@app.route('/api/get_merge_history')
+@login_required
+def api_get_merge_history():
+    """API endpoint to get merge history"""
+    if current_user.role != 'admin':
+        return jsonify([])
+    from models import SKUMergeHistory
+    history = SKUMergeHistory.query.order_by(SKUMergeHistory.merged_at.desc()).limit(50).all()
+    return jsonify([{
+        'date': h.merged_at.strftime('%Y-%m-%d %H:%M'),
+        'old_sku': h.old_sku.sku if h.old_sku else 'Unknown',
+        'new_sku': h.new_sku.sku if h.new_sku else 'Unknown',
+        'records': h.records_transferred,
+        'by': h.user.full_name if h.user else 'System'
+    } for h in history])
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
