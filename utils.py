@@ -6,7 +6,8 @@ import sys
 from datetime import datetime
 import pytz
 import pandas as pd
-from models import db, SKU
+from models import db, SKU, AuditLog
+from flask_login import current_user
 
 # Google API imports
 from google.oauth2 import service_account
@@ -74,8 +75,54 @@ def parse_container_details(container_details_str):
     matches = re.findall(pattern, container_details_str)
     return [{'qty': int(qty), 'date': date} for qty, date in matches]
 
+def detect_column_mapping(df):
+    """
+    Automatically detect column mapping based on available columns
+    Returns a dictionary mapping standard fields to Excel column names
+    """
+    # Get all column names as strings
+    columns = [str(col).strip() for col in df.columns]
+    
+    # Define possible column name variations
+    column_patterns = {
+        'sku': ['SKU', 'Sku', 'sku', 'Item Code', 'Product Code', 'Code', 'Item_Code', 'Product_ID', 'ID'],
+        'description': ['Description', 'description', 'Item Category', 'Item', 'Product Name', 'DESCRIPTION', 'Item_Name', 'Product', 'Name'],
+        'category': ['Category', 'category', 'Day Category', 'Day', 'Type', 'CATEGORY', 'Day_Category', 'Product_Type'],
+        'last_count_date': ['LastCountDate', 'Last Count Date', 'last_count_date', 'Previous Count Date', 'Last Counted'],
+        'last_count': ['LastCount', 'Last Count', 'last_count', 'Previous Count', 'Previous Quantity'],
+        'total_container_qty': ['TotalContainerQty', 'Total Container Qty', 'Container Qty', 'Container Quantity'],
+        'container_details': ['ContainerDetails', 'Container Details', 'Container Info', 'Details'],
+        'total_orders': ['TotalOrders', 'Total Orders', 'Orders', 'Order Count'],
+        'final_expected_count': ['Final Expected Count', 'Expected Count', 'Final Count', 'Expected', 'Target Count'],
+        'kenneth_inventory': ["Kenneth's Inventory", 'Kenneth Inventory', 'Kenneth Count', 'Physical Count'],
+        'buffer_qty': ['BufferQty', 'Buffer Qty', 'Buffer', 'Safety Stock'],
+        'stock_status': ['StockStatus', 'Stock Status', 'Status', 'Stock Level'],
+        'inventory_remark': ['InventoryRemark', 'Inventory Remark', 'Remark', 'Notes', 'Comments'],
+        'sku_status': ['SKUStatus', 'SKU Status', 'Active Status', 'Status']
+    }
+    
+    mapping = {}
+    for field, patterns in column_patterns.items():
+        for pattern in patterns:
+            # Try exact match first
+            if pattern in columns:
+                mapping[field] = pattern
+                break
+            # Try case-insensitive match
+            for col in columns:
+                if col.lower() == pattern.lower():
+                    mapping[field] = col
+                    break
+            if field in mapping:
+                break
+    
+    # Debug output
+    print(f"Detected column mapping: {mapping}", file=sys.stderr)
+    
+    return mapping
+
 def sync_data_from_drive():
-    """Sync data from Google Drive using service account - with flexible column mapping"""
+    """Sync data from Google Drive using service account - PRESERVES existing data"""
     try:
         print("=== STARTING SYNC PROCESS ===", file=sys.stderr)
         
@@ -113,7 +160,7 @@ def sync_data_from_drive():
         # Search for Excel files
         print("Searching for Excel files...", file=sys.stderr)
         results = drive_service.files().list(
-            q=f"'{folder_id}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'",
+            q=f"'{folder_id}' in parents and (mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType='application/vnd.ms-excel')",
             fields="files(id, name, createdTime)",
             orderBy="createdTime desc"
         ).execute()
@@ -145,105 +192,171 @@ def sync_data_from_drive():
         file_stream.seek(0)
         print("Download complete", file=sys.stderr)
         
-        # Read Excel
+        # Read Excel - try different engines if needed
         print("Reading Excel file...", file=sys.stderr)
-        df = pd.read_excel(file_stream)
+        try:
+            df = pd.read_excel(file_stream, engine='openpyxl')
+        except:
+            file_stream.seek(0)
+            df = pd.read_excel(file_stream, engine='xlrd')
+        
         total_rows = len(df)
         
         # Print column names for debugging
-        print(f"Excel columns: {list(df.columns)}", file=sys.stderr)
+        print(f"Excel columns found: {list(df.columns)}", file=sys.stderr)
         
-        # Flexible column mapping - try different possible column names
-        # For SKU column
-        sku_col = None
-        for col in ['SKU', 'Sku', 'sku', 'Item Code', 'Product Code', 'Code']:
-            if col in df.columns:
-                sku_col = col
-                break
+        # Auto-detect column mapping
+        column_mapping = detect_column_mapping(df)
         
-        # For Description/Item Category column
-        desc_col = None
-        for col in ['Description', 'description', 'Item Category', 'Item', 'Product Name', 'DESCRIPTION']:
-            if col in df.columns:
-                desc_col = col
-                break
-        
-        # For Category/Day Category column
-        cat_col = None
-        for col in ['Category', 'category', 'Day Category', 'Day', 'Type', 'CATEGORY']:
-            if col in df.columns:
-                cat_col = col
-                break
-        
-        print(f"Mapped columns - SKU: {sku_col}, Description: {desc_col}, Category: {cat_col}", file=sys.stderr)
-        
-        if not sku_col:
+        # Check if we found required columns
+        if 'sku' not in column_mapping:
             print("ERROR: Could not find SKU column", file=sys.stderr)
             print(f"Available columns: {list(df.columns)}", file=sys.stderr)
+            print("Please ensure your Excel has a column named: SKU, Item Code, Product Code, or Code", file=sys.stderr)
             return False
         
-        total_rows = len(df)
-        print(f"Excel has {total_rows} rows", file=sys.stderr)
+        print(f"Using column mapping: {column_mapping}", file=sys.stderr)
         
-        # Clear existing SKUs to avoid duplicates
-        print("Clearing existing SKUs...", file=sys.stderr)
-        SKU.query.delete()
-        db.session.commit()
-        print("Existing SKUs cleared", file=sys.stderr)
+        # Track statistics
+        skus_updated = 0
+        skus_added = 0
+        skus_unchanged = 0
+        errors = []
         
-        # Process rows and add to database
-        count = 0
-        batch_size = 500
-        
+        # Process each row - UPDATE instead of DELETE
         for index, row in df.iterrows():
             try:
-                sku = SKU()
+                # Get SKU value
+                sku_value = str(row[column_mapping['sku']]) if pd.notna(row[column_mapping['sku']]) else ''
                 
-                # Required field - SKU
-                sku.sku = str(row[sku_col]) if pd.notna(row[sku_col]) else ''
+                if not sku_value or sku_value == 'nan':
+                    print(f"Warning: Empty SKU at row {index}, skipping", file=sys.stderr)
+                    continue
                 
-                # Description (Item Category)
-                sku.description = str(row.get(desc_col, '')) if desc_col and pd.notna(row.get(desc_col)) else ''
+                # Check if SKU exists
+                existing_sku = SKU.query.filter_by(sku=sku_value).first()
                 
-                # Category (Day Category) - This is what you filter by
-                sku.category = str(row.get(cat_col, '')) if cat_col and pd.notna(row.get(cat_col)) else ''
+                if existing_sku:
+                    # Update existing SKU
+                    sku = existing_sku
+                    skus_updated += 1
+                else:
+                    # Create new SKU
+                    sku = SKU()
+                    skus_added += 1
                 
-                # Other fields
-                sku.last_count_date = str(row.get('LastCountDate', '')) if pd.notna(row.get('LastCountDate')) else ''
-                sku.last_count = float(row.get('LastCount', 0)) if pd.notna(row.get('LastCount')) else 0
-                sku.total_container_qty = float(row.get('TotalContainerQty', 0)) if pd.notna(row.get('TotalContainerQty')) else 0
-                sku.container_details = str(row.get('ContainerDetails', '')) if pd.notna(row.get('ContainerDetails')) else ''
-                sku.total_orders = float(row.get('TotalOrders', 0)) if pd.notna(row.get('TotalOrders')) else 0
-                sku.final_expected_count = float(row.get('Final Expected Count', 0)) if pd.notna(row.get('Final Expected Count')) else 0
-                sku.kenneth_inventory = float(row.get("Kenneth's Inventory", 0)) if pd.notna(row.get("Kenneth's Inventory")) else 0
-                sku.buffer_qty = float(row.get('BufferQty', 0)) if pd.notna(row.get('BufferQty')) else 0
-                sku.stock_status = str(row.get('StockStatus', '')) if pd.notna(row.get('StockStatus')) else ''
-                sku.inventory_remark = str(row.get('InventoryRemark', '')) if pd.notna(row.get('InventoryRemark')) else ''
-                sku.sku_status = str(row.get('SKUStatus', '')) if pd.notna(row.get('SKUStatus')) else ''
+                # Update SKU fields based on detected mapping
+                sku.sku = sku_value
+                
+                # Description
+                if 'description' in column_mapping:
+                    sku.description = str(row[column_mapping['description']]) if pd.notna(row[column_mapping['description']]) else ''
+                
+                # Category (Day Category)
+                if 'category' in column_mapping:
+                    sku.category = str(row[column_mapping['category']]) if pd.notna(row[column_mapping['category']]) else ''
+                
+                # Numeric fields - handle carefully
+                if 'last_count' in column_mapping:
+                    try:
+                        sku.last_count = float(row[column_mapping['last_count']]) if pd.notna(row[column_mapping['last_count']]) else 0
+                    except:
+                        sku.last_count = 0
+                
+                if 'total_container_qty' in column_mapping:
+                    try:
+                        sku.total_container_qty = float(row[column_mapping['total_container_qty']]) if pd.notna(row[column_mapping['total_container_qty']]) else 0
+                    except:
+                        sku.total_container_qty = 0
+                
+                if 'total_orders' in column_mapping:
+                    try:
+                        sku.total_orders = float(row[column_mapping['total_orders']]) if pd.notna(row[column_mapping['total_orders']]) else 0
+                    except:
+                        sku.total_orders = 0
+                
+                if 'final_expected_count' in column_mapping:
+                    try:
+                        sku.final_expected_count = float(row[column_mapping['final_expected_count']]) if pd.notna(row[column_mapping['final_expected_count']]) else 0
+                    except:
+                        sku.final_expected_count = 0
+                
+                if 'kenneth_inventory' in column_mapping:
+                    try:
+                        sku.kenneth_inventory = float(row[column_mapping['kenneth_inventory']]) if pd.notna(row[column_mapping['kenneth_inventory']]) else 0
+                    except:
+                        sku.kenneth_inventory = 0
+                
+                if 'buffer_qty' in column_mapping:
+                    try:
+                        sku.buffer_qty = float(row[column_mapping['buffer_qty']]) if pd.notna(row[column_mapping['buffer_qty']]) else 0
+                    except:
+                        sku.buffer_qty = 0
+                
+                # Text fields
+                if 'last_count_date' in column_mapping:
+                    sku.last_count_date = str(row[column_mapping['last_count_date']]) if pd.notna(row[column_mapping['last_count_date']]) else ''
+                
+                if 'container_details' in column_mapping:
+                    sku.container_details = str(row[column_mapping['container_details']]) if pd.notna(row[column_mapping['container_details']]) else ''
+                
+                if 'stock_status' in column_mapping:
+                    sku.stock_status = str(row[column_mapping['stock_status']]) if pd.notna(row[column_mapping['stock_status']]) else ''
+                
+                if 'inventory_remark' in column_mapping:
+                    sku.inventory_remark = str(row[column_mapping['inventory_remark']]) if pd.notna(row[column_mapping['inventory_remark']]) else ''
+                
+                if 'sku_status' in column_mapping:
+                    sku.sku_status = str(row[column_mapping['sku_status']]) if pd.notna(row[column_mapping['sku_status']]) else ''
                 
                 # Set bypass recount for specific Item Categories
                 if sku.description in ['Console/Armrest', 'Armrest', 'Wiper', 'Armrest category', 'Wiper category']:
                     sku.bypass_recount = True
                 
-                db.session.add(sku)
-                count += 1
+                # Update timestamp
+                sku.updated_at = get_ph_time()
                 
-                # Commit in batches
-                if count % batch_size == 0:
+                # Add to session (will be committed in batches)
+                db.session.add(sku)
+                
+                # Commit every 500 rows to avoid memory issues
+                if (skus_updated + skus_added) % 500 == 0:
                     db.session.commit()
-                    print(f"Committed {count}/{total_rows} rows", file=sys.stderr)
-                    
+                    print(f"Progress: {skus_added} new, {skus_updated} updated SKUs so far", file=sys.stderr)
+                
             except Exception as row_error:
-                print(f"Error processing row {index}: {row_error}", file=sys.stderr)
+                error_msg = f"Error processing row {index}: {row_error}"
+                print(error_msg, file=sys.stderr)
+                errors.append(error_msg)
                 continue
         
         # Final commit
         db.session.commit()
-        print(f"=== SYNC COMPLETE: {count} SKUs imported ===", file=sys.stderr)
         
-        # Verify data was saved
-        db_count = SKU.query.count()
-        print(f"Verified: {db_count} SKUs in database", file=sys.stderr)
+        # Log the sync action if we have user context (optional)
+        try:
+            from flask import has_request_context
+            if has_request_context():
+                from flask_login import current_user
+                if current_user and current_user.is_authenticated:
+                    audit = AuditLog(
+                        user_id=current_user.id,
+                        action='Google Drive Sync',
+                        details=f"Synced from {file_name}: {skus_added} new SKUs, {skus_updated} updated, {len(errors)} errors",
+                        ip_address='SYSTEM'
+                    )
+                    db.session.add(audit)
+                    db.session.commit()
+        except:
+            pass  # Skip audit if no request context
+        
+        print(f"=== SYNC COMPLETE ===", file=sys.stderr)
+        print(f"New SKUs added: {skus_added}", file=sys.stderr)
+        print(f"Existing SKUs updated: {skus_updated}", file=sys.stderr)
+        print(f"Total SKUs in database: {SKU.query.count()}", file=sys.stderr)
+        
+        if errors:
+            print(f"Errors encountered: {len(errors)}", file=sys.stderr)
         
         return True
         
@@ -254,37 +367,122 @@ def sync_data_from_drive():
         return False
 
 def import_excel_data(file_path):
-    """Import data from Excel file to database"""
+    """Import data from Excel file to database - PRESERVES existing data"""
     try:
         df = pd.read_excel(file_path)
         
+        # Auto-detect column mapping
+        column_mapping = detect_column_mapping(df)
+        
+        if 'sku' not in column_mapping:
+            print("ERROR: Could not find SKU column", file=sys.stderr)
+            return False
+        
+        skus_updated = 0
+        skus_added = 0
+        
         for _, row in df.iterrows():
-            sku = SKU.query.filter_by(sku=str(row['SKU'])).first()
+            sku_value = str(row[column_mapping.get('sku')]) if pd.notna(row[column_mapping.get('sku')]) else ''
+            
+            if not sku_value:
+                continue
+            
+            # Check if SKU exists
+            sku = SKU.query.filter_by(sku=sku_value).first()
             if not sku:
                 sku = SKU()
+                skus_added += 1
+            else:
+                skus_updated += 1
             
-            sku.sku = str(row['SKU'])
-            sku.description = str(row.get('Description', ''))
-            sku.category = str(row.get('Category', ''))
-            sku.last_count_date = str(row.get('LastCountDate', ''))
-            sku.last_count = float(row.get('LastCount', 0)) if pd.notna(row.get('LastCount')) else 0
-            sku.total_container_qty = float(row.get('TotalContainerQty', 0)) if pd.notna(row.get('TotalContainerQty')) else 0
-            sku.container_details = str(row.get('ContainerDetails', ''))
-            sku.total_orders = float(row.get('TotalOrders', 0)) if pd.notna(row.get('TotalOrders')) else 0
-            sku.final_expected_count = float(row.get('Final Expected Count', 0)) if pd.notna(row.get('Final Expected Count')) else 0
-            sku.kenneth_inventory = float(row.get("Kenneth's Inventory", 0)) if pd.notna(row.get("Kenneth's Inventory")) else 0
-            sku.buffer_qty = float(row.get('BufferQty', 0)) if pd.notna(row.get('BufferQty')) else 0
-            sku.stock_status = str(row.get('StockStatus', ''))
-            sku.inventory_remark = str(row.get('InventoryRemark', ''))
-            sku.sku_status = str(row.get('SKUStatus', ''))
+            # Update fields
+            sku.sku = sku_value
             
+            if 'description' in column_mapping:
+                sku.description = str(row[column_mapping['description']]) if pd.notna(row[column_mapping['description']]) else ''
+            
+            if 'category' in column_mapping:
+                sku.category = str(row[column_mapping['category']]) if pd.notna(row[column_mapping['category']]) else ''
+            
+            if 'last_count_date' in column_mapping:
+                sku.last_count_date = str(row[column_mapping['last_count_date']]) if pd.notna(row[column_mapping['last_count_date']]) else ''
+            
+            if 'last_count' in column_mapping:
+                try:
+                    sku.last_count = float(row[column_mapping['last_count']]) if pd.notna(row[column_mapping['last_count']]) else 0
+                except:
+                    sku.last_count = 0
+            
+            if 'total_container_qty' in column_mapping:
+                try:
+                    sku.total_container_qty = float(row[column_mapping['total_container_qty']]) if pd.notna(row[column_mapping['total_container_qty']]) else 0
+                except:
+                    sku.total_container_qty = 0
+            
+            if 'container_details' in column_mapping:
+                sku.container_details = str(row[column_mapping['container_details']]) if pd.notna(row[column_mapping['container_details']]) else ''
+            
+            if 'total_orders' in column_mapping:
+                try:
+                    sku.total_orders = float(row[column_mapping['total_orders']]) if pd.notna(row[column_mapping['total_orders']]) else 0
+                except:
+                    sku.total_orders = 0
+            
+            if 'final_expected_count' in column_mapping:
+                try:
+                    sku.final_expected_count = float(row[column_mapping['final_expected_count']]) if pd.notna(row[column_mapping['final_expected_count']]) else 0
+                except:
+                    sku.final_expected_count = 0
+            
+            if 'kenneth_inventory' in column_mapping:
+                try:
+                    sku.kenneth_inventory = float(row[column_mapping['kenneth_inventory']]) if pd.notna(row[column_mapping['kenneth_inventory']]) else 0
+                except:
+                    sku.kenneth_inventory = 0
+            
+            if 'buffer_qty' in column_mapping:
+                try:
+                    sku.buffer_qty = float(row[column_mapping['buffer_qty']]) if pd.notna(row[column_mapping['buffer_qty']]) else 0
+                except:
+                    sku.buffer_qty = 0
+            
+            if 'stock_status' in column_mapping:
+                sku.stock_status = str(row[column_mapping['stock_status']]) if pd.notna(row[column_mapping['stock_status']]) else ''
+            
+            if 'inventory_remark' in column_mapping:
+                sku.inventory_remark = str(row[column_mapping['inventory_remark']]) if pd.notna(row[column_mapping['inventory_remark']]) else ''
+            
+            if 'sku_status' in column_mapping:
+                sku.sku_status = str(row[column_mapping['sku_status']]) if pd.notna(row[column_mapping['sku_status']]) else ''
+            
+            # Set bypass recount for specific Item Categories
             if sku.description in ['Console/Armrest', 'Armrest', 'Wiper', 'Armrest category', 'Wiper category']:
                 sku.bypass_recount = True
+            
+            sku.updated_at = get_ph_time()
             
             db.session.add(sku)
         
         db.session.commit()
+        print(f"Import complete: {skus_added} added, {skus_updated} updated", file=sys.stderr)
         return True
+        
     except Exception as e:
-        print(f"Error importing data: {e}")
+        print(f"Error importing data: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return False
+
+def get_sync_status():
+    """Get information about the current sync state"""
+    try:
+        total_skus = SKU.query.count()
+        last_updated = db.session.query(db.func.max(SKU.updated_at)).scalar()
+        
+        return {
+            'total_skus': total_skus,
+            'last_sync': last_updated.strftime('%Y-%m-%d %H:%M:%S') if last_updated else 'Never',
+            'status': 'ok'
+        }
+    except:
+        return {'total_skus': 0, 'last_sync': 'Never', 'status': 'error'}
