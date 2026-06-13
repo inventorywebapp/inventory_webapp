@@ -1663,6 +1663,40 @@ def admin_inactive_skus():
     inactive_skus = SKU.query.filter_by(is_active=False).order_by(SKU.sku).all()
     return render_template('admin_inactive_skus.html', inactive_skus=inactive_skus)
 
+@app.route('/api/get_inactive_skus')
+@login_required
+def api_get_inactive_skus():
+    """API endpoint to get inactive SKUs for merge tool dropdown"""
+    if current_user.role != 'admin':
+        return jsonify([])
+    skus = SKU.query.filter_by(is_active=False).order_by(SKU.sku).all()
+    return jsonify([{'id': s.id, 'sku': s.sku, 'description': s.description} for s in skus])
+
+@app.route('/api/get_active_skus')
+@login_required
+def api_get_active_skus():
+    """API endpoint to get active SKUs for merge tool dropdown"""
+    if current_user.role != 'admin':
+        return jsonify([])
+    skus = SKU.query.filter_by(is_active=True).order_by(SKU.sku).all()
+    return jsonify([{'id': s.id, 'sku': s.sku, 'description': s.description} for s in skus])
+
+@app.route('/api/get_merge_history')
+@login_required
+def api_get_merge_history():
+    """API endpoint to get merge history"""
+    if current_user.role != 'admin':
+        return jsonify([])
+    from models import SKUMergeHistory
+    history = SKUMergeHistory.query.order_by(SKUMergeHistory.merged_at.desc()).limit(50).all()
+    return jsonify([{
+        'date': h.merged_at.strftime('%Y-%m-%d %H:%M'),
+        'old_sku': h.old_sku.sku if h.old_sku else 'Unknown',
+        'new_sku': h.new_sku.sku if h.new_sku else 'Unknown',
+        'records': h.records_transferred,
+        'by': h.user.full_name if h.user else 'System'
+    } for h in history])
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
