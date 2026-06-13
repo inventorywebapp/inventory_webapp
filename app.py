@@ -1274,6 +1274,110 @@ def get_active_session():
 def health_check():
     return jsonify({'status': 'healthy'}), 200
 
+@app.route('/debug/sync_info')
+@login_required
+def debug_sync_info():
+    """Debug endpoint to check sync status and column mapping"""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    from utils import get_sync_status, detect_column_mapping
+    import pandas as pd
+    import io
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaIoBaseDownload
+    
+    result = {
+        'sync_status': get_sync_status(),
+        'database_stats': {
+            'total_skus': SKU.query.count(),
+            'sample_skus': []
+        },
+        'excel_info': {},
+        'column_mapping': {}
+    }
+    
+    # Get sample SKUs
+    sample = SKU.query.limit(5).all()
+    for sku in sample:
+        result['database_stats']['sample_skus'].append({
+            'sku': sku.sku,
+            'description': sku.description,
+            'category': sku.category
+        })
+    
+    # Try to read Excel to check columns
+    try:
+        creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
+        folder_id = os.environ.get('GOOGLE_DRIVE_FOLDER_ID')
+        
+        if creds_json and folder_id:
+            creds_dict = json.loads(creds_json)
+            credentials = service_account.Credentials.from_service_account_info(
+                creds_dict, 
+                scopes=['https://www.googleapis.com/auth/drive.readonly']
+            )
+            drive_service = build('drive', 'v3', credentials=credentials)
+            
+            results = drive_service.files().list(
+                q=f"'{folder_id}' in parents and (mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType='application/vnd.ms-excel')",
+                fields="files(id, name, createdTime)",
+                orderBy="createdTime desc"
+            ).execute()
+            
+            files = results.get('files', [])
+            if files:
+                latest_file = files[0]
+                result['excel_info']['file_name'] = latest_file['name']
+                result['excel_info']['file_id'] = latest_file['id']
+                result['excel_info']['created'] = latest_file.get('createdTime')
+                
+                # Download and read first few rows
+                request = drive_service.files().get_media(fileId=latest_file['id'])
+                file_stream = io.BytesIO()
+                downloader = MediaIoBaseDownload(file_stream, request)
+                done = False
+                while not done:
+                    status, done = downloader.next_chunk()
+                
+                file_stream.seek(0)
+                df = pd.read_excel(file_stream)
+                
+                result['excel_info']['total_rows'] = len(df)
+                result['excel_info']['columns'] = list(df.columns)
+                result['excel_info']['sample_data'] = df.head(3).to_dict('records')
+                
+                # Detect column mapping
+                result['column_mapping'] = detect_column_mapping(df)
+    except Exception as e:
+        result['error'] = str(e)
+    
+    return jsonify(result)
+
+@app.route('/debug/force_refresh')
+@login_required
+def debug_force_refresh():
+    """Force refresh database connection and clear any cache"""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        # Force a database commit to ensure all changes are persisted
+        db.session.commit()
+        
+        # Get current count
+        sku_count = SKU.query.count()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Database refreshed',
+            'total_skus': sku_count,
+            'timestamp': get_ph_time().strftime('%Y-%m-%d %H:%M:%S')
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
