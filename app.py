@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 import os
 import sys
 import re
+import json
 from sqlalchemy import or_
 
 # Configuration for count expiration (in days)
