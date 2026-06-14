@@ -5,92 +5,61 @@
 
 <div class="card mb-3">
     <div class="card-body">
-        <div class="row g-2">
-            <div class="col-md-3 col-6">
-                <label>Warehouse</label>
-                <select id="warehouse" class="form-select form-select-sm">
-                    <option value="All">-- All --</option>
+        <div class="row">
+            <div class="col-md-3">
+                <label>Select Warehouse</label>
+                <select id="warehouse" class="form-control">
+                    <option value="All">-- All Warehouses --</option>
                     <option value="Main">Main Warehouse</option>
-                    <option value="5thFloor">5th Floor</option>
+                    <option value="5thFloor">5th Floor Warehouse</option>
                 </select>
+                <small class="text-muted">Filters SKUs by warehouse</small>
             </div>
-            <div class="col-md-3 col-6">
+            <div class="col-md-3">
                 <label>Day Category</label>
-                <select id="dayCategory" class="form-select form-select-sm">
-                    <option value="All">-- All --</option>
+                <select id="dayCategory" class="form-control">
+                    <option value="All">-- All Day Categories --</option>
                 </select>
             </div>
-            <div class="col-md-3 col-6">
+            <div class="col-md-3">
                 <label>Item Category</label>
-                <select id="itemCategory" class="form-select form-select-sm">
-                    <option value="All">-- All --</option>
+                <select id="itemCategory" class="form-control">
+                    <option value="All">-- All Item Categories --</option>
                 </select>
             </div>
-            <div class="col-md-3 col-6">
-                <label>Search</label>
-                <input type="text" id="searchSku" class="form-control form-control-sm" placeholder="SKU or Description">
+            <div class="col-md-3">
+                <label>Search SKU</label>
+                <div style="position: relative;">
+                    <input type="text" id="searchSku" class="form-control" placeholder="Type to search... (e.g., Visor, Door, Armrest)" autocomplete="off">
+                    <div id="suggestions" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-top: none; z-index: 1000; max-height: 200px; overflow-y: auto; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
+                </div>
+                <small class="text-muted">Smart search - type to see suggestions instantly</small>
             </div>
         </div>
         <div class="row mt-2">
-            <div class="col-12 d-flex gap-2 flex-wrap">
-                <button id="applyFilters" class="btn btn-primary btn-sm" onclick="applyFilters()">Apply Filters</button>
-                <button id="saveCounts" class="btn btn-success btn-sm" onclick="saveAllCounts()">Save All</button>
-                <button id="scanBarcodeBtn" class="btn btn-info btn-sm" onclick="startBarcodeScanner()">
-                    <i class="bi bi-upc-scan"></i> Scan
+            <div class="col-md-12">
+                <button id="applyFilters" class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
+                <button id="saveCounts" class="btn btn-success" onclick="saveAllCounts()">Save All Counts</button>
+                <button id="completeCounting" class="btn btn-danger" onclick="completeCounting()">Complete Counting Session</button>
+                <button id="scanBarcodeBtn" class="btn btn-info" onclick="startBarcodeScanner()">
+                    <i class="bi bi-upc-scan"></i> Scan Barcode/QR
                 </button>
-                <button id="completeCounting" class="btn btn-danger btn-sm" onclick="completeCounting()">Complete</button>
             </div>
         </div>
-    </div>
-</div>
-
-<!-- Swipe Indicator for Mobile -->
-<div id="swipeIndicator" class="text-center mb-2 d-md-none" style="display: none;">
-    <small class="text-muted">
-        <i class="bi bi-arrow-left-right"></i> Swipe left/right to see all columns
-    </small>
-    <div class="progress mt-1" style="height: 2px; width: 100px; margin: 0 auto;">
-        <div class="progress-bar" style="width: 30%;"></div>
-    </div>
-</div>
-
-<!-- Loading Indicator -->
-<div id="loadingIndicator" style="display: none; text-align: center; padding: 20px;">
-    <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Loading...</span>
-    </div>
-    <p>Loading SKUs...</p>
-</div>
-
-<!-- SKU Table - Mobile Optimized -->
-<div id="skusList" class="row">
-    <div class="col-12">
-        <div class="alert alert-info text-center">
-            Select filters and click "Apply Filters" to load SKUs
-        </div>
-    </div>
-</div>
-
-<!-- Pagination -->
-<div id="paginationControls" class="row mt-3" style="display: none;">
-    <div class="col-12 text-center">
-        <button class="btn btn-secondary btn-sm" onclick="previousPage()">◀ Previous</button>
-        <span id="pageInfo" class="mx-2">Page 1</span>
-        <button class="btn btn-secondary btn-sm" onclick="nextPage()">Next ▶</button>
     </div>
 </div>
 
 <!-- Scanner Modal -->
-<div class="modal fade" id="scannerModal" tabindex="-1" data-bs-backdrop="static">
+<div class="modal fade" id="scannerModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-upc-scan"></i> Scan Barcode/QR</h5>
+                <h5 class="modal-title"><i class="bi bi-upc-scan"></i> Scan Barcode or QR Code</h5>
                 <button type="button" class="btn-close btn-close-white" onclick="stopBarcodeScanner()"></button>
             </div>
-            <div class="modal-body p-0">
-                <div id="qr-reader" style="width: 100%; min-height: 400px;"></div>
-                <div id="qr-reader-results" class="p-2"></div>
+            <div class="modal-body" style="padding: 0;">
+                <div id="qr-reader" style="width: 100%;"></div>
+                <div id="qr-reader-results" class="mt-2 p-2"></div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="stopBarcodeScanner()">Close</button>
@@ -100,166 +69,562 @@
     </div>
 </div>
 
-<!-- Recount Modal -->
-<div class="modal fade" id="recountModal" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog modal-xl">
+<!-- Manual SKU Selection Modal -->
+<div class="modal fade" id="manualSkuModal" tabindex="-1">
+    <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-warning">
-                <h5 class="modal-title">⚠️ Recount Required</h5>
-                <button type="button" class="btn-close" onclick="closeRecountModal()"></button>
+                <h5 class="modal-title">⚠️ Multiple SKUs Found</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" id="recountModalBody"></div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeRecountModal()">Close</button>
-                <button class="btn btn-success" onclick="saveRecounts()">Save Recounts</button>
+            <div class="modal-body">
+                <p>Multiple SKUs match the scanned code. Please select the correct one:</p>
+                <div id="manualSkuList" class="list-group"></div>
             </div>
         </div>
     </div>
 </div>
 
+<div id="loadingIndicator" style="display: none; text-align: center; padding: 20px;">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    <p>Loading SKUs...</p>
+</div>
+
+<div id="skusList" class="row">
+    <div class="col-12">
+        <div class="alert alert-info text-center">
+            Select filters and click "Apply Filters" to load SKUs
+        </div>
+    </div>
+</div>
+
+<div id="paginationControls" class="row mt-3" style="display: none;">
+    <div class="col-12 text-center">
+        <button class="btn btn-secondary" onclick="previousPage()">Previous</button>
+        <span id="pageInfo" class="mx-3">Page 1</span>
+        <button class="btn btn-secondary" onclick="nextPage()">Next</button>
+    </div>
+</div>
+
 <style>
-/* Mobile Optimizations */
-@media (max-width: 768px) {
-    .table-responsive {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scroll-behavior: smooth;
-    }
-    
-    /* Sticky first two columns on mobile */
-    .table thead th:first-child,
-    .table tbody td:first-child {
-        position: sticky;
-        left: 0;
-        background-color: #343a40;
-        z-index: 10;
-    }
-    
-    .table thead th:first-child {
-        background-color: #343a40;
-        color: white;
-    }
-    
-    .table tbody td:first-child {
-        background-color: white;
-        box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1);
-    }
-    
-    .table thead th:nth-child(2),
-    .table tbody td:nth-child(2) {
-        position: sticky;
-        left: 120px;
-        background-color: #343a40;
-        z-index: 9;
-    }
-    
-    .table thead th:nth-child(2) {
-        background-color: #343a40;
-        color: white;
-    }
-    
-    .table tbody td:nth-child(2) {
-        background-color: white;
-        box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1);
-    }
-    
-    /* Larger touch targets for inputs */
-    .initial-count {
-        min-height: 44px;
-        font-size: 16px !important;
-    }
-    
-    /* Highlight active row */
-    .table tbody tr:active {
-        background-color: #e7f1ff !important;
-    }
-    
-    /* Better badge sizing */
-    .badge {
-        font-size: 10px;
-        padding: 4px 8px;
-        white-space: nowrap;
-    }
-    
-    /* Smaller text for mobile */
-    .table td, .table th {
-        font-size: 12px;
-        padding: 8px 6px;
-    }
+.suggestion-item:hover {
+    background-color: #f0f0f0;
 }
-
-/* Desktop optimizations */
-@media (min-width: 769px) {
-    .table-responsive {
-        overflow-x: auto;
-    }
-    
-    .initial-count {
-        min-width: 100px;
-    }
-}
-
-/* Common styles */
 .sku-completed {
     background-color: #d1e7dd !important;
     border-left: 3px solid #198754;
+}
+.sku-completed:hover {
+    background-color: #b6dbc8 !important;
 }
 .sku-in-progress {
     background-color: #cfe2ff !important;
     border-left: 3px solid #0d6efd;
 }
+.sku-in-progress:hover {
+    background-color: #b6d4fe !important;
+}
 .sku-needs-count {
     background-color: #fff3cd !important;
     border-left: 3px solid #ffc107;
+}
+.sku-needs-count:hover {
+    background-color: #ffe69e !important;
 }
 .sku-typing {
     background-color: #ffe69e !important;
     border-left: 3px solid #ffc107;
 }
-.initial-count:focus {
-    outline: none;
-    box-shadow: 0 0 0 2px #0d6efd;
-    background-color: #fff;
+.uncounted-badge {
+    display: inline-block;
+    background-color: #ffc107;
+    color: #856404;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-left: 10px;
 }
-.fw-bold.text-dark {
-    font-weight: 600 !important;
+.counted-badge {
+    display: inline-block;
+    background-color: #198754;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-left: 10px;
+}
+.inprogress-badge {
+    display: inline-block;
+    background-color: #0d6efd;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-left: 10px;
+}
+.table-bordered {
+    border: 1px solid #dee2e6;
+}
+.table-bordered th,
+.table-bordered td {
+    border: 1px solid #dee2e6;
+    padding: 8px;
+    vertical-align: middle;
+}
+.table thead th {
+    background-color: #343a40;
+    color: white;
+    position: sticky;
+    top: 0;
+}
+.final-expected-col, .kenneth-col, .last-count-col {
+    font-weight: bold;
+    color: #000000 !important;
+}
+#qr-reader {
+    min-height: 400px;
+}
+#qr-reader__scan_region {
+    background: #000;
+}
+#qr-reader-results {
+    max-height: 150px;
+    overflow-y: auto;
 }
 </style>
 
+<!-- Load html5-qrcode library -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
 <script>
-// ============================================
-// CONFIGURATION
-// ============================================
-const DAY_ORDER = {'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6};
+// Day Category order mapping
+const DAY_ORDER = {
+    'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
+};
+
+// Define which Item Categories belong to 5th Floor Warehouse
 const FIFTH_FLOOR_CATEGORIES = [
     'Console/Armrest', 'Deep Dish-3D', 'Deep Dish-5D', 'Deep Dish-5D-CF',
     'Deep Dish-DL', 'Deep Dish-DM', 'Deep Dish-ROHS', 'Deep Dish-TPE-CF',
     'Deep Dish-UN', 'Trunk Tray'
 ];
 
-const COUNT_EXPIRATION_DAYS = 14;
-
+// Store all data from server
+let allItemCategories = {{ item_categories|tojson }};
+let allDayCategoriesRaw = {{ day_categories|tojson }};
 let allSkus = [];
 let filteredSkus = [];
 let currentPage = 1;
 let itemsPerPage = 50;
 let currentSessionId = null;
+let searchTimeout = null;
 let html5QrCode = null;
 let isScannerActive = false;
-let recountItems = [];
 
-let allItemCategories = {{ item_categories|tojson }};
-let allDayCategoriesRaw = {{ day_categories|tojson }};
-let allDayCategories = [...allDayCategoriesRaw].sort((a,b) => (DAY_ORDER[a] || 999) - (DAY_ORDER[b] || 999));
+// Sort day categories
+let allDayCategories = [...allDayCategoriesRaw].sort((a, b) => {
+    let orderA = DAY_ORDER[a] || 999;
+    let orderB = DAY_ORDER[b] || 999;
+    return orderA - orderB;
+});
 
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
 function getUrlParameter(name) {
-    let params = new URLSearchParams(window.location.search);
-    return params.get(name);
+    let urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(name);
+}
+
+function normalizeString(str) {
+    if (!str) return '';
+    return str.toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/\s+/g, ' ')
+        .replace(/-/g, ' ');
+}
+
+// ============ QR/BARCODE SCANNER FUNCTIONS ============
+
+async function startBarcodeScanner() {
+    if (isScannerActive) {
+        showToast("Scanner is already running", "warning");
+        return;
+    }
+    
+    if (allSkus.length === 0) {
+        showToast("Loading SKU data first...", "info");
+        const resultContainer = document.getElementById('qr-reader-results');
+        if (resultContainer) {
+            resultContainer.innerHTML = '<div class="alert alert-warning">📦 Loading SKU database... Please wait.</div>';
+        }
+        
+        try {
+            const response = await fetch('/get_skus?day_category=All&item_category=All&search=');
+            const data = await response.json();
+            allSkus = data;
+            console.log(`✅ Loaded ${allSkus.length} SKUs`);
+            buildSearchIndex();
+            
+            if (resultContainer) {
+                resultContainer.innerHTML = `<div class="alert alert-success">✓ Loaded ${allSkus.length} SKUs. Starting camera...</div>`;
+            }
+            await new Promise(resolve => setTimeout(resolve, 800));
+        } catch (error) {
+            console.error('Error loading SKUs:', error);
+            alert('Failed to load SKU data. Please refresh the page.');
+            return;
+        }
+    }
+    
+    const scannerModal = new bootstrap.Modal(document.getElementById('scannerModal'));
+    scannerModal.show();
+    
+    const resultContainer = document.getElementById('qr-reader-results');
+    if (resultContainer) {
+        resultContainer.innerHTML = '<div class="alert alert-info">📷 Initializing camera... Please allow camera access.</div>';
+    }
+    
+    if (html5QrCode) {
+        try {
+            await html5QrCode.stop();
+        } catch(e) {}
+        html5QrCode = null;
+    }
+    
+    const readerElement = document.getElementById('qr-reader');
+    if (readerElement) {
+        readerElement.innerHTML = '';
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    html5QrCode = new Html5Qrcode("qr-reader");
+    isScannerActive = true;
+    
+    const config = {
+        fps: 15,
+        qrbox: { width: 280, height: 280 },
+        aspectRatio: 1.0,
+        showTorchButtonIfSupported: true,
+        formatsToSupport: [
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.CODE_93
+        ]
+    };
+    
+    try {
+        await html5QrCode.start(
+            { facingMode: "environment" },
+            config,
+            (decodedText, decodedResult) => {
+                console.log(`📸 SCANNED: "${decodedText}"`);
+                console.log(`Format: ${decodedResult.result.format.formatName}`);
+                
+                if (resultContainer) {
+                    resultContainer.innerHTML = `<div class="alert alert-success">✓ Scanned: ${decodedText}</div>`;
+                }
+                showToast(`Scanned: ${decodedText.substring(0, 50)}`, "success");
+                
+                stopBarcodeScanner();
+                intelligentSkuSearch(decodedText);
+            },
+            (errorMessage) => {}
+        );
+        if (resultContainer) {
+            resultContainer.innerHTML = '<div class="alert alert-success">✅ Camera ready! Point at QR/Barcode.</div>';
+        }
+    } catch (err) {
+        console.error(`Camera error: ${err}`);
+        if (resultContainer) {
+            resultContainer.innerHTML = `<div class="alert alert-danger">❌ Camera error: ${err.message || err}. Please check permissions.</div>`;
+        }
+        isScannerActive = false;
+    }
+}
+
+let skuSearchIndex = {};
+
+function buildSearchIndex() {
+    skuSearchIndex = {
+        exact: new Map(),
+        lower: new Map(),
+        normalized: new Map(),
+        keywords: new Map()
+    };
+    
+    for (const sku of allSkus) {
+        skuSearchIndex.exact.set(sku.sku, sku);
+        skuSearchIndex.lower.set(sku.sku.toLowerCase(), sku);
+        const normalized = normalizeString(sku.sku);
+        skuSearchIndex.normalized.set(normalized, sku);
+        
+        const keywords = sku.sku.split(/[-_\s]+/);
+        for (const kw of keywords) {
+            if (kw.length > 2) {
+                const kwLower = kw.toLowerCase();
+                if (!skuSearchIndex.keywords.has(kwLower)) {
+                    skuSearchIndex.keywords.set(kwLower, []);
+                }
+                skuSearchIndex.keywords.get(kwLower).push(sku);
+            }
+        }
+    }
+    console.log("Search index built with", allSkus.length, "SKUs");
+}
+
+async function stopBarcodeScanner() {
+    isScannerActive = false;
+    
+    if (html5QrCode) {
+        try {
+            await html5QrCode.stop();
+        } catch(err) {}
+        html5QrCode = null;
+    }
+    
+    const readerElement = document.getElementById('qr-reader');
+    if (readerElement) {
+        readerElement.innerHTML = '';
+    }
+    
+    const scannerModal = bootstrap.Modal.getInstance(document.getElementById('scannerModal'));
+    if (scannerModal) {
+        scannerModal.hide();
+    }
+    const resultContainer = document.getElementById('qr-reader-results');
+    if (resultContainer) {
+        resultContainer.innerHTML = '';
+    }
+}
+
+function manualBarcodeEntry() {
+    let barcode = prompt('Enter barcode/QR code value:');
+    if (barcode && barcode.trim()) {
+        stopBarcodeScanner();
+        intelligentSkuSearch(barcode.trim());
+    }
+}
+
+function intelligentSkuSearch(scannedText) {
+    if (allSkus.length === 0) {
+        alert("SKU data not loaded. Please refresh the page.");
+        return;
+    }
+    
+    console.log("=== INTELLIGENT SKU SEARCH ===");
+    console.log("Raw scanned:", scannedText);
+    
+    let matches = [];
+    let searchVariations = [];
+    
+    const original = scannedText;
+    const lower = original.toLowerCase();
+    const normalized = normalizeString(original);
+    
+    const skuPatterns = [
+        original, lower, normalized,
+        original.replace(/[^A-Za-z0-9-]/g, ''),
+        original.replace(/[^A-Za-z0-9]/g, ''),
+        original.replace(/https?:\/\//i, '').replace(/www\./i, '').split('/').pop(),
+        original.match(/[A-Z0-9-]{3,}/i)?.[0] || '',
+        original.replace(/\s+/g, '-'),
+        original.replace(/-/g, ' ')
+    ];
+    
+    for (const v of skuPatterns) {
+        if (v && v.length > 2 && !searchVariations.includes(v)) {
+            searchVariations.push(v);
+        }
+    }
+    
+    console.log("Search variations:", searchVariations.slice(0, 5));
+    
+    for (const variant of searchVariations) {
+        if (skuSearchIndex.exact.has(variant)) {
+            matches.push({ sku: skuSearchIndex.exact.get(variant), score: 100, type: 'EXACT' });
+        }
+        if (skuSearchIndex.lower.has(variant.toLowerCase())) {
+            matches.push({ sku: skuSearchIndex.lower.get(variant.toLowerCase()), score: 98, type: 'CASE_INSENSITIVE' });
+        }
+        const normVariant = normalizeString(variant);
+        if (skuSearchIndex.normalized.has(normVariant)) {
+            matches.push({ sku: skuSearchIndex.normalized.get(normVariant), score: 95, type: 'NORMALIZED' });
+        }
+    }
+    
+    if (matches.length === 0) {
+        for (const sku of allSkus) {
+            let bestScore = 0;
+            let matchType = '';
+            
+            for (const variant of searchVariations.slice(0, 3)) {
+                const skuLower = sku.sku.toLowerCase();
+                const variantLower = variant.toLowerCase();
+                
+                if (skuLower === variantLower) {
+                    bestScore = 90;
+                    matchType = 'CASE_INSENSITIVE_CONTAINS';
+                } else if (skuLower.includes(variantLower) && variantLower.length > 3) {
+                    const score = 70 + (variantLower.length / skuLower.length) * 20;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        matchType = 'CONTAINS';
+                    }
+                } else if (variantLower.includes(skuLower) && skuLower.length > 3) {
+                    const score = 60 + (skuLower.length / variantLower.length) * 20;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        matchType = 'PART_OF';
+                    }
+                }
+            }
+            
+            if (bestScore > 0) {
+                matches.push({ sku: sku, score: bestScore, type: matchType });
+            }
+        }
+    }
+    
+    if (matches.length === 0) {
+        const keywords = scannedText.split(/[-_\s\/]+/).filter(k => k.length > 2);
+        const matchedSkus = new Set();
+        
+        for (const kw of keywords) {
+            const kwLower = kw.toLowerCase();
+            if (skuSearchIndex.keywords.has(kwLower)) {
+                for (const sku of skuSearchIndex.keywords.get(kwLower)) {
+                    if (!matchedSkus.has(sku.id)) {
+                        matchedSkus.add(sku.id);
+                        let score = 50;
+                        if (sku.sku.toLowerCase().includes(kwLower)) score = 60;
+                        matches.push({ sku: sku, score: score, type: 'KEYWORD' });
+                    }
+                }
+            }
+        }
+    }
+    
+    const uniqueMatches = [];
+    const seenIds = new Set();
+    for (const match of matches.sort((a, b) => b.score - a.score)) {
+        if (!seenIds.has(match.sku.id)) {
+            seenIds.add(match.sku.id);
+            uniqueMatches.push(match);
+        }
+    }
+    
+    console.log(`Found ${uniqueMatches.length} matches`);
+    
+    if (uniqueMatches.length === 0) {
+        const sampleSkus = allSkus.slice(0, 5).map(s => s.sku).join(', ');
+        alert(`❌ "${scannedText}" not found in database.\n\nPossible reasons:\n• QR code may contain different format\n• SKU may not exist in current data\n\nExample SKUs in system:\n${sampleSkus}...\n\nTry searching manually.`);
+        document.getElementById('searchSku').value = scannedText;
+        applyFilters();
+        
+    } else if (uniqueMatches.length === 1) {
+        const matched = uniqueMatches[0];
+        console.log(`✅ SELECTED: ${matched.sku.sku} (${matched.type})`);
+        
+        document.getElementById('searchSku').value = matched.sku.sku;
+        applyFilters();
+        showToast(`✓ Found: ${matched.sku.sku}`, "success");
+        
+        setTimeout(() => {
+            const row = document.getElementById(`sku-row-${matched.sku.id}`);
+            if (row) {
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                row.style.backgroundColor = '#90EE90';
+                setTimeout(() => {
+                    if (row) row.style.backgroundColor = '';
+                }, 3000);
+            }
+        }, 500);
+        
+    } else {
+        showSkuSelectionDialog(uniqueMatches, scannedText);
+    }
+}
+
+function showSkuSelectionDialog(matches, originalScan) {
+    const modalHtml = `
+        <div class="modal fade" id="selectionModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title">🔍 Select Correct SKU</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Scanned: <strong>${escapeHtml(originalScan)}</strong></p>
+                        <p>Found <strong>${matches.length}</strong> matching SKUs. Please select the correct one:</p>
+                        <div class="list-group">
+                            ${matches.map((m, idx) => `
+                                <button type="button" class="list-group-item list-group-item-action" onclick="selectSkuFromModal(${m.sku.id}, '${escapeHtml(m.sku.sku)}')">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>${escapeHtml(m.sku.sku)}</strong>
+                                            <br><small class="text-muted">${escapeHtml(m.sku.description || 'No description')}</small>
+                                        </div>
+                                        <span class="badge bg-secondary">${m.type} (${Math.round(m.score)}%)</span>
+                                    </div>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const existingModal = document.getElementById('selectionModal');
+    if (existingModal) existingModal.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modal = new bootstrap.Modal(document.getElementById('selectionModal'));
+    modal.show();
+}
+
+function selectSkuFromModal(skuId, skuCode) {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('selectionModal'));
+    if (modal) modal.hide();
+    
+    document.getElementById('searchSku').value = skuCode;
+    applyFilters();
+    showToast(`✓ Selected: ${skuCode}`, "success");
+    
+    setTimeout(() => {
+        const row = document.getElementById(`sku-row-${skuId}`);
+        if (row) {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            row.style.backgroundColor = '#90EE90';
+            setTimeout(() => {
+                if (row) row.style.backgroundColor = '';
+            }, 3000);
+        }
+    }, 500);
+}
+
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type === 'success' ? 'success' : (type === 'error' ? 'danger' : 'info')} alert-dismissible fade show position-fixed`;
+    toast.style.bottom = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '9999';
+    toast.style.minWidth = '300px';
+    toast.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
 }
 
 function escapeHtml(text) {
@@ -272,287 +637,594 @@ function escapeHtml(text) {
     });
 }
 
-function showToast(message, type) {
-    let toast = document.createElement('div');
-    toast.className = `alert alert-${type} position-fixed bottom-0 end-0 m-3`;
-    toast.style.zIndex = 9999;
-    toast.style.minWidth = '250px';
-    toast.innerHTML = message;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
-}
+// ============ END OF QR SCANNER ============
 
-// ============================================
-// FILTER FUNCTIONS
-// ============================================
 function filterItemCategoriesByWarehouse() {
     let warehouse = document.getElementById('warehouse').value;
-    let itemSelect = document.getElementById('itemCategory');
-    let currentVal = itemSelect.value;
+    let itemCategorySelect = document.getElementById('itemCategory');
+    if (!itemCategorySelect) return;
     
-    itemSelect.innerHTML = '<option value="All">-- All --</option>';
-    let filtered = warehouse === '5thFloor' ? allItemCategories.filter(c => FIFTH_FLOOR_CATEGORIES.includes(c)) :
-                    warehouse === 'Main' ? allItemCategories.filter(c => !FIFTH_FLOOR_CATEGORIES.includes(c)) :
-                    [...allItemCategories];
-    filtered.sort();
-    filtered.forEach(cat => {
-        let opt = document.createElement('option');
-        opt.value = cat;
-        opt.textContent = cat;
-        itemSelect.appendChild(opt);
-    });
-    if (filtered.includes(currentVal)) itemSelect.value = currentVal;
+    let currentValue = itemCategorySelect.value;
+    
+    itemCategorySelect.innerHTML = '<option value="All">-- All Item Categories --</option>';
+    
+    let filteredCategories = [];
+    
+    if (warehouse === '5thFloor') {
+        filteredCategories = allItemCategories.filter(cat => FIFTH_FLOOR_CATEGORIES.includes(cat));
+    } else if (warehouse === 'Main') {
+        filteredCategories = allItemCategories.filter(cat => !FIFTH_FLOOR_CATEGORIES.includes(cat));
+    } else {
+        filteredCategories = [...allItemCategories];
+    }
+    
+    filteredCategories.sort();
+    
+    for (let i = 0; i < filteredCategories.length; i++) {
+        let option = document.createElement('option');
+        option.value = filteredCategories[i];
+        option.textContent = filteredCategories[i];
+        itemCategorySelect.appendChild(option);
+    }
+    
+    if (currentValue !== 'All' && filteredCategories.includes(currentValue)) {
+        itemCategorySelect.value = currentValue;
+    }
+    
     updateDayCategories();
 }
 
 function updateDayCategories() {
-    let selectedItem = document.getElementById('itemCategory').value;
-    let daySelect = document.getElementById('dayCategory');
-    let currentVal = daySelect.value;
+    let selectedItemCategory = document.getElementById('itemCategory').value;
+    let dayCategorySelect = document.getElementById('dayCategory');
+    if (!dayCategorySelect) return;
     
-    daySelect.innerHTML = '<option value="All">-- All --</option>';
-    let filteredDays = selectedItem !== 'All' && allSkus.length > 0 ?
-        [...new Set(allSkus.filter(s => s.description === selectedItem && s.category).map(s => s.category))] :
-        [...allDayCategories];
-    filteredDays.sort((a,b) => (DAY_ORDER[a] || 999) - (DAY_ORDER[b] || 999));
-    filteredDays.forEach(day => {
-        if (day) {
-            let opt = document.createElement('option');
-            opt.value = day;
-            opt.textContent = day;
-            daySelect.appendChild(opt);
+    let currentValue = dayCategorySelect.value;
+    
+    dayCategorySelect.innerHTML = '<option value="All">-- All Day Categories --</option>';
+    
+    let filteredDayCategories = [];
+    
+    if (selectedItemCategory !== 'All' && allSkus.length > 0) {
+        let daySet = new Set();
+        for (let i = 0; i < allSkus.length; i++) {
+            if (allSkus[i].description === selectedItemCategory && allSkus[i].category) {
+                daySet.add(allSkus[i].category);
+            }
         }
+        filteredDayCategories = Array.from(daySet);
+    } else {
+        filteredDayCategories = [...allDayCategories];
+    }
+    
+    filteredDayCategories.sort((a, b) => {
+        let orderA = DAY_ORDER[a] || 999;
+        let orderB = DAY_ORDER[b] || 999;
+        return orderA - orderB;
     });
-    if (filteredDays.includes(currentVal)) daySelect.value = currentVal;
+    
+    for (let i = 0; i < filteredDayCategories.length; i++) {
+        if (filteredDayCategories[i]) {
+            let option = document.createElement('option');
+            option.value = filteredDayCategories[i];
+            option.textContent = filteredDayCategories[i];
+            dayCategorySelect.appendChild(option);
+        }
+    }
+    
+    if (currentValue !== 'All' && filteredDayCategories.includes(currentValue)) {
+        dayCategorySelect.value = currentValue;
+    }
 }
 
-// ============================================
-// LOAD SKUS
-// ============================================
+function highlightSkusStatus() {
+    let countInputs = document.querySelectorAll('.initial-count');
+    let uncountedCount = 0;
+    let completedCount = 0;
+    let inProgressCount = 0;
+    
+    for (let i = 0; i < countInputs.length; i++) {
+        let input = countInputs[i];
+        let row = input ? input.closest('tr') : null;
+        if (!row) continue;
+        
+        let count = input.value;
+        
+        let isCompleted = row.getAttribute('data-completed') === 'true';
+        let isInProgress = row.getAttribute('data-in-progress') === 'true';
+        let isExpired = row.getAttribute('data-expired') === 'true';
+        
+        if (!count || count === '') {
+            if (isCompleted && !isExpired) {
+                row.classList.add('sku-completed');
+                row.classList.remove('sku-in-progress', 'sku-needs-count', 'sku-typing');
+                completedCount++;
+            } else if (isInProgress) {
+                row.classList.add('sku-in-progress');
+                row.classList.remove('sku-completed', 'sku-needs-count', 'sku-typing');
+                inProgressCount++;
+            } else {
+                row.classList.add('sku-needs-count');
+                row.classList.remove('sku-completed', 'sku-in-progress', 'sku-typing');
+                uncountedCount++;
+            }
+        } else {
+            row.classList.add('sku-typing');
+            row.classList.remove('sku-completed', 'sku-in-progress', 'sku-needs-count');
+        }
+    }
+    
+    let existingUncountedBadge = document.getElementById('uncountedBadge');
+    let existingCompletedBadge = document.getElementById('completedBadge');
+    let existingInProgressBadge = document.getElementById('inProgressBadge');
+    
+    if (existingCompletedBadge) existingCompletedBadge.remove();
+    if (existingInProgressBadge) existingInProgressBadge.remove();
+    if (existingUncountedBadge) existingUncountedBadge.remove();
+    
+    let title = document.querySelector('h2');
+    if (!title) return;
+    
+    if (completedCount > 0) {
+        let badge = document.createElement('span');
+        badge.id = 'completedBadge';
+        badge.className = 'counted-badge';
+        badge.innerHTML = `${completedCount} SKU(s) Completed`;
+        title.appendChild(badge);
+    }
+    
+    if (inProgressCount > 0) {
+        let badge = document.createElement('span');
+        badge.id = 'inProgressBadge';
+        badge.className = 'inprogress-badge';
+        badge.innerHTML = `${inProgressCount} SKU(s) In Progress`;
+        title.appendChild(badge);
+    }
+    
+    if (uncountedCount > 0) {
+        let badge = document.createElement('span');
+        badge.id = 'uncountedBadge';
+        badge.className = 'uncounted-badge';
+        badge.innerHTML = `${uncountedCount} SKU(s) Need Count`;
+        title.appendChild(badge);
+    }
+}
+
+function validateCountInput(input) {
+    if (!input) return true;
+    
+    let value = input.value;
+    
+    if (value === '' || value === null) {
+        return true;
+    }
+    
+    if (isNaN(value) || value.includes('.') || parseFloat(value) < 0 || !Number.isInteger(parseFloat(value))) {
+        alert('Please enter a valid whole number (no decimals, no negatives)');
+        input.value = '';
+        input.focus();
+        return false;
+    }
+    return true;
+}
+
+function setupSmartSearch() {
+    let searchInput = document.getElementById('searchSku');
+    let suggestionsDiv = document.getElementById('suggestions');
+    
+    if (!searchInput || !suggestionsDiv) return;
+    
+    searchInput.addEventListener('input', function() {
+        let term = this.value.trim();
+        
+        if (term.length < 2) {
+            suggestionsDiv.style.display = 'none';
+            return;
+        }
+        
+        if (searchTimeout) clearTimeout(searchTimeout);
+        
+        searchTimeout = setTimeout(function() {
+            let suggestions = [];
+            let seen = new Set();
+            
+            for (let i = 0; i < allSkus.length && suggestions.length < 15; i++) {
+                let sku = allSkus[i];
+                if (sku.sku.toLowerCase().includes(term.toLowerCase())) {
+                    if (!seen.has(sku.sku)) {
+                        seen.add(sku.sku);
+                        suggestions.push({
+                            sku: sku.sku,
+                            description: sku.description,
+                            id: sku.id
+                        });
+                    }
+                }
+            }
+            
+            if (suggestions.length > 0) {
+                suggestionsDiv.innerHTML = '';
+                for (let i = 0; i < suggestions.length; i++) {
+                    let item = suggestions[i];
+                    let div = document.createElement('div');
+                    div.className = 'suggestion-item';
+                    div.style.padding = '8px 12px';
+                    div.style.cursor = 'pointer';
+                    div.style.borderBottom = '1px solid #eee';
+                    div.style.fontSize = '14px';
+                    div.innerHTML = `<strong>${escapeHtml(item.sku)}</strong> <small class="text-muted">${escapeHtml(item.description || '')}</small>`;
+                    div.onclick = (function(skuValue) {
+                        return function() {
+                            searchInput.value = skuValue;
+                            suggestionsDiv.style.display = 'none';
+                            applyFilters();
+                        };
+                    })(item.sku);
+                    suggestionsDiv.appendChild(div);
+                }
+                suggestionsDiv.style.display = 'block';
+            } else {
+                suggestionsDiv.style.display = 'none';
+            }
+        }, 300);
+    });
+    
+    document.addEventListener('click', function(e) {
+        if (e.target !== searchInput && suggestionsDiv && !suggestionsDiv.contains(e.target)) {
+            suggestionsDiv.style.display = 'none';
+        }
+    });
+    
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.which === 13) {
+            if (suggestionsDiv) suggestionsDiv.style.display = 'none';
+            applyFilters();
+        }
+    });
+}
+
 function applyFilters() {
     let warehouse = document.getElementById('warehouse').value;
-    let dayCat = document.getElementById('dayCategory').value;
-    let itemCat = document.getElementById('itemCategory').value;
+    let dayCategory = document.getElementById('dayCategory').value;
+    let itemCategory = document.getElementById('itemCategory').value;
     let search = document.getElementById('searchSku').value;
-    loadSkus(warehouse, dayCat, itemCat, search);
+    
+    loadSkus(warehouse, dayCategory, itemCategory, search);
+}
+
+function loadInProgressSkus() {
+    let sessionIdFromUrl = getUrlParameter('session_id');
+    if (!sessionIdFromUrl) {
+        applyFilters();
+        return;
+    }
+    
+    currentSessionId = parseInt(sessionIdFromUrl);
+    
+    let loadingDiv = document.getElementById('loadingIndicator');
+    let skusListDiv = document.getElementById('skusList');
+    
+    if (loadingDiv) loadingDiv.style.display = 'block';
+    if (skusListDiv) skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-info text-center">Loading in-progress SKUs...</div></div>';
+    
+    fetch(`/get_in_progress_skus/${currentSessionId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.skus && data.skus.length > 0) {
+                for (let i = 0; i < data.skus.length; i++) {
+                    data.skus[i].in_progress = true;
+                    data.skus[i].has_count = true;
+                    data.skus[i].current_count = data.skus[i].current_count;
+                    data.skus[i].count_time = data.skus[i].count_time;
+                }
+                allSkus = data.skus;
+                filteredSkus = data.skus;
+                currentPage = 1;
+                displaySkus(data.skus);
+                if (loadingDiv) loadingDiv.style.display = 'none';
+            } else {
+                if (skusListDiv) skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-warning text-center">No in-progress SKUs found. Loading all SKUs...</div></div>';
+                applyFilters();
+                if (loadingDiv) loadingDiv.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading in-progress SKUs:', error);
+            applyFilters();
+            if (loadingDiv) loadingDiv.style.display = 'none';
+        });
 }
 
 function loadSkus(warehouse, dayCategory, itemCategory, search) {
-    document.getElementById('loadingIndicator').style.display = 'block';
-    document.getElementById('skusList').innerHTML = '<div class="col-12"><div class="alert alert-info text-center">Loading SKUs...</div></div>';
+    let loadingDiv = document.getElementById('loadingIndicator');
+    let skusListDiv = document.getElementById('skusList');
     
-    let url = `/get_skus?day_category=${encodeURIComponent(dayCategory)}&item_category=${encodeURIComponent(itemCategory)}&search=${encodeURIComponent(search)}`;
+    if (loadingDiv) loadingDiv.style.display = 'block';
+    if (skusListDiv) skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-info text-center">Loading SKUs...</div></div>';
+    
+    let url = '/get_skus?day_category=' + encodeURIComponent(dayCategory) + 
+              '&item_category=' + encodeURIComponent(itemCategory) + 
+              '&search=' + encodeURIComponent(search);
     
     fetch(url)
-        .then(res => res.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('HTTP error ' + response.status);
+            }
+            return response.json();
+        })
         .then(data => {
             allSkus = data;
-            filteredSkus = allSkus.filter(sku => {
-                let is5thFloor = FIFTH_FLOOR_CATEGORIES.includes(sku.description);
-                if (warehouse === '5thFloor') return is5thFloor;
-                if (warehouse === 'Main') return !is5thFloor;
-                return true;
-            });
             
-            document.getElementById('loadingIndicator').style.display = 'none';
-            
-            if (filteredSkus.length === 0) {
-                document.getElementById('skusList').innerHTML = '<div class="col-12"><div class="alert alert-warning text-center">No SKUs found. Try different filters.</div></div>';
-                document.getElementById('paginationControls').style.display = 'none';
-                return;
+            let warehouseFiltered = [];
+            for (let i = 0; i < data.length; i++) {
+                let sku = data[i];
+                let belongsTo5thFloor = FIFTH_FLOOR_CATEGORIES.includes(sku.description);
+                
+                if (warehouse === '5thFloor' && belongsTo5thFloor) {
+                    warehouseFiltered.push(sku);
+                } else if (warehouse === 'Main' && !belongsTo5thFloor) {
+                    warehouseFiltered.push(sku);
+                } else if (warehouse === 'All') {
+                    warehouseFiltered.push(sku);
+                }
             }
             
-            // Show swipe indicator on mobile
-            let swipeIndicator = document.getElementById('swipeIndicator');
-            if (swipeIndicator && window.innerWidth < 768 && filteredSkus.length > 0) {
-                swipeIndicator.style.display = 'block';
-                setTimeout(() => {
-                    if (swipeIndicator) swipeIndicator.style.display = 'none';
-                }, 5000);
-            }
-            
+            filteredSkus = warehouseFiltered;
             currentPage = 1;
             displaySkusWithPagination();
-            if (currentSessionId) loadExistingCountsForSkus();
+            if (loadingDiv) loadingDiv.style.display = 'none';
             updateDayCategories();
         })
-        .catch(err => {
-            console.error(err);
-            document.getElementById('loadingIndicator').style.display = 'none';
-            document.getElementById('skusList').innerHTML = '<div class="col-12"><div class="alert alert-danger text-center">Error loading SKUs</div></div>';
+        .catch(error => {
+            console.error('Error loading SKUs:', error);
+            if (skusListDiv) {
+                skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-danger text-center">Error loading SKUs: ' + error.message + '</div></div>';
+            }
+            if (loadingDiv) loadingDiv.style.display = 'none';
         });
+}
+
+function displaySkusWithPagination() {
+    let startIndex = (currentPage - 1) * itemsPerPage;
+    let endIndex = startIndex + itemsPerPage;
+    let pageSkus = filteredSkus.slice(startIndex, endIndex);
+    
+    displaySkus(pageSkus);
+    
+    let paginationDiv = document.getElementById('paginationControls');
+    if (paginationDiv) {
+        if (filteredSkus.length > itemsPerPage) {
+            paginationDiv.style.display = 'block';
+            let totalPages = Math.ceil(filteredSkus.length / itemsPerPage);
+            let pageInfo = document.getElementById('pageInfo');
+            if (pageInfo) {
+                pageInfo.textContent = 'Page ' + currentPage + ' of ' + totalPages + ' (' + filteredSkus.length + ' total SKUs)';
+            }
+        } else {
+            paginationDiv.style.display = 'none';
+        }
+    }
+    
+    if (currentSessionId && filteredSkus.length > 0) {
+        loadExistingCountsForSkus();
+    }
 }
 
 function loadExistingCountsForSkus() {
     let skuIds = filteredSkus.map(s => s.id).join(',');
-    if (!skuIds || !currentSessionId) return;
+    if (!skuIds) return;
     
     fetch(`/get_latest_counts?sku_ids=${skuIds}&session_id=${currentSessionId}`)
-        .then(res => res.json())
-        .then(data => {
-            for (let [skuId, countData] of Object.entries(data)) {
-                let input = document.querySelector(`.initial-count[data-sku-id="${skuId}"]`);
+        .then(response => response.json())
+        .then(latestCounts => {
+            for (let skuId in latestCounts) {
+                let countInput = document.querySelector(`.initial-count[data-sku-id="${skuId}"]`);
                 let lastCountedSpan = document.getElementById(`last-counted-${skuId}`);
-                if (input) input.value = countData.initial_count;
-                if (lastCountedSpan) lastCountedSpan.innerHTML = countData.count_time;
+                let lastCountValueSpan = document.getElementById(`last-count-value-${skuId}`);
+                
+                if (countInput && latestCounts[skuId]) {
+                    countInput.value = latestCounts[skuId].initial_count;
+                    
+                    if (lastCountedSpan) {
+                        lastCountedSpan.innerHTML = latestCounts[skuId].count_time;
+                    }
+                    if (lastCountValueSpan) {
+                        lastCountValueSpan.innerHTML = latestCounts[skuId].initial_count;
+                    }
+                    
+                    let row = countInput.closest('tr');
+                    if (row) {
+                        row.setAttribute('data-in-progress', 'true');
+                        row.setAttribute('data-completed', 'false');
+                    }
+                }
             }
             highlightSkusStatus();
         })
-        .catch(err => console.error(err));
-}
-
-// ============================================
-// DISPLAY TABLE
-// ============================================
-function displaySkusWithPagination() {
-    let start = (currentPage - 1) * itemsPerPage;
-    let end = start + itemsPerPage;
-    let pageSkus = filteredSkus.slice(start, end);
-    displaySkus(pageSkus);
-    
-    let totalPages = Math.ceil(filteredSkus.length / itemsPerPage);
-    let paginationDiv = document.getElementById('paginationControls');
-    if (filteredSkus.length > itemsPerPage) {
-        paginationDiv.style.display = 'block';
-        document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages} (${filteredSkus.length} total)`;
-    } else {
-        paginationDiv.style.display = 'none';
-    }
+        .catch(error => console.error('Error loading existing counts:', error));
 }
 
 function displaySkus(skus) {
-    if (!skus || skus.length === 0) {
-        document.getElementById('skusList').innerHTML = '<div class="col-12"><div class="alert alert-warning text-center">No SKUs found</div></div>';
+    let skusListDiv = document.getElementById('skusList');
+    
+    if (!skusListDiv) {
+        console.error("skusList element not found!");
         return;
     }
     
-    let html = `<div class="col-12"><div class="table-responsive">
-        <table class="table table-bordered table-hover table-striped">
-            <thead class="table-dark">
-                <tr>
-                    <th>SKU</th>
-                    <th>Description</th>
-                    <th>Day<br>Cat</th>
-                    <th>Last<br>Date</th>
-                    <th>Last<br>Count</th>
-                    <th>Container<br>Qty</th>
-                    <th>Container Details</th>
-                    <th>Final<br>Expected</th>
-                    <th>Kenneth's<br>Inv</th>
-                    <th>Current Count</th>
-                    <th>Last Counted Date</th>
-                    <th>Prev<br>Count</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>`;
-    
-    for (let sku of skus) {
-        let isCompleted = sku.has_count && sku.is_completed && !sku.is_expired;
-        let isInProgress = sku.in_progress || (sku.has_count && !sku.is_completed);
-        let isExpired = sku.is_expired;
-        let hasCount = sku.has_count && !isExpired;
-        
-        let rowClass = '';
-        let statusBadge = '';
-        
-        if (isExpired) {
-            rowClass = 'sku-needs-count';
-            statusBadge = '<span class="badge bg-warning">Expired</span>';
-        } else if (isCompleted) {
-            rowClass = 'sku-completed';
-            statusBadge = '<span class="badge bg-success">Completed</span>';
-        } else if (isInProgress) {
-            rowClass = 'sku-in-progress';
-            statusBadge = '<span class="badge bg-primary">In Progress</span>';
-        } else {
-            rowClass = 'sku-needs-count';
-            statusBadge = '<span class="badge bg-warning">Needs Count</span>';
-        }
-        
-        if (sku.bypass_recount) statusBadge = '<span class="badge bg-secondary">Bypass</span>';
-        
-        let containerDetails = sku.container_details || '-';
-        if (containerDetails.length > 30) containerDetails = containerDetails.substring(0, 30) + '...';
-        
-        html += `<tr id="sku-row-${sku.id}" class="${rowClass}" data-sku-id="${sku.id}">
-            <td><strong>${escapeHtml(sku.sku)}</strong></td>
-            <td>${escapeHtml(sku.description || '-')}</td>
-            <td>${escapeHtml(sku.category || '-')}</td>
-            <td>${escapeHtml(sku.last_count_date?.split(' ')[0] || '-')}</td>
-            <td class="fw-bold">${sku.last_count || 0}</td>
-            <td>${sku.total_container_qty || 0}</td>
-            <td><small>${escapeHtml(containerDetails)}</small></td>
-            <td class="fw-bold text-dark">${sku.final_expected_count || 0}</td>
-            <td class="fw-bold text-dark">${sku.kenneth_inventory || 0}</td>
-            <td><input type="text" class="form-control initial-count" data-sku-id="${sku.id}" style="min-width:90px" placeholder="Enter count" inputmode="numeric" value="${hasCount && sku.final_count ? sku.final_count : ''}"></td>
-            <td><span id="last-counted-${sku.id}">${hasCount && sku.count_time ? sku.count_time : '-'}</span></td>
-            <td><span id="prev-count-${sku.id}">${hasCount && sku.final_count ? sku.final_count : '-'}</span></td>
-            <td>${statusBadge}</td>
-        </tr>`;
+    if (!skus || skus.length === 0) {
+        skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-warning text-center">No SKUs found. Try different filters.</div></div>';
+        return;
     }
     
-    html += `</tbody></table></div></div>`;
-    document.getElementById('skusList').innerHTML = html;
+    let html = '<div class="col-12"><div class="table-responsive"><table class="table table-bordered table-hover table-striped">';
+    html += '<thead class="table-dark">';
+    html += '<tr>';
+    html += '<th>SKU</th>';
+    html += '<th>Description (Item Category)</th>';
+    html += '<th>Day Category</th>';
+    html += '<th>Last Count Date</th>';
+    html += '<th>Last Count</th>';
+    html += '<th>Container Qty</th>';
+    html += '<th>Container Details</th>';
+    html += '<th>Final Expected</th>';
+    html += '<th>Kenneth\'s Inv</th>';
+    html += '<th>Current Count</th>';
+    html += '<th>Last Counted Date</th>';
+    html += '<th>Previous Count</th>';
+    html += '<th>Status</th>';
+    html += '</tr>';
+    html += '</thead><tbody>';
     
-    // Bind input events
-    setTimeout(() => {
-        document.querySelectorAll('.initial-count').forEach(input => {
-            input.addEventListener('input', () => highlightSkusStatus());
-            input.addEventListener('blur', function() {
-                let val = this.value;
-                if (val && (isNaN(val) || val.includes('.') || parseFloat(val) < 0)) {
-                    alert('Please enter a valid whole number');
-                    this.value = '';
-                }
-            });
-            input.addEventListener('keypress', (e) => {
-                if (!/[\d]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'Tab' && e.key !== 'Enter') {
-                    e.preventDefault();
-                }
-            });
-        });
-        highlightSkusStatus();
-    }, 50);
-}
-
-function highlightSkusStatus() {
-    let counted = 0;
-    document.querySelectorAll('.initial-count').forEach(input => {
-        let row = input.closest('tr');
-        if (!row) return;
-        let val = input.value;
-        if (val && val !== '') {
-            counted++;
-            row.classList.add('sku-typing');
-            row.classList.remove('sku-needs-count', 'sku-in-progress', 'sku-completed');
-        } else {
-            row.classList.remove('sku-typing');
-            let hasCount = row.querySelector('#prev-count-') && row.querySelector('#prev-count-').innerHTML !== '-';
-            if (hasCount) row.classList.add('sku-in-progress');
-            else row.classList.add('sku-needs-count');
-            row.classList.remove('sku-completed');
+    for (let i = 0; i < skus.length; i++) {
+        let sku = skus[i];
+        let statusBadge = '';
+        let existingCountTime = '';
+        let finalCountValue = '';
+        let isInProgress = false;
+        let isCompleted = false;
+        let isExpired = false;
+        let rowClass = '';
+        let existingCountValue = '';
+        
+        if (sku.has_count === true && !sku.in_progress && sku.is_completed === true && !sku.is_expired) {
+            existingCountTime = sku.count_time || '';
+            finalCountValue = sku.final_count;
+            isCompleted = true;
+            rowClass = 'sku-completed';
+            statusBadge = '<span class="badge bg-success">Completed (ready for next count)</span>';
         }
-    });
+        else if (sku.is_expired === true) {
+            isExpired = true;
+            rowClass = 'sku-needs-count';
+            statusBadge = '<span class="badge bg-warning">Expired - Needs Recount</span>';
+        }
+        else if (sku.in_progress === true || (sku.has_count === true && sku.current_count !== undefined && sku.current_count !== null && sku.current_count !== '')) {
+            existingCountValue = sku.current_count;
+            existingCountTime = sku.count_time || '';
+            finalCountValue = sku.final_count || sku.current_count;
+            isInProgress = true;
+            rowClass = 'sku-in-progress';
+            statusBadge = '<span class="badge bg-primary">In Progress</span>';
+        }
+        
+        if (sku.bypass_recount) {
+            statusBadge = '<span class="badge bg-warning">Bypass Recount</span>';
+        }
+        
+        let containerDetails = sku.container_details || '-';
+        if (containerDetails.length > 50) {
+            containerDetails = containerDetails.substring(0, 50) + '...';
+        }
+        
+        let lastCountDate = sku.last_count_date || '-';
+        if (lastCountDate !== '-' && lastCountDate.length > 10) {
+            lastCountDate = lastCountDate.split(' ')[0];
+        }
+        
+        let inputValue = (isInProgress && existingCountValue) ? existingCountValue : '';
+        let inputPlaceholder = 'Enter count';
+        
+        let lastCountClass = 'fw-bold text-dark';
+        let finalExpectedClass = 'fw-bold text-dark';
+        let kennethClass = 'fw-bold text-dark';
+        
+        let rowId = `sku-row-${sku.id}`;
+        
+        html += `<tr id="${rowId}" class="${rowClass}" data-in-progress="${isInProgress}" data-completed="${isCompleted}" data-expired="${isExpired}">`;
+        html += '<td><strong>' + escapeHtml(sku.sku) + '</strong></td>';
+        html += '<td>' + escapeHtml(sku.description || '-') + '</td>';
+        html += '<td>' + escapeHtml(sku.category || '-') + '</td>';
+        html += '<td class="text-nowrap">' + escapeHtml(lastCountDate) + '</td>';
+        html += '<td class="' + lastCountClass + '">' + (sku.last_count || 0) + '</td>';
+        html += '<td>' + (sku.total_container_qty || 0) + '</td>';
+        html += '<td><small>' + escapeHtml(containerDetails) + '</small></td>';
+        html += '<td class="' + finalExpectedClass + '">' + (sku.final_expected_count || 0) + '</td>';
+        html += '<td class="' + kennethClass + '">' + (sku.kenneth_inventory || 0) + '</td>';
+        html += '<td>';
+        html += `<input type="text" class="form-control initial-count" data-sku-id="${sku.id}" style="min-width: 100px; width: 100px;" placeholder="${inputPlaceholder}" inputmode="numeric"`;
+        if (inputValue) {
+            html += ` value="${inputValue}"`;
+        }
+        html += '>';
+        html += '</td>';
+        html += '<td>';
+        if (existingCountTime && !isExpired) {
+            html += `<span id="last-counted-${sku.id}" style="color: #0d6efd; font-weight: bold;">${existingCountTime}</span>`;
+        } else {
+            html += `<span id="last-counted-${sku.id}">-</span>`;
+        }
+        html += '</td>';
+        html += '<td>';
+        if (finalCountValue && !isExpired) {
+            html += `<span id="last-count-value-${sku.id}" style="color: #0d6efd; font-weight: bold;">${finalCountValue}</span>`;
+        } else {
+            html += `<span id="last-count-value-${sku.id}">-</span>`;
+        }
+        html += '</td>';
+        html += '<td>' + statusBadge + '</td>';
+        html += '</tr>';
+    }
     
-    // Update badges in title
-    let title = document.querySelector('h2');
-    if (!title) return;
-    document.querySelectorAll('#completedBadge, #inProgressBadge, #uncountedBadge').forEach(b => b.remove());
+    html += '</tbody></table></div></div>';
     
-    let total = document.querySelectorAll('.initial-count').length;
-    let completed = document.querySelectorAll('.sku-completed').length;
-    let inProgress = document.querySelectorAll('.sku-in-progress').length;
-    let needCount = total - completed - inProgress;
+    let sessionIdFromUrl = getUrlParameter('session_id');
+    if (sessionIdFromUrl && currentSessionId == sessionIdFromUrl && filteredSkus.length > 0) {
+        let banner = `<div class="col-12 mb-3">
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> 
+                <strong>Continuing Session #${currentSessionId}</strong> - Showing ${filteredSkus.length} SKU(s) that have been counted but not completed.
+                <br><small>Click "Apply Filters" to see all SKUs or continue counting these.</small>
+            </div>
+        </div>`;
+        skusListDiv.innerHTML = banner + html;
+    } else {
+        skusListDiv.innerHTML = html;
+    }
     
-    if (completed > 0) title.insertAdjacentHTML('beforeend', `<span id="completedBadge" class="badge bg-success ms-2">${completed} Done</span>`);
-    if (inProgress > 0) title.insertAdjacentHTML('beforeend', `<span id="inProgressBadge" class="badge bg-primary ms-2">${inProgress} In Progress</span>`);
-    if (needCount > 0) title.insertAdjacentHTML('beforeend', `<span id="uncountedBadge" class="badge bg-warning ms-2">${needCount} Need Count</span>`);
+    // Bind events after DOM is updated
+    setTimeout(function() {
+        document.querySelectorAll('.initial-count').forEach(function(input) {
+            if (input) {
+                input.addEventListener('blur', function() {
+                    if (this.value !== '' && this.value !== null) {
+                        validateCountInput(this);
+                    }
+                    highlightSkusStatus();
+                });
+                
+                input.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        this.blur();
+                        return;
+                    }
+                    if (!/[\d]/.test(e.key) && 
+                        e.key !== 'Backspace' && 
+                        e.key !== 'Delete' && 
+                        e.key !== 'Tab' && 
+                        e.key !== 'ArrowLeft' && 
+                        e.key !== 'ArrowRight') {
+                        e.preventDefault();
+                        alert('Only numbers are allowed. Please enter a whole number.');
+                    }
+                });
+                
+                input.addEventListener('input', function() {
+                    let row = this.closest('tr');
+                    if (row) {
+                        row.classList.add('sku-typing');
+                        row.classList.remove('sku-completed', 'sku-in-progress', 'sku-needs-count');
+                    }
+                    highlightSkusStatus();
+                });
+            }
+        });
+        
+        highlightSkusStatus();
+    }, 100);
 }
 
-// ============================================
-// PAGINATION
-// ============================================
 function previousPage() {
     if (currentPage > 1) {
         currentPage--;
@@ -570,127 +1242,366 @@ function nextPage() {
     }
 }
 
-// ============================================
-// SAVE COUNTS
-// ============================================
 function saveAllCounts() {
     let warehouse = document.getElementById('warehouse').value;
     let warehouseDisplay = warehouse === '5thFloor' ? '5th Floor Warehouse' : (warehouse === 'Main' ? 'Main Warehouse' : 'All Warehouses');
     
-    let counts = {};
+    let countInputs = document.querySelectorAll('.initial-count');
+    let totalSkus = countInputs.length;
+    let countedSkus = 0;
+    let blankSkus = 0;
     let invalidSkus = [];
+    let blankSkuNames = [];
     
-    document.querySelectorAll('.initial-count').forEach(input => {
-        let skuId = input.getAttribute('data-sku-id');
-        let val = input.value;
-        if (val && val !== '') {
-            if (isNaN(val) || val.includes('.') || parseFloat(val) < 0 || !Number.isInteger(parseFloat(val))) {
-                let row = input.closest('tr');
-                invalidSkus.push(row?.cells[0]?.innerText || 'Unknown');
+    let hasInvalid = false;
+    for (let i = 0; i < countInputs.length; i++) {
+        let input = countInputs[i];
+        let value = input.value;
+        let row = input.closest('tr');
+        let skuName = row ? row.cells[0].innerText : 'Unknown SKU';
+        
+        if (value !== '' && value !== null) {
+            if (isNaN(value) || value.includes('.') || parseFloat(value) < 0 || !Number.isInteger(parseFloat(value))) {
+                hasInvalid = true;
+                invalidSkus.push(skuName);
+                input.style.border = '2px solid red';
             } else {
-                counts[skuId] = { initial_count: parseInt(val) };
+                input.style.border = '';
+                countedSkus++;
             }
+        } else {
+            blankSkus++;
+            blankSkuNames.push(skuName);
+            input.style.border = '';
         }
-    });
+    }
     
-    if (invalidSkus.length > 0) {
-        alert(`Invalid counts (decimals/negatives):\n${invalidSkus.join('\n')}\n\nPlease correct.`);
+    if (hasInvalid) {
+        alert(`Cannot save. The following SKU(s) have invalid counts (decimals or negatives):\n\n${invalidSkus.map(s => `  • ${s}`).join('\n')}\n\nPlease correct these entries.`);
         return;
     }
     
+    if (blankSkus > 0) {
+        let warningMsg = `⚠️ You have ${blankSkus} SKU(s) with NO count entered.\n\n`;
+        warningMsg += `Total SKUs: ${totalSkus}\n`;
+        warningMsg += `Counted: ${countedSkus}\n`;
+        warningMsg += `Blank: ${blankSkus}\n\n`;
+        
+        if (blankSkus <= 5) {
+            warningMsg += `Uncounted SKUs:\n${blankSkuNames.map(s => `  • ${s}`).join('\n')}\n\n`;
+        } else {
+            warningMsg += `First 5 uncounted: ${blankSkuNames.slice(0, 5).join(', ')}\n`;
+            warningMsg += `... and ${blankSkus - 5} more\n\n`;
+        }
+        
+        warningMsg += `Are you sure you want to save with missing counts?`;
+        
+        if (!confirm(warningMsg)) {
+            return;
+        }
+    }
+    
+    let counts = {};
+    for (let i = 0; i < countInputs.length; i++) {
+        let input = countInputs[i];
+        let skuId = input.getAttribute('data-sku-id');
+        let count = input.value;
+        
+        if (count && count !== '') {
+            counts[skuId] = {initial_count: parseInt(count, 10)};
+        }
+    }
+    
     if (Object.keys(counts).length === 0) {
-        alert('No counts entered');
+        alert('No counts entered. Please enter at least one count before saving.');
         return;
     }
     
     let saveBtn = document.getElementById('saveCounts');
-    saveBtn.disabled = true;
-    saveBtn.innerHTML = 'Saving...';
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+    }
     
     fetch('/counting', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: currentSessionId, warehouse: warehouseDisplay, counts: counts })
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            session_id: currentSessionId,
+            warehouse: warehouseDisplay,
+            counts: counts
+        })
     })
-    .then(res => res.json())
+    .then(response => response.json())
     .then(data => {
         if (data.success) {
             currentSessionId = data.session_id;
+            
             if (data.recount_needed_count > 0) {
+                alert(`⚠️ ${data.recount_needed_count} SKU(s) need recount (discrepancy > 3)\n\nThe recount window will now open.`);
                 checkForRecounts();
             } else {
-                alert(`✓ Saved ${Object.keys(counts).length} counts successfully!`);
-                location.reload();
+                let completeMsg = `✓ Counts saved successfully!\n\n`;
+                completeMsg += `Saved ${Object.keys(counts).length} SKU counts\n`;
+                completeMsg += `✅ No discrepancies found.\n\n`;
+                completeMsg += `Do you want to complete the counting session now?`;
+                
+                if (confirm(completeMsg)) {
+                    completeCountingSession();
+                }
             }
         } else {
             alert('Error saving counts');
         }
     })
-    .catch(err => alert('Error: ' + err))
+    .catch(error => {
+        alert('Error: ' + error);
+    })
     .finally(() => {
-        saveBtn.disabled = false;
-        saveBtn.innerHTML = 'Save All';
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save All Counts';
+        }
     });
 }
 
 function checkForRecounts() {
-    fetch(`/get_recount_list?session_id=${currentSessionId}`)
-        .then(res => res.json())
+    if (!currentSessionId) return;
+    
+    fetch('/get_recount_list?session_id=' + currentSessionId)
+        .then(response => response.json())
         .then(data => {
             if (data.length > 0) {
-                recountItems = data;
-                showRecountModal();
+                showRecountModal(data);
             } else {
-                alert('All counts saved! Session completed.');
-                window.location.href = '/dashboard';
+                fetch('/check_recount_status?session_id=' + currentSessionId)
+                    .then(res => res.json())
+                    .then(status => {
+                        if (!status.has_pending_recounts) {
+                            if (confirm('All counts are valid!\n\nDo you want to complete the counting session now?')) {
+                                completeCountingSession();
+                            }
+                        }
+                    });
             }
         });
 }
 
-function showRecountModal() {
-    let html = '<div class="table-responsive"><table class="table table-bordered"><thead class="table-dark"><tr>';
-    html += '<th>SKU</th><th>Description</th><th>Initial</th><th>Expected</th><th>Kenneth</th><th>Recount</th><th>Remarks</th></tr></thead><tbody>';
+function showRecountModal(recountItems) {
+    let html = '<div class="table-responsive"><table class="table table-bordered">';
+    html += '<thead class="table-dark">';
+    html += '<tr>';
+    html += '<th>SKU</th>';
+    html += '<th>Description</th>';
+    html += '<th>Initial Count</th>';
+    html += '<th>Final Expected Count</th>';
+    html += '<th>Kenneth\'s Inventory</th>';
+    html += '<th>Recount Count</th>';
+    html += '<th>Remarks (Optional)</th>';
+    html += '</tr></thead><tbody>';
     
-    recountItems.forEach(item => {
-        html += `<tr>
-            <td><strong>${escapeHtml(item.sku)}</strong></td>
-            <td>${escapeHtml(item.description || '-')}</td>
-            <td class="bg-warning">${item.initial_count}</td>
-            <td class="bg-info">${item.final_expected_count || 0}</td>
-            <td class="bg-info">${item.kenneth_inventory || 0}</td>
-            <td><input type="text" class="form-control recount-count" data-record-id="${item.id}" inputmode="numeric" style="width:100px"></td>
-            <td><textarea class="form-control recount-remarks" data-record-id="${item.id}" rows="1" style="width:150px"></textarea></td>
-        </tr>`;
-    });
+    for (let i = 0; i < recountItems.length; i++) {
+        let item = recountItems[i];
+        html += '<tr>';
+        html += '<td><strong>' + escapeHtml(item.sku) + '</strong></td>';
+        html += '<td>' + escapeHtml(item.description || '-') + '</td>';
+        html += '<td class="bg-warning">' + (item.initial_count || 0) + '</td>';
+        html += '<td class="bg-info">' + (item.final_expected_count || 0) + '</td>';
+        html += '<td class="bg-info">' + (item.kenneth_inventory || 0) + '</td>';
+        html += '<td><input type="text" class="form-control recount-count" data-record-id="' + item.id + '" style="width: 120px;" placeholder="Enter whole number" inputmode="numeric"></td>';
+        html += '<td><textarea class="form-control recount-remarks" data-record-id="' + item.id + '" rows="2" placeholder="Optional: Reason for discrepancy (e.g., 9 were damaged)" style="width: 250px;"></textarea></td>';
+        html += '</tr>';
+    }
+    
     html += '</tbody></table></div>';
-    document.getElementById('recountModalBody').innerHTML = html;
-    new bootstrap.Modal(document.getElementById('recountModal')).show();
+    html += '<div class="mt-3 d-flex justify-content-between">';
+    html += '<button class="btn btn-secondary" onclick="closeRecountModal()">Close</button>';
+    html += '<button class="btn btn-success" onclick="saveRecounts()">Save Recounts & Complete Session</button>';
+    html += '</div>';
+    
+    let modalHtml = `
+        <div class="modal fade" id="recountModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning">
+                        <h5 class="modal-title">⚠️ Recount Required</h5>
+                        <button type="button" class="btn-close" onclick="closeRecountModal()"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-danger">
+                            <strong>Important:</strong> The following SKUs have discrepancies greater than 3 units.
+                            Please recount and enter the correct quantity.
+                        </div>
+                        ${html}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    let existingModal = document.getElementById('recountModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    document.querySelectorAll('.recount-count').forEach(input => {
+        input.addEventListener('blur', function() {
+            let value = this.value;
+            if (value !== '' && value !== null) {
+                if (isNaN(value) || value.includes('.') || parseFloat(value) < 0 || !Number.isInteger(parseFloat(value))) {
+                    alert('Invalid count. Please enter a whole number (no decimals, no negatives).');
+                    this.value = '';
+                    this.focus();
+                } else {
+                    this.value = parseInt(value, 10);
+                }
+            }
+        });
+        
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                this.blur();
+                return;
+            }
+            if (!/[\d]/.test(e.key) && 
+                e.key !== 'Backspace' && 
+                e.key !== 'Delete' && 
+                e.key !== 'Tab' && 
+                e.key !== 'ArrowLeft' && 
+                e.key !== 'ArrowRight') {
+                e.preventDefault();
+                alert('Only numbers are allowed.');
+            }
+        });
+    });
+    
+    let modal = new bootstrap.Modal(document.getElementById('recountModal'), {
+        backdrop: 'static',
+        keyboard: false
+    });
+    modal.show();
 }
 
 function closeRecountModal() {
-    bootstrap.Modal.getInstance(document.getElementById('recountModal')).hide();
+    let modal = document.getElementById('recountModal');
+    if (modal) {
+        let bsModal = bootstrap.Modal.getInstance(modal);
+        if (bsModal) bsModal.hide();
+        modal.remove();
+    }
 }
 
 function saveRecounts() {
     let recounts = [];
-    document.querySelectorAll('.recount-count').forEach(input => {
+    let countInputs = document.querySelectorAll('.recount-count');
+    let hasError = false;
+    let errorMessage = '';
+    
+    for (let i = 0; i < countInputs.length; i++) {
+        let input = countInputs[i];
         let recordId = input.getAttribute('data-record-id');
-        let remarks = document.querySelector(`.recount-remarks[data-record-id="${recordId}"]`)?.value || '';
-        recounts.push({ record_id: recordId, recount_count: parseInt(input.value) || 0, remarks: remarks });
-    });
+        let recountCount = input.value;
+        let remarks = document.querySelector('.recount-remarks[data-record-id="' + recordId + '"]').value;
+        
+        let row = input.closest('tr');
+        let skuName = row ? row.cells[0].innerText : 'Unknown';
+        
+        if (!recountCount || recountCount === '') {
+            hasError = true;
+            errorMessage += `• Please enter recount count for ${skuName}\n`;
+            input.style.border = '2px solid red';
+        } else if (isNaN(recountCount) || recountCount.includes('.') || parseFloat(recountCount) < 0 || !Number.isInteger(parseFloat(recountCount))) {
+            hasError = true;
+            errorMessage += `• Invalid recount count for ${skuName}. Please enter a whole number (no decimals)\n`;
+            input.style.border = '2px solid red';
+        } else {
+            input.style.border = '';
+        }
+        
+        let remarksInput = document.querySelector('.recount-remarks[data-record-id="' + recordId + '"]');
+        if (remarksInput) remarksInput.style.border = '';
+        
+        recounts.push({
+            record_id: recordId,
+            recount_count: recountCount ? parseInt(recountCount, 10) : 0,
+            remarks: remarks || ''
+        });
+    }
+    
+    if (hasError) {
+        alert('Please fix the following issues:\n\n' + errorMessage);
+        return;
+    }
+    
+    let saveBtn = document.querySelector('#recountModal .btn-success');
+    let originalText = saveBtn ? saveBtn.textContent : 'Saving...';
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+    }
     
     fetch('/save_recount', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recounts: recounts })
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({recounts: recounts})
     })
-    .then(res => res.json())
+    .then(response => response.json())
     .then(data => {
         if (data.success) {
-            closeRecountModal();
-            alert('Recounts saved! Session completed.');
-            window.location.href = '/dashboard';
+            let modal = document.getElementById('recountModal');
+            if (modal) {
+                let bsModal = bootstrap.Modal.getInstance(modal);
+                if (bsModal) bsModal.hide();
+                modal.remove();
+            }
+            completeCountingSession();
+        } else {
+            alert('Error saving recounts');
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = originalText;
+            }
         }
+    })
+    .catch(error => {
+        alert('Error: ' + error);
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalText;
+        }
+    });
+}
+
+function completeCountingSession() {
+    if (!currentSessionId) {
+        alert('Please save counts first');
+        return;
+    }
+    
+    fetch('/complete_counting', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({session_id: currentSessionId})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✓ Counting session completed successfully!');
+            window.location.href = '/dashboard';
+        } else {
+            alert(data.message || 'Error completing session');
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error);
     });
 }
 
@@ -699,135 +1610,67 @@ function completeCounting() {
         alert('Please save counts first');
         return;
     }
-    fetch(`/check_recount_status?session_id=${currentSessionId}`)
-        .then(res => res.json())
+    
+    fetch('/check_recount_status?session_id=' + currentSessionId)
+        .then(response => response.json())
         .then(data => {
             if (data.has_pending_recounts) {
-                alert(`You have ${data.count} pending recount(s). Complete them first.`);
-            } else if (confirm('Complete counting session?')) {
-                fetch('/complete_counting', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ session_id: currentSessionId })
-                })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('Session completed!');
-                        window.location.href = '/dashboard';
-                    }
-                });
+                alert(`Cannot complete session. You have ${data.count} pending recount(s) that need to be completed first.`);
+                return;
+            }
+            
+            if (confirm('Complete this counting session? This will mark all counts as final.')) {
+                completeCountingSession();
             }
         });
 }
 
-// ============================================
-// BARCODE SCANNER
-// ============================================
-async function startBarcodeScanner() {
-    if (isScannerActive) return;
-    if (filteredSkus.length === 0) {
-        alert('Please load SKUs first by applying filters');
-        return;
-    }
-    
-    new bootstrap.Modal(document.getElementById('scannerModal')).show();
-    
-    if (html5QrCode) {
-        try { await html5QrCode.stop(); } catch(e) {}
-        html5QrCode = null;
-    }
-    document.getElementById('qr-reader').innerHTML = '';
-    
-    html5QrCode = new Html5Qrcode("qr-reader");
-    isScannerActive = true;
-    
-    try {
-        await html5QrCode.start(
-            { facingMode: "environment" },
-            { fps: 15, qrbox: { width: 280, height: 280 } },
-            (decodedText) => {
-                stopBarcodeScanner();
-                findSkuByBarcode(decodedText);
-            },
-            (errorMessage) => {}
-        );
-    } catch(err) {
-        console.error(err);
-        isScannerActive = false;
-    }
-}
-
-function stopBarcodeScanner() {
-    isScannerActive = false;
-    if (html5QrCode) {
-        html5QrCode.stop().catch(e => {});
-        html5QrCode = null;
-    }
-    bootstrap.Modal.getInstance(document.getElementById('scannerModal'))?.hide();
-    document.getElementById('qr-reader').innerHTML = '';
-}
-
-function manualBarcodeEntry() {
-    let code = prompt('Enter barcode/QR code:');
-    if (code) findSkuByBarcode(code);
-}
-
-function findSkuByBarcode(scannedText) {
-    let searchTerm = scannedText.toLowerCase();
-    let foundIndex = filteredSkus.findIndex(sku => 
-        sku.sku.toLowerCase() === searchTerm || 
-        sku.sku.toLowerCase().includes(searchTerm)
-    );
-    
-    if (foundIndex !== -1) {
-        let targetPage = Math.floor(foundIndex / itemsPerPage) + 1;
-        if (targetPage !== currentPage) {
-            currentPage = targetPage;
-            displaySkusWithPagination();
-            setTimeout(() => {
-                let row = document.getElementById(`sku-row-${filteredSkus[foundIndex].id}`);
-                if (row) {
-                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    row.style.backgroundColor = '#90EE90';
-                    setTimeout(() => { if (row) row.style.backgroundColor = ''; }, 3000);
-                }
-            }, 300);
-        } else {
-            let row = document.getElementById(`sku-row-${filteredSkus[foundIndex].id}`);
-            if (row) {
-                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                row.style.backgroundColor = '#90EE90';
-                setTimeout(() => { if (row) row.style.backgroundColor = ''; }, 3000);
-            }
-        }
-        showToast(`Found: ${filteredSkus[foundIndex].sku}`, 'success');
-    } else {
-        showToast(`SKU "${scannedText}" not found`, 'danger');
-        document.getElementById('searchSku').value = scannedText;
-        applyFilters();
-    }
-}
-
-// ============================================
-// INITIALIZATION
-// ============================================
+// Event listeners with null checks
 document.addEventListener('DOMContentLoaded', function() {
-    filterItemCategoriesByWarehouse();
+    const warehouseSelect = document.getElementById('warehouse');
+    const itemCategorySelect = document.getElementById('itemCategory');
+    const scannerModal = document.getElementById('scannerModal');
     
-    document.getElementById('warehouse').addEventListener('change', () => { filterItemCategoriesByWarehouse(); applyFilters(); });
-    document.getElementById('itemCategory').addEventListener('change', () => { updateDayCategories(); applyFilters(); });
-    document.getElementById('searchSku').addEventListener('keypress', (e) => { if (e.key === 'Enter') applyFilters(); });
-    
-    let sessionId = getUrlParameter('session_id');
-    if (sessionId) {
-        currentSessionId = parseInt(sessionId);
-        applyFilters();
-    } else {
-        fetch('/api/active_session').then(r => r.json()).then(data => {
-            if (data.session_id) currentSessionId = data.session_id;
+    if (warehouseSelect) {
+        warehouseSelect.addEventListener('change', function() {
+            filterItemCategoriesByWarehouse();
             applyFilters();
-        }).catch(() => applyFilters());
+        });
+    }
+    
+    if (itemCategorySelect) {
+        itemCategorySelect.addEventListener('change', function() {
+            updateDayCategories();
+            applyFilters();
+        });
+    }
+    
+    if (scannerModal) {
+        scannerModal.addEventListener('hidden.bs.modal', function () {
+            stopBarcodeScanner();
+        });
+    }
+    
+    filterItemCategoriesByWarehouse();
+    setupSmartSearch();
+    
+    let sessionIdFromUrl = getUrlParameter('session_id');
+    if (sessionIdFromUrl) {
+        currentSessionId = parseInt(sessionIdFromUrl);
+        loadInProgressSkus();
+    } else {
+        fetch('/api/active_session')
+            .then(response => response.json())
+            .then(data => {
+                if (data.session_id) {
+                    currentSessionId = data.session_id;
+                }
+                applyFilters();
+            })
+            .catch(error => {
+                console.error('Error checking active session:', error);
+                applyFilters();
+            });
     }
 });
 </script>
