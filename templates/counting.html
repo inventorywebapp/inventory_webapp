@@ -355,21 +355,27 @@ let skuSearchIndex = {};
 function buildSearchIndex() {
     skuSearchIndex = {
         exact: new Map(),
-        exactLower: new Map(),
-        contains: new Map()
+        lower: new Map(),
+        normalized: new Map(),
+        keywords: new Map()
     };
     
     for (const sku of allSkus) {
-        // Exact match maps
         skuSearchIndex.exact.set(sku.sku, sku);
-        skuSearchIndex.exactLower.set(sku.sku.toLowerCase(), sku);
+        skuSearchIndex.lower.set(sku.sku.toLowerCase(), sku);
+        const normalized = normalizeString(sku.sku);
+        skuSearchIndex.normalized.set(normalized, sku);
         
-        // For contains matching (fallback)
-        const key = sku.sku.toLowerCase();
-        if (!skuSearchIndex.contains.has(key)) {
-            skuSearchIndex.contains.set(key, []);
+        const keywords = sku.sku.split(/[-_\s]+/);
+        for (const kw of keywords) {
+            if (kw.length > 2) {
+                const kwLower = kw.toLowerCase();
+                if (!skuSearchIndex.keywords.has(kwLower)) {
+                    skuSearchIndex.keywords.set(kwLower, []);
+                }
+                skuSearchIndex.keywords.get(kwLower).push(sku);
+            }
         }
-        skuSearchIndex.contains.get(key).push(sku);
     }
     console.log("Search index built with", allSkus.length, "SKUs");
 }
@@ -407,113 +413,125 @@ function manualBarcodeEntry() {
     }
 }
 
-// FIXED: Priority EXACT match FIRST, then partial, then keyword
 function intelligentSkuSearch(scannedText) {
     if (allSkus.length === 0) {
-        showToast("SKU data not loaded. Please refresh.", "error");
+        alert("SKU data not loaded. Please refresh the page.");
         return;
     }
     
     console.log("=== INTELLIGENT SKU SEARCH ===");
     console.log("Raw scanned:", scannedText);
     
-    let cleanedScan = scannedText.trim();
-    let cleanedScanLower = cleanedScan.toLowerCase();
+    let matches = [];
+    let searchVariations = [];
     
-    // ========== STEP 1: EXACT MATCH (CASE-INSENSITIVE) ==========
-    let exactMatch = null;
+    const original = scannedText;
+    const lower = original.toLowerCase();
+    const normalized = normalizeString(original);
     
-    // Check exact match first (most important)
-    if (skuSearchIndex.exact.has(cleanedScan)) {
-        exactMatch = skuSearchIndex.exact.get(cleanedScan);
-        console.log(`✅ EXACT MATCH found: ${exactMatch.sku}`);
-    } else if (skuSearchIndex.exactLower.has(cleanedScanLower)) {
-        exactMatch = skuSearchIndex.exactLower.get(cleanedScanLower);
-        console.log(`✅ EXACT MATCH (case-insensitive): ${exactMatch.sku}`);
+    const skuPatterns = [
+        original, lower, normalized,
+        original.replace(/[^A-Za-z0-9-]/g, ''),
+        original.replace(/[^A-Za-z0-9]/g, ''),
+        original.replace(/https?:\/\//i, '').replace(/www\./i, '').split('/').pop(),
+        original.match(/[A-Z0-9-]{3,}/i)?.[0] || '',
+        original.replace(/\s+/g, '-'),
+        original.replace(/-/g, ' ')
+    ];
+    
+    for (const v of skuPatterns) {
+        if (v && v.length > 2 && !searchVariations.includes(v)) {
+            searchVariations.push(v);
+        }
     }
     
-    // If exact match found, jump directly to it
-    if (exactMatch) {
-        handleExactMatch(exactMatch);
-        return;
+    console.log("Search variations:", searchVariations.slice(0, 5));
+    
+    for (const variant of searchVariations) {
+        if (skuSearchIndex.exact.has(variant)) {
+            matches.push({ sku: skuSearchIndex.exact.get(variant), score: 100, type: 'EXACT' });
+        }
+        if (skuSearchIndex.lower.has(variant.toLowerCase())) {
+            matches.push({ sku: skuSearchIndex.lower.get(variant.toLowerCase()), score: 98, type: 'CASE_INSENSITIVE' });
+        }
+        const normVariant = normalizeString(variant);
+        if (skuSearchIndex.normalized.has(normVariant)) {
+            matches.push({ sku: skuSearchIndex.normalized.get(normVariant), score: 95, type: 'NORMALIZED' });
+        }
     }
     
-    // ========== STEP 2: NO EXACT MATCH - Search for contains ==========
-    console.log("No exact match found. Searching for partial matches...");
-    
-    let partialMatches = [];
-    let keywordMatches = [];
-    let exactMatchInList = null;
-    
-    // First pass: look for SKUs that CONTAIN the scanned text
-    for (let sku of allSkus) {
-        let skuLower = sku.sku.toLowerCase();
-        
-        // Check if scanned text is CONTAINED in SKU (not just keyword)
-        if (skuLower.includes(cleanedScanLower)) {
-            // Check if it's an exact match within the list (but not exact due to case or spaces)
-            if (skuLower === cleanedScanLower) {
-                exactMatchInList = sku;
-            } else {
-                partialMatches.push({ sku: sku, score: 80, type: "CONTAINS" });
+    if (matches.length === 0) {
+        for (const sku of allSkus) {
+            let bestScore = 0;
+            let matchType = '';
+            
+            for (const variant of searchVariations.slice(0, 3)) {
+                const skuLower = sku.sku.toLowerCase();
+                const variantLower = variant.toLowerCase();
+                
+                if (skuLower === variantLower) {
+                    bestScore = 90;
+                    matchType = 'CASE_INSENSITIVE_CONTAINS';
+                } else if (skuLower.includes(variantLower) && variantLower.length > 3) {
+                    const score = 70 + (variantLower.length / skuLower.length) * 20;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        matchType = 'CONTAINS';
+                    }
+                } else if (variantLower.includes(skuLower) && skuLower.length > 3) {
+                    const score = 60 + (skuLower.length / variantLower.length) * 20;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        matchType = 'PART_OF';
+                    }
+                }
+            }
+            
+            if (bestScore > 0) {
+                matches.push({ sku: sku, score: bestScore, type: matchType });
             }
         }
     }
     
-    // If we found an exact match in the list but not in index (due to formatting)
-    if (exactMatchInList) {
-        console.log(`✅ EXACT MATCH (in list): ${exactMatchInList.sku}`);
-        handleExactMatch(exactMatchInList);
-        return;
-    }
-    
-    // ========== STEP 3: FALLBACK - Keyword matching ==========
-    if (partialMatches.length === 0) {
-        console.log("No partial matches. Trying keyword matching...");
-        let keywords = cleanedScan.split(/[-_\s\/]+/).filter(k => k.length > 2);
+    if (matches.length === 0) {
+        const keywords = scannedText.split(/[-_\s\/]+/).filter(k => k.length > 2);
+        const matchedSkus = new Set();
         
-        for (let kw of keywords) {
-            let kwLower = kw.toLowerCase();
-            for (let sku of allSkus) {
-                if (sku.sku.toLowerCase().includes(kwLower)) {
-                    // Avoid duplicates
-                    if (!keywordMatches.some(m => m.sku.id === sku.id)) {
-                        keywordMatches.push({ sku: sku, score: 50, type: "KEYWORD" });
+        for (const kw of keywords) {
+            const kwLower = kw.toLowerCase();
+            if (skuSearchIndex.keywords.has(kwLower)) {
+                for (const sku of skuSearchIndex.keywords.get(kwLower)) {
+                    if (!matchedSkus.has(sku.id)) {
+                        matchedSkus.add(sku.id);
+                        let score = 50;
+                        if (sku.sku.toLowerCase().includes(kwLower)) score = 60;
+                        matches.push({ sku: sku, score: score, type: 'KEYWORD' });
                     }
                 }
             }
         }
     }
     
-    // Combine results: partial matches first (higher score), then keyword matches
-    let allMatches = [...partialMatches, ...keywordMatches];
-    
-    // Remove duplicates
-    let uniqueMatches = [];
-    let seenIds = new Set();
-    for (let match of allMatches) {
+    const uniqueMatches = [];
+    const seenIds = new Set();
+    for (const match of matches.sort((a, b) => b.score - a.score)) {
         if (!seenIds.has(match.sku.id)) {
             seenIds.add(match.sku.id);
             uniqueMatches.push(match);
         }
     }
     
-    console.log(`Found ${uniqueMatches.length} matches (partial: ${partialMatches.length}, keyword: ${keywordMatches.length})`);
+    console.log(`Found ${uniqueMatches.length} matches`);
     
-    // ========== STEP 4: Handle results ==========
     if (uniqueMatches.length === 0) {
-        // No matches at all
         const sampleSkus = allSkus.slice(0, 5).map(s => s.sku).join(', ');
-        showToast(`❌ "${scannedText}" not found in database`, "error");
-        if (confirm(`"${scannedText}" not found.\n\nExample SKUs:\n${sampleSkus}\n\nWould you like to search manually?`)) {
-            document.getElementById('searchSku').value = scannedText;
-            applyFilters();
-        }
+        alert(`❌ "${scannedText}" not found in database.\n\nPossible reasons:\n• QR code may contain different format\n• SKU may not exist in current data\n\nExample SKUs in system:\n${sampleSkus}...\n\nTry searching manually.`);
+        document.getElementById('searchSku').value = scannedText;
+        applyFilters();
         
     } else if (uniqueMatches.length === 1) {
-        // Single match - select it
         const matched = uniqueMatches[0];
-        console.log(`✅ SELECTED (single): ${matched.sku.sku} (${matched.type})`);
+        console.log(`✅ SELECTED: ${matched.sku.sku} (${matched.type})`);
         
         document.getElementById('searchSku').value = matched.sku.sku;
         applyFilters();
@@ -531,67 +549,11 @@ function intelligentSkuSearch(scannedText) {
         }, 500);
         
     } else {
-        // Multiple matches - show selection dialog
         showSkuSelectionDialog(uniqueMatches, scannedText);
     }
 }
 
-// Helper function to handle exact match and jump to SKU
-function handleExactMatch(sku) {
-    console.log(`🎯 EXACT MATCH HANDLER: ${sku.sku}`);
-    
-    // Store the matched SKU
-    let matchedSku = sku;
-    
-    // Check if SKU is in current filtered list
-    let newIndex = filteredSkus.findIndex(s => s.id === matchedSku.id);
-    
-    if (newIndex !== -1) {
-        // SKU is in current view - jump to it
-        currentIndex = newIndex;
-        displayCurrentSku();
-        showToast(`✓ ${matchedSku.sku}`, "success");
-        
-        // Highlight the reference card
-        let refCard = document.querySelector('.card-header.bg-dark');
-        if (refCard) {
-            let originalBg = refCard.style.backgroundColor;
-            refCard.style.backgroundColor = '#28a745';
-            setTimeout(() => {
-                if (refCard) refCard.style.backgroundColor = originalBg;
-            }, 500);
-        }
-    } else {
-        // SKU exists but not in current filters - offer to adjust filters
-        if (confirm(`✓ Found "${matchedSku.sku}" but it's not in current filters.\n\nClick OK to clear filters and show this SKU.`)) {
-            // Reset filters
-            document.getElementById('warehouse').value = 'All';
-            document.getElementById('dayCategory').value = 'All';
-            document.getElementById('itemCategory').value = 'All';
-            document.getElementById('searchSku').value = matchedSku.sku;
-            
-            // Apply filters and wait for load
-            applyFilters();
-            
-            // After filters apply, find and jump to this SKU
-            setTimeout(() => {
-                let newIdx = filteredSkus.findIndex(s => s.id === matchedSku.id);
-                if (newIdx !== -1) {
-                    currentIndex = newIdx;
-                    displayCurrentSku();
-                    showToast(`✓ ${matchedSku.sku}`, "success");
-                } else {
-                    showToast(`SKU found but not in filtered results. Try removing filters.`, "warning");
-                }
-            }, 1500);
-        }
-    }
-}
-
 function showSkuSelectionDialog(matches, originalScan) {
-    // Sort matches by score (higher first)
-    matches.sort((a, b) => b.score - a.score);
-    
     const modalHtml = `
         <div class="modal fade" id="selectionModal" tabindex="-1">
             <div class="modal-dialog modal-lg">
@@ -603,7 +565,7 @@ function showSkuSelectionDialog(matches, originalScan) {
                     <div class="modal-body">
                         <p>Scanned: <strong>${escapeHtml(originalScan)}</strong></p>
                         <p>Found <strong>${matches.length}</strong> matching SKUs. Please select the correct one:</p>
-                        <div class="list-group" style="max-height: 400px; overflow-y: auto;">
+                        <div class="list-group">
                             ${matches.map((m, idx) => `
                                 <button type="button" class="list-group-item list-group-item-action" onclick="selectSkuFromModal(${m.sku.id}, '${escapeHtml(m.sku.sku)}')">
                                     <div class="d-flex justify-content-between align-items-center">
@@ -611,7 +573,7 @@ function showSkuSelectionDialog(matches, originalScan) {
                                             <strong>${escapeHtml(m.sku.sku)}</strong>
                                             <br><small class="text-muted">${escapeHtml(m.sku.description || 'No description')}</small>
                                         </div>
-                                        <span class="badge bg-secondary">${m.type}</span>
+                                        <span class="badge bg-secondary">${m.type} (${Math.round(m.score)}%)</span>
                                     </div>
                                 </button>
                             `).join('')}
@@ -637,35 +599,37 @@ function selectSkuFromModal(skuId, skuCode) {
     const modal = bootstrap.Modal.getInstance(document.getElementById('selectionModal'));
     if (modal) modal.hide();
     
-    // Find the SKU in allSkus
-    const sku = allSkus.find(s => s.id === skuId);
-    if (sku) {
-        handleExactMatch(sku);
-    } else {
-        document.getElementById('searchSku').value = skuCode;
-        applyFilters();
-        showToast(`✓ Selected: ${skuCode}`, "success");
-    }
+    document.getElementById('searchSku').value = skuCode;
+    applyFilters();
+    showToast(`✓ Selected: ${skuCode}`, "success");
+    
+    setTimeout(() => {
+        const row = document.getElementById(`sku-row-${skuId}`);
+        if (row) {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            row.style.backgroundColor = '#90EE90';
+            setTimeout(() => {
+                if (row) row.style.backgroundColor = '';
+            }, 3000);
+        }
+    }, 500);
 }
 
 function showToast(message, type = 'info') {
     const toast = document.createElement('div');
     toast.className = `alert alert-${type === 'success' ? 'success' : (type === 'error' ? 'danger' : 'info')} alert-dismissible fade show position-fixed`;
     toast.style.bottom = '20px';
-    toast.style.left = '50%';
-    toast.style.transform = 'translateX(-50%)';
+    toast.style.right = '20px';
     toast.style.zIndex = '9999';
-    toast.style.minWidth = '250px';
-    toast.style.maxWidth = '90%';
-    toast.style.textAlign = 'center';
+    toast.style.minWidth = '300px';
     toast.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
     document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+    setTimeout(() => toast.remove(), 4000);
 }
 
 function escapeHtml(text) {
     if (!text) return '';
-    return String(text).replace(/[&<>]/g, function(m) {
+    return text.replace(/[&<>]/g, function(m) {
         if (m === '&') return '&amp;';
         if (m === '<') return '&lt;';
         if (m === '>') return '&gt;';
