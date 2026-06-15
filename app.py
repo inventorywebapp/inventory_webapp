@@ -1709,6 +1709,38 @@ def api_get_audit_logs_paginated():
     })
 
 # ============================================
+# SCANNER ENDPOINT - Get ALL SKUs (no limit)
+# ============================================
+@app.route('/api/get_all_skus')
+@login_required
+def api_get_all_skus():
+    """Get ALL active SKUs without limit - specifically for barcode scanner"""
+    skus = SKU.query.filter_by(is_active=True).all()
+    
+    result = []
+    for sku in skus:
+        result.append({
+            'id': sku.id,
+            'sku': sku.sku,
+            'description': sku.description,
+            'category': sku.category,
+            'last_count_date': sku.last_count_date,
+            'last_count': sku.last_count,
+            'total_container_qty': sku.total_container_qty,
+            'container_details': sku.container_details,
+            'final_expected_count': sku.final_expected_count,
+            'kenneth_inventory': sku.kenneth_inventory,
+            'stock_status': sku.stock_status,
+            'bypass_recount': sku.bypass_recount,
+            'has_count': False,
+            'is_expired': False,
+            'is_completed': False
+        })
+    
+    print(f"🔍 Scanner API: Loaded {len(result)} SKUs", file=sys.stderr)
+    return jsonify(result)
+
+# ============================================
 # MAIN ENTRY POINT
 # ============================================
 if __name__ == '__main__':
