@@ -382,7 +382,7 @@ function manualBarcodeEntry() {
     }
 }
 
-// FIXED: EXACT MATCH FIRST - No fuzzy matching until exact fails
+// FIXED: SIMPLE DIRECT EXACT MATCH - NO FUZZY FIRST
 function intelligentSkuSearch(scannedText) {
     if (allSkus.length === 0) {
         alert("SKU data not loaded. Please refresh the page.");
@@ -390,25 +390,26 @@ function intelligentSkuSearch(scannedText) {
     }
     
     console.log("=== SCANNED:", scannedText);
+    console.log("Total SKUs in memory:", allSkus.length);
     
     let cleanedScan = scannedText.trim();
-    let cleanedScanLower = cleanedScan.toLowerCase();
     
-    // ========== STEP 1: EXACT MATCH (CASE-INSENSITIVE) ==========
+    // ========== DIRECT EXACT MATCH (case-insensitive) ==========
     let exactMatch = null;
     
     for (let sku of allSkus) {
-        if (sku.sku.toLowerCase() === cleanedScanLower) {
+        if (sku.sku.toLowerCase() === cleanedScan.toLowerCase()) {
             exactMatch = sku;
+            console.log("✅ EXACT MATCH FOUND:", sku.sku);
             break;
         }
     }
     
-    // ========== STEP 2: If exact match found, JUMP TO IT ==========
+    // If exact match found, jump to it immediately
     if (exactMatch) {
-        console.log("✅ EXACT MATCH FOUND:", exactMatch.sku);
+        console.log("🎯 JUMPING TO SKU:", exactMatch.sku);
         
-        // Clear search and set to exact match
+        // Set search box to the exact SKU
         document.getElementById('searchSku').value = exactMatch.sku;
         
         // Reset filters to ensure SKU is visible
@@ -431,7 +432,7 @@ function intelligentSkuSearch(scannedText) {
                     if (row) row.style.backgroundColor = '';
                 }, 3000);
             } else {
-                // If row not found, try again after a delay
+                // Try again after a delay
                 setTimeout(() => {
                     let row2 = document.getElementById(`sku-row-${exactMatch.id}`);
                     if (row2) {
@@ -448,127 +449,29 @@ function intelligentSkuSearch(scannedText) {
         return;
     }
     
-    // ========== STEP 3: NO EXACT MATCH - Try partial/contains ==========
-    console.log("No exact match. Searching partial matches...");
-    let matches = [];
+    // ========== NO EXACT MATCH - Show error with similar SKUs ==========
+    console.log("❌ No exact match found for:", cleanedScan);
     
+    // Find similar SKUs for suggestion
+    let similar = [];
     for (let sku of allSkus) {
-        if (sku.sku.toLowerCase().includes(cleanedScanLower)) {
-            matches.push({ sku: sku, type: "CONTAINS" });
+        if (sku.sku.toLowerCase().includes(cleanedScan.toLowerCase()) || 
+            cleanedScan.toLowerCase().includes(sku.sku.toLowerCase().split(' ')[0])) {
+            similar.push(sku);
         }
     }
     
-    // ========== STEP 4: Still no matches? Try keyword ==========
-    if (matches.length === 0) {
-        console.log("No partial matches. Trying keywords...");
-        let keywords = cleanedScan.split(/[-_\s\/]+/).filter(k => k.length > 2);
-        for (let kw of keywords) {
-            let kwLower = kw.toLowerCase();
-            for (let sku of allSkus) {
-                if (sku.sku.toLowerCase().includes(kwLower)) {
-                    if (!matches.some(m => m.sku.id === sku.id)) {
-                        matches.push({ sku: sku, type: "KEYWORD" });
-                    }
-                }
-            }
-        }
-    }
+    let similarList = similar.slice(0, 5).map(s => s.sku).join('\n• ');
     
-    // ========== STEP 5: Handle results ==========
-    if (matches.length === 0) {
-        showToast(`❌ "${scannedText}" not found`, "error");
-        document.getElementById('searchSku').value = scannedText;
-        applyFilters();
-        
-    } else if (matches.length === 1) {
-        let sku = matches[0].sku;
-        console.log(`✅ SINGLE MATCH: ${sku.sku} (${matches[0].type})`);
-        
-        document.getElementById('searchSku').value = sku.sku;
-        applyFilters();
-        showToast(`✓ Found: ${sku.sku}`, "success");
-        
-        setTimeout(() => {
-            let row = document.getElementById(`sku-row-${sku.id}`);
-            if (row) {
-                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                row.style.backgroundColor = '#90EE90';
-                setTimeout(() => {
-                    if (row) row.style.backgroundColor = '';
-                }, 3000);
-            }
-        }, 800);
-        
+    if (similar.length > 0) {
+        alert(`❌ "${cleanedScan}" not found exactly in database.\n\nDid you mean?\n• ${similarList}\n\nPlease check the QR code or SKU spelling.`);
     } else {
-        console.log(`⚠️ Multiple matches (${matches.length}) - showing selection dialog`);
-        showSkuSelectionDialog(matches, scannedText);
+        let sampleSkus = allSkus.slice(0, 5).map(s => s.sku).join('\n• ');
+        alert(`❌ "${cleanedScan}" not found in database.\n\nExample SKUs in system:\n• ${sampleSkus}\n\nPlease check the QR code.`);
     }
-}
-
-function showSkuSelectionDialog(matches, originalScan) {
-    // Limit to first 15 matches
-    let displayMatches = matches.slice(0, 15);
     
-    const modalHtml = `
-        <div class="modal fade" id="selectionModal" tabindex="-1">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title">🔍 Select Correct SKU</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p>Scanned: <strong>${escapeHtml(originalScan)}</strong></p>
-                        <p>Found <strong>${matches.length}</strong> matching SKUs. Please select the correct one:</p>
-                        <div class="list-group" style="max-height: 400px; overflow-y: auto;">
-                            ${displayMatches.map(m => `
-                                <button type="button" class="list-group-item list-group-item-action" onclick="selectSkuFromModal(${m.sku.id}, '${escapeHtml(m.sku.sku)}')">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <strong>${escapeHtml(m.sku.sku)}</strong>
-                                            <br><small class="text-muted">${escapeHtml(m.sku.description || 'No description')}</small>
-                                        </div>
-                                        <span class="badge bg-secondary">${m.type}</span>
-                                    </div>
-                                </button>
-                            `).join('')}
-                        </div>
-                        ${matches.length > 15 ? `<p class="text-muted mt-2">... and ${matches.length - 15} more matches</p>` : ''}
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const existingModal = document.getElementById('selectionModal');
-    if (existingModal) existingModal.remove();
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const modal = new bootstrap.Modal(document.getElementById('selectionModal'));
-    modal.show();
-}
-
-function selectSkuFromModal(skuId, skuCode) {
-    const modal = bootstrap.Modal.getInstance(document.getElementById('selectionModal'));
-    if (modal) modal.hide();
-    
-    document.getElementById('searchSku').value = skuCode;
+    document.getElementById('searchSku').value = cleanedScan;
     applyFilters();
-    showToast(`✓ Selected: ${skuCode}`, "success");
-    
-    setTimeout(() => {
-        const row = document.getElementById(`sku-row-${skuId}`);
-        if (row) {
-            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            row.style.backgroundColor = '#90EE90';
-            setTimeout(() => {
-                if (row) row.style.backgroundColor = '';
-            }, 3000);
-        }
-    }, 500);
 }
 
 function showToast(message, type = 'info') {
@@ -1356,7 +1259,7 @@ function showRecountModal(recountItems) {
     html += '<th>Kenneth\'s Inventory</th>';
     html += '<th>Recount Count</th>';
     html += '<th>Remarks (Optional)</th>';
-    html += '</tr></thead><tbody>';
+    html += '<tr></thead><tbody>';
     
     for (let i = 0; i < recountItems.length; i++) {
         let item = recountItems[i];
