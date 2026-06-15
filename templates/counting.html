@@ -277,7 +277,7 @@ async function startBarcodeScanner() {
     
     try {
         // Load ALL SKUs without any filters
-        const response = await fetch('/get_skus?day_category=All&item_category=All&search=');
+        const response = await fetch('/api/get_all_skus');
         const data = await response.json();
         allSkus = data;
         console.log(`✅ Loaded ${allSkus.length} SKUs into memory`);
