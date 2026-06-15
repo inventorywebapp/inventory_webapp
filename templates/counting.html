@@ -268,7 +268,7 @@ async function startBarcodeScanner() {
         return;
     }
     
-    // FORCE LOAD ALL SKUs from server
+    // FORCE LOAD ALL SKUs from server using the new endpoint
     showToast("Loading all SKUs from database...", "info");
     const resultContainer = document.getElementById('qr-reader-results');
     if (resultContainer) {
@@ -276,7 +276,7 @@ async function startBarcodeScanner() {
     }
     
     try {
-        // Load ALL SKUs without any filters
+        // USE THE NEW ENDPOINT that returns ALL SKUs (no 1000 limit)
         const response = await fetch('/api/get_all_skus');
         const data = await response.json();
         allSkus = data;
@@ -296,6 +296,7 @@ async function startBarcodeScanner() {
         return;
     }
     
+    // Rest of the camera initialization code remains the same...
     const scannerModal = new bootstrap.Modal(document.getElementById('scannerModal'));
     scannerModal.show();
     
@@ -340,10 +341,9 @@ async function startBarcodeScanner() {
             { facingMode: "environment" },
             config,
             (decodedText, decodedResult) => {
-                // Clean the scanned text (remove newlines, carriage returns)
+                // Clean the scanned text
                 let cleanedText = decodedText.trim().replace(/[\n\r]/g, '');
-                console.log(`📸 SCANNED RAW: "${decodedText}"`);
-                console.log(`📸 SCANNED CLEANED: "${cleanedText}"`);
+                console.log(`📸 SCANNED: "${cleanedText}"`);
                 
                 if (resultContainer) {
                     resultContainer.innerHTML = `<div class="alert alert-success">✓ Scanned: ${cleanedText}</div>`;
