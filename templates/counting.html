@@ -1227,6 +1227,8 @@ function checkForRecounts() {
 }
 
 function showRecountModal(recountItems) {
+    console.log("Recount Items:", recountItems); // Debug log
+    
     let html = '<div class="table-responsive"><table class="table table-bordered">';
     html += '<thead class="table-dark">';
     html += '<tr>';
@@ -1237,7 +1239,7 @@ function showRecountModal(recountItems) {
     html += '<th>Kenneth\'s Inventory</th>';
     html += '<th>Recount Count</th>';
     html += '<th>Remarks (Optional)</th>';
-    html += '</table></thead><tbody>';
+    html += '</tr></thead><tbody>';  // ← FIXED: removed extra </table>
     
     for (let i = 0; i < recountItems.length; i++) {
         let item = recountItems[i];
@@ -1285,6 +1287,7 @@ function showRecountModal(recountItems) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
+    // Bind events for recount inputs
     document.querySelectorAll('.recount-count').forEach(input => {
         input.addEventListener('blur', function() {
             let value = this.value;
