@@ -1,33 +1,347 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h4 class="mb-0">Login to Inventory System</h4>
-            </div>
-            <div class="card-body">
-                <form method="POST">
-                    <div class="mb-3">
-                        <label for="username" class="form-label">Username</label>
-                        <input type="text" class="form-control" id="username" name="username" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Password</label>
-                        <input type="password" class="form-control" id="password" name="password" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">Login</button>
-                </form>
-                <hr>
-                <div class="text-center small text-muted">
-                    <p>Default Users:</p>
-                    <p>Admin: admin / admin123</p>
-                    <p>Staff: staff1 / staff123</p>
-                    <p>Audit: audit1 / audit123</p>
+<div class="login-wrapper">
+    <div class="login-container">
+        <div class="login-card">
+            <!-- Brand Header -->
+            <div class="login-header">
+                <div class="login-icon">
+                    <i class="bi bi-box-seam"></i>
                 </div>
+                <h1 class="login-title">Inventory Counting System</h1>
+                <p class="login-subtitle">Sign in to continue counting</p>
+            </div>
+
+            <!-- Login Form -->
+            <form method="POST" class="login-form" id="loginForm">
+                <div class="form-group">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-person"></i></span>
+                        <input type="text" class="form-control" id="username" name="username" 
+                               placeholder="Username" required autofocus>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                        <input type="password" class="form-control" id="password" name="password" 
+                               placeholder="Password" required>
+                        <button type="button" class="input-group-text password-toggle" 
+                                onclick="togglePassword()" tabindex="-1">
+                            <i class="bi bi-eye" id="passwordIcon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-options">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="remember" name="remember">
+                        <label class="form-check-label" for="remember">Remember me</label>
+                    </div>
+                    <a href="#" class="forgot-link">Forgot password?</a>
+                </div>
+
+                <button type="submit" class="btn-login" id="loginBtn">
+                    <span id="loginText">Sign In</span>
+                    <span id="loginSpinner" class="spinner-border spinner-border-sm" style="display: none;" role="status"></span>
+                </button>
+            </form>
+
+            <!-- Footer -->
+            <div class="login-footer">
+                <p>&copy; 2026 Inventory Management System</p>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+.login-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 50%, #084298 100%);
+    padding: 20px;
+    margin: -20px -12px -20px -12px; /* Remove container padding */
+}
+
+.login-container {
+    width: 100%;
+    max-width: 420px;
+    animation: slideUp 0.6s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.login-card {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 40px 35px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    transition: transform 0.3s ease;
+}
+
+.login-card:hover {
+    transform: translateY(-2px);
+}
+
+.login-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.login-icon {
+    width: 70px;
+    height: 70px;
+    background: linear-gradient(135deg, #0d6efd, #0a58ca);
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 15px;
+    font-size: 32px;
+    color: white;
+    box-shadow: 0 8px 25px rgba(13, 110, 253, 0.35);
+}
+
+.login-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 0 0 6px 0;
+    letter-spacing: -0.5px;
+}
+
+.login-subtitle {
+    font-size: 14px;
+    color: #6c757d;
+    margin: 0;
+}
+
+.login-form {
+    margin-top: 25px;
+}
+
+.form-group {
+    margin-bottom: 18px;
+}
+
+.input-group-text {
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-right: none;
+    color: #6c757d;
+    padding: 10px 14px;
+}
+
+.form-control {
+    border: 2px solid #e9ecef;
+    border-left: none;
+    padding: 10px 14px;
+    font-size: 14px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.form-control:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.15);
+}
+
+.password-toggle {
+    cursor: pointer;
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-left: none;
+    transition: background 0.2s ease;
+}
+
+.password-toggle:hover {
+    background: #e9ecef;
+}
+
+.form-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 8px 0 22px 0;
+}
+
+.form-check {
+    padding-left: 22px;
+}
+
+.form-check-input {
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    cursor: pointer;
+}
+
+.form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.form-check-label {
+    font-size: 14px;
+    color: #495057;
+    cursor: pointer;
+    margin-left: 2px;
+}
+
+.forgot-link {
+    font-size: 14px;
+    color: #0d6efd;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.forgot-link:hover {
+    color: #0a58ca;
+    text-decoration: underline;
+}
+
+.btn-login {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, #0d6efd, #0a58ca);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-login:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(13, 110, 253, 0.4);
+}
+
+.btn-login:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.btn-login:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-login::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s ease, height 0.6s ease;
+}
+
+.btn-login:active::after {
+    width: 300px;
+    height: 300px;
+}
+
+.login-footer {
+    text-align: center;
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid #e9ecef;
+}
+
+.login-footer p {
+    font-size: 13px;
+    color: #6c757d;
+    margin: 0;
+}
+
+/* Alert styles inside login */
+.login-card .alert {
+    margin-bottom: 20px;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 14px;
+}
+
+/* Mobile Responsive */
+@media (max-width: 576px) {
+    .login-wrapper {
+        padding: 10px;
+        margin: -12px -8px -12px -8px;
+    }
+    
+    .login-card {
+        padding: 30px 20px;
+        border-radius: 16px;
+    }
+    
+    .login-title {
+        font-size: 20px;
+    }
+    
+    .login-icon {
+        width: 60px;
+        height: 60px;
+        font-size: 26px;
+    }
+    
+    .form-options {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .forgot-link {
+        align-self: flex-end;
+    }
+}
+</style>
+
+<script>
+function togglePassword() {
+    const passwordInput = document.getElementById('password');
+    const icon = document.getElementById('passwordIcon');
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        icon.className = 'bi bi-eye-slash';
+    } else {
+        passwordInput.type = 'password';
+        icon.className = 'bi bi-eye';
+    }
+}
+
+// Loading state on form submit
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('loginForm');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginText = document.getElementById('loginText');
+    const loginSpinner = document.getElementById('loginSpinner');
+    
+    form.addEventListener('submit', function() {
+        loginBtn.disabled = true;
+        loginText.textContent = 'Signing In...';
+        loginSpinner.style.display = 'inline-block';
+    });
+});
+</script>
 {% endblock %}
