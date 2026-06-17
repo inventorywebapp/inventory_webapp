@@ -1945,6 +1945,166 @@ def api_sync_status():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/seed_skus')
+@login_required
+def seed_skus():
+    """Emergency: Add sample SKUs if database is empty"""
+    # Only admins can do this
+    if current_user.role != 'admin':
+        return "❌ Admin access required", 403
+    
+    # Check if we already have SKUs
+    existing_count = SKU.query.count()
+    if existing_count > 0:
+        return f"""
+        <h2>✅ Database already has {existing_count} SKUs</h2>
+        <p>If you're still having issues, <a href="/counting">go to counting page</a> and refresh.</p>
+        <p>If SKUs still don't load, <a href="/seed_skus?force=true">click here to force re-add</a></p>
+        """
+    
+    # Add sample SKUs (50 Visor + other categories)
+    skus_to_add = []
+    
+    # Door Visors (Mon)
+    for i in range(1, 21):
+        skus_to_add.append({
+            'sku': f'Visor-Vios-Gen{i}',
+            'description': 'Door Visor',
+            'category': 'Mon',
+            'final_expected_count': 100 + i,
+            'kenneth_inventory': 95 + i,
+            'total_container_qty': 10,
+            'container_details': f'Box of {i} units',
+            'is_active': True
+        })
+    
+    # Armrest (Tue)
+    for i in range(1, 11):
+        skus_to_add.append({
+            'sku': f'Armrest-Driver-{i}',
+            'description': 'Console/Armrest',
+            'category': 'Tue',
+            'final_expected_count': 50 + i,
+            'kenneth_inventory': 48 + i,
+            'total_container_qty': 5,
+            'container_details': f'Box of {i} armrests',
+            'is_active': True
+        })
+    
+    # Door Handles (Wed)
+    for i in range(1, 11):
+        skus_to_add.append({
+            'sku': f'Door-Handle-{i}',
+            'description': 'Door Handle',
+            'category': 'Wed',
+            'final_expected_count': 120 + i,
+            'kenneth_inventory': 115 + i,
+            'total_container_qty': 8,
+            'container_details': f'Box of {i} handles',
+            'is_active': True
+        })
+    
+    # Trunk Trays (Thu)
+    for i in range(1, 11):
+        skus_to_add.append({
+            'sku': f'Trunk-Tray-{i}',
+            'description': 'Trunk Tray',
+            'category': 'Thu',
+            'final_expected_count': 60 + i,
+            'kenneth_inventory': 58 + i,
+            'total_container_qty': 4,
+            'container_details': f'Box of {i} trays',
+            'is_active': True
+        })
+    
+    # Deep Dish (Fri)
+    for i in range(1, 11):
+        skus_to_add.append({
+            'sku': f'Deep-Dish-{i}',
+            'description': 'Deep Dish-5D',
+            'category': 'Fri',
+            'final_expected_count': 80 + i,
+            'kenneth_inventory': 78 + i,
+            'total_container_qty': 6,
+            'container_details': f'Box of {i} dishes',
+            'is_active': True
+        })
+    
+    # Console (Sat)
+    for i in range(1, 8):
+        skus_to_add.append({
+            'sku': f'Console-{i}',
+            'description': 'Console/Armrest',
+            'category': 'Sat',
+            'final_expected_count': 40 + i,
+            'kenneth_inventory': 38 + i,
+            'total_container_qty': 3,
+            'container_details': f'Box of {i} consoles',
+            'is_active': True
+        })
+    
+    # Add all SKUs
+    count = 0
+    for sku_data in skus_to_add:
+        sku = SKU(
+            sku=sku_data['sku'],
+            description=sku_data['description'],
+            category=sku_data['category'],
+            final_expected_count=sku_data['final_expected_count'],
+            kenneth_inventory=sku_data['kenneth_inventory'],
+            total_container_qty=sku_data['total_container_qty'],
+            container_details=sku_data['container_details'],
+            is_active=sku_data['is_active']
+        )
+        db.session.add(sku)
+        count += 1
+    
+    db.session.commit()
+    
+    # Also create a session for the admin
+    session = CountingSession(
+        user_id=current_user.id,
+        warehouse='Main Warehouse',
+        is_completed=False
+    )
+    db.session.add(session)
+    db.session.commit()
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>SKUs Added!</title>
+        <style>
+            body {{ font-family: system-ui; text-align: center; padding: 50px; background: #f0f8ff; }}
+            .success {{ background: #d4edda; padding: 20px; border-radius: 10px; border: 2px solid #28a745; }}
+            .btn {{ background: #0d6efd; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; margin-top: 20px; }}
+            .btn:hover {{ background: #0a58ca; color: white; }}
+        </style>
+    </head>
+    <body>
+        <div class="success">
+            <h1>✅ SUCCESS!</h1>
+            <h2>Added {count} sample SKUs to your database!</h2>
+            <p>These SKUs are now ready for offline testing.</p>
+            <p>Total SKUs in database: {SKU.query.count()}</p>
+            <a href="/counting" class="btn">📱 Go to Counting Page</a>
+            <br><br>
+            <small>Now you can:</small>
+            <ul style="text-align: left; max-width: 400px; margin: 20px auto;">
+                <li>✅ Search SKUs (online & offline)</li>
+                <li>✅ Scan QR codes</li>
+                <li>✅ Save counts offline</li>
+                <li>✅ Auto-sync when online</li>
+            </ul>
+            <p style="margin-top: 20px; color: #6c757d;">
+                <strong>💡 Next:</strong> Go to counting page, wait 2 seconds, then go offline and test!
+            </p>
+        </div>
+    </body>
+    </html>
+    """
+
 # ============================================
 # MAIN ENTRY POINT
 # ============================================
