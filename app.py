@@ -2105,6 +2105,56 @@ def seed_skus():
     </html>
     """
 
+@app.route('/emergency_seed')
+def emergency_seed():
+    """Emergency seed - bypasses all checks"""
+    import sqlite3
+    import os
+    
+    db_path = 'instance/inventory.db'
+    
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Check current count
+        cursor.execute("SELECT COUNT(*) FROM skus")
+        count = cursor.fetchone()[0]
+        
+        html = f"<h2>Current SKUs: {count}</h2>"
+        
+        if count == 0:
+            html += "<p>Adding sample SKUs...</p>"
+            
+            # Insert 20 sample SKUs
+            for i in range(1, 21):
+                cursor.execute("""
+                    INSERT INTO skus (sku, description, category, final_expected_count, kenneth_inventory, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (f'Visor-Vios-Gen{i}', 'Door Visor', 'Mon', 100 + i, 95 + i, 1))
+            
+            conn.commit()
+            
+            cursor.execute("SELECT COUNT(*) FROM skus")
+            new_count = cursor.fetchone()[0]
+            html += f"<p style='color:green'>✅ Added {new_count} SKUs!</p>"
+        
+        conn.close()
+        
+        html += """
+            <p><a href="/counting">Go to Counting Page</a></p>
+            <script>
+                setTimeout(function() {
+                    window.location.href = '/counting';
+                }, 3000);
+            </script>
+        """
+        
+        return html
+        
+    except Exception as e:
+        return f"<h2>Error: {e}</h2>"
+
 # ============================================
 # MAIN ENTRY POINT
 # ============================================
