@@ -1741,6 +1741,211 @@ def api_get_all_skus():
     return jsonify(result)
 
 # ============================================
+# OFFLINE SYNC ENDPOINTS
+# Add to app.py
+# ============================================
+
+@app.route('/api/save_count', methods=['POST'])
+@login_required
+def api_save_count():
+    """Save a single count (for online/offline sync)"""
+    data = request.json
+    sku_id = data.get('sku_id')
+    count = data.get('count')
+    session_id = data.get('session_id')
+    
+    if not sku_id or count is None:
+        return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+    
+    try:
+        # Get or create session
+        session_obj = CountingSession.query.get(session_id)
+        if not session_obj:
+            session_obj = CountingSession(
+                user_id=current_user.id,
+                warehouse='Main Warehouse'
+            )
+            db.session.add(session_obj)
+            db.session.commit()
+            session_id = session_obj.id
+        
+        # Check if SKU exists
+        sku = SKU.query.get(int(sku_id))
+        if not sku:
+            return jsonify({'success': False, 'message': 'SKU not found'}), 404
+        
+        # Create count record
+        latest_record = CountRecord.query.filter_by(
+            session_id=session_obj.id,
+            sku_id=int(sku_id)
+        ).order_by(CountRecord.version.desc()).first()
+        
+        old_version = latest_record.version if latest_record else 0
+        new_version = old_version + 1
+        
+        recount_needed = check_recount_needed(
+            float(count), 
+            sku.final_expected_count, 
+            sku.kenneth_inventory
+        )
+        
+        new_record = CountRecord(
+            session_id=session_obj.id,
+            sku_id=int(sku_id),
+            initial_count=float(count),
+            is_recount_needed=recount_needed,
+            count_time=get_ph_time(),
+            version=new_version
+        )
+        db.session.add(new_record)
+        
+        # Log audit
+        audit = AuditLog(
+            user_id=current_user.id,
+            action='Count Saved (Offline Sync)',
+            details=f'SKU {sku.sku}: version {new_version} count {count}',
+            ip_address=request.remote_addr
+        )
+        db.session.add(audit)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'session_id': session_obj.id,
+            'record_id': new_record.id,
+            'version': new_version,
+            'recount_needed': recount_needed
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/sync_offline_counts', methods=['POST'])
+@login_required
+def sync_offline_counts():
+    """Sync multiple offline counts (batch)"""
+    data = request.json
+    sku_id = data.get('sku_id')
+    count = data.get('count')
+    session_id = data.get('session_id')
+    timestamp = data.get('timestamp')
+    
+    if not sku_id or count is None:
+        return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+    
+    try:
+        # Check if count already exists (prevent duplicates)
+        existing = CountRecord.query.filter_by(
+            session_id=session_id,
+            sku_id=int(sku_id)
+        ).order_by(CountRecord.version.desc()).first()
+        
+        if existing:
+            # Check if same count already saved
+            if existing.initial_count == float(count):
+                return jsonify({
+                    'success': True,
+                    'message': 'Count already synced',
+                    'duplicate': True
+                })
+        
+        # Save the count
+        session_obj = CountingSession.query.get(session_id)
+        if not session_obj:
+            session_obj = CountingSession(
+                user_id=current_user.id,
+                warehouse='Main Warehouse'
+            )
+            db.session.add(session_obj)
+            db.session.commit()
+            session_id = session_obj.id
+        
+        sku = SKU.query.get(int(sku_id))
+        if not sku:
+            return jsonify({'success': False, 'message': 'SKU not found'}), 404
+        
+        old_version = existing.version if existing else 0
+        new_version = old_version + 1
+        
+        recount_needed = check_recount_needed(
+            float(count), 
+            sku.final_expected_count, 
+            sku.kenneth_inventory
+        )
+        
+        # Parse timestamp if provided
+        count_time = get_ph_time()
+        if timestamp:
+            try:
+                count_time = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            except:
+                pass
+        
+        new_record = CountRecord(
+            session_id=session_obj.id,
+            sku_id=int(sku_id),
+            initial_count=float(count),
+            is_recount_needed=recount_needed,
+            count_time=count_time,
+            version=new_version
+        )
+        db.session.add(new_record)
+        
+        audit = AuditLog(
+            user_id=current_user.id,
+            action='Count Synced (Offline)',
+            details=f'SKU {sku.sku}: offline sync version {new_version} count {count}',
+            ip_address=request.remote_addr
+        )
+        db.session.add(audit)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'session_id': session_obj.id,
+            'record_id': new_record.id,
+            'version': new_version
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/sync_status', methods=['GET'])
+@login_required
+def api_sync_status():
+    """Get sync status for the current user"""
+    try:
+        # Check if there are unsynced records
+        pending_sessions = CountingSession.query.filter_by(
+            is_completed=False
+        ).filter(CountingSession.user_id == current_user.id).count()
+        
+        # Get recent sync logs
+        from models import SKUMergeHistory
+        recent_syncs = SKUMergeHistory.query.order_by(
+            SKUMergeHistory.merged_at.desc()
+        ).limit(5).all()
+        
+        return jsonify({
+            'pending_sessions': pending_sessions,
+            'last_sync': [{
+                'date': h.merged_at.strftime('%Y-%m-%d %H:%M'),
+                'records': h.records_transferred,
+                'reason': h.reason
+            } for h in recent_syncs],
+            'user_id': current_user.id,
+            'username': current_user.username,
+            'is_online': True
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
 # MAIN ENTRY POINT
 # ============================================
 if __name__ == '__main__':
