@@ -4,13 +4,16 @@
  */
 
 // ============================================
-// GLOBAL STATE (SINGLE DECLARATION)
+// GLOBAL STATE - SINGLE DECLARATION ONLY
 // ============================================
-// allSkus is declared here ONCE - DO NOT redeclare in offline.js
-// The offline.js file should use window.allSkus
+// Remove the duplicate 'let allSkus = []' - use window.allSkus instead
+// This prevents the "already declared" error
+
+// Use window.allSkus for the main SKU array
+// This allows offline.js to access it without redeclaring
 
 // ============================================
-// SKU LOADING - SIMPLIFIED
+// SKU LOADING
 // ============================================
 async function loadSkus() {
     try {
