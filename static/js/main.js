@@ -1,6 +1,6 @@
 /**
  * MAIN APPLICATION - Inventory Counting System
- * Version: 2.2 (FIXED - No Duplicates)
+ * Version: 2.4 (FIXED - Initial Load Offline Check)
  */
 
 // ============================================
@@ -30,7 +30,7 @@ const FIFTH_FLOOR_CATEGORIES = [
 ];
 
 // ============================================
-// LOAD SKUS - FIXED VERSION
+// LOAD SKUS - WITH OFFLINE CHECK
 // ============================================
 function loadSkus(warehouse, dayCategory, itemCategory, search) {
     let loadingDiv = document.getElementById('loadingIndicator');
@@ -97,11 +97,90 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
         })
         .catch(error => {
             console.error('❌ Error loading SKUs:', error);
-            if (skusListDiv) {
-                skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-danger text-center">Error loading SKUs: ' + error.message + '</div></div>';
-            }
-            if (loadingDiv) loadingDiv.style.display = 'none';
+            
+            // Try loading from cache as fallback
+            loadSkusFromCache().then(success => {
+                if (!success) {
+                    if (skusListDiv) {
+                        skusListDiv.innerHTML = `
+                            <div class="col-12">
+                                <div class="alert alert-danger text-center">
+                                    <strong>❌ Error loading SKUs:</strong> ${error.message}
+                                    <br><small>Please check your connection and refresh.</small>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    if (loadingDiv) loadingDiv.style.display = 'none';
+                }
+            });
         });
+}
+
+// ============================================
+// LOAD SKUS FROM CACHE (OFFLINE FALLBACK)
+// ============================================
+async function loadSkusFromCache() {
+    let loadingDiv = document.getElementById('loadingIndicator');
+    let skusListDiv = document.getElementById('skusList');
+    
+    console.log('📶 Attempting to load SKUs from cache...');
+    
+    if (window.offlineManager && window.offlineManager.db) {
+        try {
+            const cachedSkus = await window.offlineManager.db.getAllSkus();
+            if (cachedSkus && cachedSkus.length > 0) {
+                console.log(`✅ Loaded ${cachedSkus.length} SKUs from cache`);
+                allSkus = cachedSkus;
+                if (loadingDiv) loadingDiv.style.display = 'none';
+                
+                // Apply filters on cached data
+                filterAndDisplaySkus(
+                    document.getElementById('warehouse').value,
+                    document.getElementById('dayCategory').value,
+                    document.getElementById('itemCategory').value,
+                    document.getElementById('searchSku').value
+                );
+                showToast('📶 Offline mode - using cached SKUs', 'warning');
+                return true;
+            } else {
+                console.warn('⚠️ No SKUs in cache');
+                if (skusListDiv) {
+                    skusListDiv.innerHTML = `
+                        <div class="col-12">
+                            <div class="alert alert-warning text-center">
+                                <strong>📶 Offline mode</strong><br>
+                                No cached SKUs available. Please connect to the internet first.
+                            </div>
+                        </div>
+                    `;
+                }
+                if (loadingDiv) loadingDiv.style.display = 'none';
+                showToast('📶 Offline - no cached SKUs available', 'error');
+                return false;
+            }
+        } catch (error) {
+            console.error('❌ Cache error:', error);
+            if (loadingDiv) loadingDiv.style.display = 'none';
+            showToast('📶 Offline - error loading cache', 'error');
+            return false;
+        }
+    } else {
+        console.warn('⚠️ Offline manager not available');
+        if (skusListDiv) {
+            skusListDiv.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-warning text-center">
+                        <strong>📶 Offline mode</strong><br>
+                        Offline features not available.
+                    </div>
+                </div>
+            `;
+        }
+        if (loadingDiv) loadingDiv.style.display = 'none';
+        showToast('📶 Offline features not available', 'error');
+        return false;
+    }
 }
 
 // ============================================
@@ -120,63 +199,6 @@ function applyFilters() {
     }
     
     loadSkus(warehouse, dayCategory, itemCategory, search);
-}
-
-// ============================================
-// LOAD SKUS FROM CACHE (OFFLINE FALLBACK)
-// ============================================
-async function loadSkusFromCache() {
-    let loadingDiv = document.getElementById('loadingIndicator');
-    let skusListDiv = document.getElementById('skusList');
-    
-    if (loadingDiv) loadingDiv.style.display = 'block';
-    if (skusListDiv) {
-        skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-info text-center">Loading cached SKUs...</div></div>';
-    }
-    
-    if (window.offlineManager && window.offlineManager.db) {
-        try {
-            const cachedSkus = await window.offlineManager.db.getAllSkus();
-            if (cachedSkus && cachedSkus.length > 0) {
-                console.log(`✅ Loaded ${cachedSkus.length} SKUs from cache (offline)`);
-                allSkus = cachedSkus;
-                if (loadingDiv) loadingDiv.style.display = 'none';
-                // Apply filters on cached data
-                filterAndDisplaySkus(
-                    document.getElementById('warehouse').value,
-                    document.getElementById('dayCategory').value,
-                    document.getElementById('itemCategory').value,
-                    document.getElementById('searchSku').value
-                );
-                showToast('📶 Offline mode - using cached SKUs', 'warning');
-                return;
-            } else {
-                console.warn('⚠️ No SKUs in cache');
-                if (skusListDiv) {
-                    skusListDiv.innerHTML = `
-                        <div class="col-12">
-                            <div class="alert alert-warning text-center">
-                                <strong>📶 Offline mode</strong><br>
-                                No cached SKUs available. Please connect to the internet first.
-                            </div>
-                        </div>
-                    `;
-                }
-                if (loadingDiv) loadingDiv.style.display = 'none';
-                showToast('📶 Offline - no cached SKUs available', 'error');
-                return;
-            }
-        } catch (error) {
-            console.error('❌ Cache error:', error);
-            if (loadingDiv) loadingDiv.style.display = 'none';
-            showToast('📶 Offline - error loading cache', 'error');
-            return;
-        }
-    } else {
-        if (loadingDiv) loadingDiv.style.display = 'none';
-        showToast('📶 Offline features not available', 'error');
-        return;
-    }
 }
 
 // ============================================
@@ -217,7 +239,7 @@ function filterAndDisplaySkus(warehouse, dayCategory, itemCategory, search) {
 }
 
 // ============================================
-// SAVE ALL COUNTS - FIXED
+// SAVE ALL COUNTS - FULLY FIXED FOR OFFLINE
 // ============================================
 function saveAllCounts() {
     let warehouse = document.getElementById('warehouse').value;
@@ -288,54 +310,86 @@ function saveAllCounts() {
         saveBtn.textContent = 'Saving...';
     }
     
-    // Check if offline
-    if (!navigator.onLine) {
-        console.log('📶 Offline - saving to IndexedDB');
+    // ==========================================
+    // CRITICAL FIX: Check if we're OFFLINE
+    // ==========================================
+    const isOffline = !navigator.onLine;
+    console.log('📶 Current network status:', isOffline ? 'OFFLINE' : 'ONLINE');
+    console.log('📶 offlineManager exists:', !!window.offlineManager);
+    console.log('📶 offlineManager ready:', window.offlineManager ? window.offlineManager.isInitialized : false);
+    
+    // If OFFLINE - save to IndexedDB
+    if (isOffline) {
+        console.log('📶 OFFLINE - saving to IndexedDB');
         
-        // Save to IndexedDB
-        let offlineCount = 0;
-        let promises = [];
-        
-        for (let skuId in counts) {
-            if (window.offlineManager) {
-                const promise = window.offlineManager.saveCountOffline(
-                    parseInt(skuId), 
-                    counts[skuId].initial_count, 
-                    currentSessionId
-                );
-                promises.push(promise);
-            }
-        }
-        
-        if (promises.length > 0) {
-            Promise.all(promises)
-                .then(results => {
-                    const successCount = results.filter(r => r && r.success).length;
-                    showToast(`💾 ${successCount} counts saved offline`, 'info');
-                    if (saveBtn) {
-                        saveBtn.disabled = false;
-                        saveBtn.textContent = 'Save All Counts';
-                    }
-                })
-                .catch(error => {
-                    console.error('❌ Offline save error:', error);
-                    showToast('❌ Error saving offline', 'error');
-                    if (saveBtn) {
-                        saveBtn.disabled = false;
-                        saveBtn.textContent = 'Save All Counts';
-                    }
-                });
-        } else {
-            showToast('⚠️ Offline manager not available', 'error');
+        // Check if offlineManager is ready
+        if (!window.offlineManager || !window.offlineManager.isInitialized) {
+            showToast('⚠️ Offline features initializing, please try again in a moment...', 'warning');
             if (saveBtn) {
                 saveBtn.disabled = false;
                 saveBtn.textContent = 'Save All Counts';
             }
+            return;
         }
+        
+        // Save each count to IndexedDB
+        let offlineCount = 0;
+        let promises = [];
+        
+        for (let skuId in counts) {
+            const promise = window.offlineManager.saveCountOffline(
+                parseInt(skuId), 
+                counts[skuId].initial_count, 
+                currentSessionId
+            );
+            promises.push(promise);
+        }
+        
+        if (promises.length === 0) {
+            showToast('⚠️ No counts to save', 'warning');
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save All Counts';
+            }
+            return;
+        }
+        
+        Promise.all(promises)
+            .then(results => {
+                const successCount = results.filter(r => r && r.success).length;
+                console.log(`💾 Saved ${successCount} counts offline`);
+                showToast(`💾 ${successCount} counts saved offline - will sync when online`, 'success');
+                
+                // Update pending badge
+                window.offlineManager.db.getPendingCounts().then(pending => {
+                    const badge = document.querySelector('.pending-badge');
+                    if (badge && pending.length > 0) {
+                        badge.textContent = pending.length;
+                        badge.style.display = 'inline-block';
+                    }
+                });
+                
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Save All Counts';
+                }
+            })
+            .catch(error => {
+                console.error('❌ Offline save error:', error);
+                showToast('❌ Error saving offline: ' + error.message, 'error');
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Save All Counts';
+                }
+            });
         return;
     }
     
+    // ==========================================
     // ONLINE - save to server
+    // ==========================================
+    console.log('📡 ONLINE - saving to server');
+    
     fetch('/counting', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -345,7 +399,12 @@ function saveAllCounts() {
             counts: counts
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('HTTP error ' + response.status);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             currentSessionId = data.session_id;
@@ -361,11 +420,60 @@ function saveAllCounts() {
                 }
             }
         } else {
-            alert('Error saving counts');
+            alert('Error saving counts: ' + (data.message || 'Unknown error'));
         }
     })
     .catch(error => {
-        alert('Error: ' + error);
+        console.error('❌ Online save error:', error);
+        
+        // If online save fails, offer offline fallback
+        if (confirm('⚠️ Connection error. Would you like to save offline instead?')) {
+            showToast('💾 Saving offline...', 'info');
+            
+            if (!window.offlineManager || !window.offlineManager.isInitialized) {
+                alert('Offline features not available. Please try again.');
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Save All Counts';
+                }
+                return;
+            }
+            
+            let offlineCount = 0;
+            let promises = [];
+            for (let skuId in counts) {
+                const promise = window.offlineManager.saveCountOffline(
+                    parseInt(skuId), 
+                    counts[skuId].initial_count, 
+                    currentSessionId
+                );
+                promises.push(promise);
+            }
+            
+            Promise.all(promises)
+                .then(results => {
+                    const successCount = results.filter(r => r && r.success).length;
+                    showToast(`💾 ${successCount} counts saved offline - will sync when online`, 'success');
+                    if (saveBtn) {
+                        saveBtn.disabled = false;
+                        saveBtn.textContent = 'Save All Counts';
+                    }
+                })
+                .catch(err => {
+                    console.error('Offline fallback error:', err);
+                    alert('Error saving offline: ' + err.message);
+                    if (saveBtn) {
+                        saveBtn.disabled = false;
+                        saveBtn.textContent = 'Save All Counts';
+                    }
+                });
+        } else {
+            alert('Save cancelled.');
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save All Counts';
+            }
+        }
     })
     .finally(() => {
         if (saveBtn) {
@@ -373,6 +481,44 @@ function saveAllCounts() {
             saveBtn.textContent = 'Save All Counts';
         }
     });
+}
+
+// ============================================
+// CHECK OFFLINE STATUS - DEBUG HELPER
+// ============================================
+function checkOfflineStatus() {
+    const status = {
+        isOnline: navigator.onLine,
+        offlineManagerExists: !!window.offlineManager,
+        offlineManagerReady: window.offlineManager ? window.offlineManager.isInitialized : false,
+        allSkusCount: allSkus.length,
+        pendingCounts: 0
+    };
+    
+    console.log('📶 OFFLINE STATUS:', status);
+    
+    // Get pending counts if available
+    if (window.offlineManager && window.offlineManager.isInitialized) {
+        window.offlineManager.db.getPendingCounts().then(pending => {
+            status.pendingCounts = pending.length;
+            console.log('📶 Pending counts:', pending.length);
+            
+            const badge = document.querySelector('.pending-badge');
+            if (badge && pending.length > 0) {
+                badge.textContent = pending.length;
+                badge.style.display = 'inline-block';
+            }
+        });
+    }
+    
+    // Show toast with status
+    if (!navigator.onLine) {
+        showToast('📶 OFFLINE MODE - Counts will be saved locally', 'warning');
+    } else {
+        showToast('📶 ONLINE MODE - Counts will sync to server', 'success');
+    }
+    
+    return status;
 }
 
 // ============================================
@@ -1303,7 +1449,7 @@ function completeCounting() {
 }
 
 // ============================================
-// INITIALIZATION
+// INITIALIZATION - FIXED FOR OFFLINE
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
     const warehouseSelect = document.getElementById('warehouse');
@@ -1333,6 +1479,36 @@ document.addEventListener('DOMContentLoaded', function() {
     filterItemCategoriesByWarehouse();
     setupSmartSearch();
     
+    // ==========================================
+    // CRITICAL FIX: Check OFFLINE FIRST
+    // ==========================================
+    const isOffline = !navigator.onLine;
+    console.log('📶 Initial load - Network status:', isOffline ? 'OFFLINE' : 'ONLINE');
+    
+    if (isOffline) {
+        console.log('📶 OFFLINE - Loading from cache');
+        // Load from cache immediately
+        loadSkusFromCache().then(success => {
+            if (!success) {
+                console.warn('⚠️ No cache available offline');
+                // Show message but don't try to fetch
+                const skusListDiv = document.getElementById('skusList');
+                if (skusListDiv) {
+                    skusListDiv.innerHTML = `
+                        <div class="col-12">
+                            <div class="alert alert-warning text-center">
+                                <strong>📶 Offline mode</strong><br>
+                                No cached SKUs available. Please connect to the internet first.
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        });
+        return; // STOP here - don't try to fetch from server
+    }
+    
+    // ONLINE - proceed normally
     let sessionIdFromUrl = getUrlParameter('session_id');
     if (sessionIdFromUrl) {
         currentSessionId = parseInt(sessionIdFromUrl);
@@ -1366,3 +1542,4 @@ window.previousPage = previousPage;
 window.nextPage = nextPage;
 window.saveRecounts = saveRecounts;
 window.closeRecountModal = closeRecountModal;
+window.checkOfflineStatus = checkOfflineStatus;
