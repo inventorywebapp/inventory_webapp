@@ -1,6 +1,6 @@
 /**
  * MAIN APPLICATION - Inventory Counting System
- * Version: 2.5 (FULLY FIXED - Offline Save Working)
+ * Version: 2.6 (FULLY FIXED - Offline Save Working)
  */
 
 // ============================================
@@ -30,7 +30,7 @@ const FIFTH_FLOOR_CATEGORIES = [
 ];
 
 // ============================================
-// LOAD SKUS - WITH OFFLINE CHECK
+// LOAD SKUS
 // ============================================
 function loadSkus(warehouse, dayCategory, itemCategory, search) {
     let loadingDiv = document.getElementById('loadingIndicator');
@@ -41,7 +41,6 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
         skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-info text-center">Loading SKUs...</div></div>';
     }
     
-    // Build URL properly
     let url = '/get_skus?';
     if (dayCategory && dayCategory !== 'All' && dayCategory !== '-- All Day Categories --') {
         url += 'day_category=' + encodeURIComponent(dayCategory) + '&';
@@ -52,8 +51,6 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
     if (search && search.trim()) {
         url += 'search=' + encodeURIComponent(search.trim());
     }
-    
-    // Remove trailing & or ?
     url = url.replace(/[&?]$/, '');
     
     console.log('🔍 Fetching SKUs from:', url);
@@ -69,7 +66,6 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
             console.log('✅ Loaded', data.length, 'SKUs');
             allSkus = data;
             
-            // Filter by warehouse
             let warehouseFiltered = [];
             for (let i = 0; i < data.length; i++) {
                 let sku = data[i];
@@ -90,15 +86,12 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
             if (loadingDiv) loadingDiv.style.display = 'none';
             updateDayCategories();
             
-            // Cache SKUs for offline use (don't wait)
             if (window.offlineManager && window.offlineManager.db) {
                 window.offlineManager.db.saveSkus(allSkus).catch(e => console.log('Cache save skipped:', e));
             }
         })
         .catch(error => {
             console.error('❌ Error loading SKUs:', error);
-            
-            // Try loading from cache as fallback
             loadSkusFromCache().then(success => {
                 if (!success) {
                     if (skusListDiv) {
@@ -118,7 +111,7 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
 }
 
 // ============================================
-// LOAD SKUS FROM CACHE (OFFLINE FALLBACK)
+// LOAD SKUS FROM CACHE
 // ============================================
 async function loadSkusFromCache() {
     let loadingDiv = document.getElementById('loadingIndicator');
@@ -133,8 +126,6 @@ async function loadSkusFromCache() {
                 console.log(`✅ Loaded ${cachedSkus.length} SKUs from cache`);
                 allSkus = cachedSkus;
                 if (loadingDiv) loadingDiv.style.display = 'none';
-                
-                // Apply filters on cached data
                 filterAndDisplaySkus(
                     document.getElementById('warehouse').value,
                     document.getElementById('dayCategory').value,
@@ -192,7 +183,6 @@ function applyFilters() {
     let itemCategory = document.getElementById('itemCategory').value;
     let search = document.getElementById('searchSku').value;
     
-    // If offline and no SKUs loaded, try cache
     if (!navigator.onLine && allSkus.length === 0) {
         loadSkusFromCache();
         return;
@@ -207,24 +197,20 @@ function applyFilters() {
 function filterAndDisplaySkus(warehouse, dayCategory, itemCategory, search) {
     let filtered = [...allSkus];
     
-    // Filter by warehouse
     if (warehouse === '5thFloor') {
         filtered = filtered.filter(sku => FIFTH_FLOOR_CATEGORIES.includes(sku.description));
     } else if (warehouse === 'Main') {
         filtered = filtered.filter(sku => !FIFTH_FLOOR_CATEGORIES.includes(sku.description));
     }
     
-    // Filter by day category
     if (dayCategory && dayCategory !== 'All' && dayCategory !== '-- All Day Categories --') {
         filtered = filtered.filter(sku => sku.category === dayCategory);
     }
     
-    // Filter by item category
     if (itemCategory && itemCategory !== 'All' && itemCategory !== '-- All Item Categories --') {
         filtered = filtered.filter(sku => sku.description === itemCategory);
     }
     
-    // Filter by search
     if (search && search.trim()) {
         const searchTerm = search.trim().toLowerCase();
         filtered = filtered.filter(sku => 
@@ -239,12 +225,14 @@ function filterAndDisplaySkus(warehouse, dayCategory, itemCategory, search) {
 }
 
 // ============================================
-// SAVE ALL COUNTS - COMPLETELY FIXED FOR OFFLINE
+// SAVE ALL COUNTS - COMPLETELY REWRITTEN
 // ============================================
 function saveAllCounts() {
+    // Get warehouse
     let warehouse = document.getElementById('warehouse').value;
     let warehouseDisplay = warehouse === '5thFloor' ? '5th Floor Warehouse' : (warehouse === 'Main' ? 'Main Warehouse' : 'All Warehouses');
     
+    // Get all count inputs
     let countInputs = document.querySelectorAll('.initial-count');
     let totalSkus = countInputs.length;
     let countedSkus = 0;
@@ -252,6 +240,7 @@ function saveAllCounts() {
     let invalidSkus = [];
     let blankSkuNames = [];
     
+    // Validate inputs
     let hasInvalid = false;
     for (let i = 0; i < countInputs.length; i++) {
         let input = countInputs[i];
@@ -289,6 +278,7 @@ function saveAllCounts() {
         }
     }
     
+    // Build counts object
     let counts = {};
     for (let i = 0; i < countInputs.length; i++) {
         let input = countInputs[i];
@@ -304,6 +294,7 @@ function saveAllCounts() {
         return;
     }
     
+    // Disable button
     let saveBtn = document.getElementById('saveCounts');
     if (saveBtn) {
         saveBtn.disabled = true;
@@ -311,18 +302,18 @@ function saveAllCounts() {
     }
     
     // ==========================================
-    // STEP 1: CHECK IF OFFLINE
+    // CHECK IF OFFLINE - THIS IS THE KEY FIX
     // ==========================================
     const isOffline = !navigator.onLine;
     console.log('📶 SAVE - Network status:', isOffline ? 'OFFLINE' : 'ONLINE');
     
     // ==========================================
-    // STEP 2: IF OFFLINE - SAVE TO INDEXEDDB
+    // IF OFFLINE - SAVE TO INDEXEDDB
     // ==========================================
     if (isOffline) {
-        console.log('📶 SAVE OFFLINE - saving to IndexedDB');
+        console.log('📶 SAVING OFFLINE - to IndexedDB');
         
-        // Check offline manager is ready
+        // Check offline manager
         if (!window.offlineManager || !window.offlineManager.isInitialized) {
             alert('⚠️ Offline features are still initializing. Please try again in a moment.');
             if (saveBtn) {
@@ -333,9 +324,7 @@ function saveAllCounts() {
         }
         
         // Save each count to IndexedDB
-        let savedCount = 0;
         let promises = [];
-        
         for (let skuId in counts) {
             const promise = window.offlineManager.saveCountOffline(
                 parseInt(skuId), 
@@ -357,7 +346,7 @@ function saveAllCounts() {
         Promise.all(promises)
             .then(results => {
                 const successCount = results.filter(r => r && r.success).length;
-                console.log(`💾 OFFLINE SAVE: ${successCount} counts saved`);
+                console.log(`💾 OFFLINE: ${successCount} counts saved`);
                 showToast(`💾 ${successCount} counts saved offline - will sync when online`, 'success');
                 
                 // Update pending badge
@@ -382,13 +371,13 @@ function saveAllCounts() {
                     saveBtn.textContent = 'Save All Counts';
                 }
             });
-        return; // ✅ EXIT HERE - DON'T TRY TO FETCH
+        return; // EXIT - DO NOT FETCH
     }
     
     // ==========================================
-    // STEP 3: ONLINE - SAVE TO SERVER
+    // ONLINE - SAVE TO SERVER
     // ==========================================
-    console.log('📡 ONLINE SAVE - saving to server');
+    console.log('📡 SAVING ONLINE - to server');
     
     fetch('/counting', {
         method: 'POST',
@@ -428,7 +417,7 @@ function saveAllCounts() {
     .catch(error => {
         console.error('❌ ONLINE SAVE ERROR:', error);
         
-        // If online save fails, offer offline fallback
+        // Fallback to offline
         if (confirm('⚠️ Connection error. Would you like to save offline instead?')) {
             if (!window.offlineManager || !window.offlineManager.isInitialized) {
                 alert('Offline features not available. Please try again.');
@@ -439,7 +428,6 @@ function saveAllCounts() {
                 return;
             }
             
-            let savedCount = 0;
             let promises = [];
             for (let skuId in counts) {
                 const promise = window.offlineManager.saveCountOffline(
@@ -472,7 +460,7 @@ function saveAllCounts() {
 }
 
 // ============================================
-// CHECK OFFLINE STATUS - DEBUG HELPER
+// CHECK OFFLINE STATUS
 // ============================================
 function checkOfflineStatus() {
     const status = {
@@ -485,12 +473,10 @@ function checkOfflineStatus() {
     
     console.log('📶 OFFLINE STATUS:', status);
     
-    // Get pending counts if available
     if (window.offlineManager && window.offlineManager.isInitialized) {
         window.offlineManager.db.getPendingCounts().then(pending => {
             status.pendingCounts = pending.length;
             console.log('📶 Pending counts:', pending.length);
-            
             const badge = document.querySelector('.pending-badge');
             if (badge && pending.length > 0) {
                 badge.textContent = pending.length;
@@ -499,7 +485,6 @@ function checkOfflineStatus() {
         });
     }
     
-    // Show toast with status
     if (!navigator.onLine) {
         showToast('📶 OFFLINE MODE - Counts will be saved locally', 'warning');
     } else {
@@ -644,7 +629,6 @@ function displaySkus(skus) {
     html += '</tbody></table></div></div>';
     skusListDiv.innerHTML = html;
     
-    // Bind events
     setTimeout(function() {
         document.querySelectorAll('.initial-count').forEach(function(input) {
             if (input) {
@@ -1437,7 +1421,7 @@ function completeCounting() {
 }
 
 // ============================================
-// INITIALIZATION - FIXED FOR OFFLINE
+// INITIALIZATION
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
     const warehouseSelect = document.getElementById('warehouse');
@@ -1467,19 +1451,13 @@ document.addEventListener('DOMContentLoaded', function() {
     filterItemCategoriesByWarehouse();
     setupSmartSearch();
     
-    // ==========================================
-    // CRITICAL FIX: Check OFFLINE FIRST
-    // ==========================================
     const isOffline = !navigator.onLine;
     console.log('📶 Initial load - Network status:', isOffline ? 'OFFLINE' : 'ONLINE');
     
     if (isOffline) {
         console.log('📶 OFFLINE - Loading from cache');
-        // Load from cache immediately
         loadSkusFromCache().then(success => {
             if (!success) {
-                console.warn('⚠️ No cache available offline');
-                // Show message but don't try to fetch
                 const skusListDiv = document.getElementById('skusList');
                 if (skusListDiv) {
                     skusListDiv.innerHTML = `
@@ -1493,10 +1471,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
-        return; // STOP here - don't try to fetch from server
+        return;
     }
     
-    // ONLINE - proceed normally
     let sessionIdFromUrl = getUrlParameter('session_id');
     if (sessionIdFromUrl) {
         currentSessionId = parseInt(sessionIdFromUrl);
