@@ -1,6 +1,6 @@
 /**
  * MAIN APPLICATION - Inventory Counting System
- * Version: 2.0 (PWA Ready - CLEAN)
+ * Version: 2.1 (Full Offline Support)
  */
 
 // ============================================
@@ -29,7 +29,138 @@ const FIFTH_FLOOR_CATEGORIES = [
 ];
 
 // ============================================
-// LOAD SKUS - FIXED VERSION
+// OFFLINE SKU LOADING - NEW
+// ============================================
+async function loadSkusWithOfflineSupport() {
+    console.log('🔍 Attempting to load SKUs...');
+    let loadingDiv = document.getElementById('loadingIndicator');
+    let skusListDiv = document.getElementById('skusList');
+    
+    if (loadingDiv) loadingDiv.style.display = 'block';
+    if (skusListDiv) {
+        skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-info text-center">Loading SKUs...</div></div>';
+    }
+    
+    // Check if offline
+    if (!navigator.onLine) {
+        console.log('📶 Offline mode detected - trying cache...');
+        
+        // Try to load from IndexedDB
+        if (window.offlineManager && window.offlineManager.db) {
+            try {
+                const cachedSkus = await window.offlineManager.db.getAllSkus();
+                if (cachedSkus && cachedSkus.length > 0) {
+                    console.log(`✅ Loaded ${cachedSkus.length} SKUs from cache (offline)`);
+                    allSkus = cachedSkus;
+                    if (loadingDiv) loadingDiv.style.display = 'none';
+                    applyFilters();
+                    showToast('📶 Offline mode - using cached SKUs', 'warning');
+                    return true;
+                } else {
+                    console.warn('⚠️ No SKUs in cache');
+                    if (skusListDiv) {
+                        skusListDiv.innerHTML = `
+                            <div class="col-12">
+                                <div class="alert alert-warning text-center">
+                                    <strong>📶 Offline mode</strong><br>
+                                    No cached SKUs available. Please connect to the internet to load SKUs first.
+                                </div>
+                            </div>
+                        `;
+                    }
+                    if (loadingDiv) loadingDiv.style.display = 'none';
+                    showToast('📶 Offline - no cached SKUs available', 'error');
+                    return false;
+                }
+            } catch (error) {
+                console.error('❌ Cache error:', error);
+                if (loadingDiv) loadingDiv.style.display = 'none';
+                showToast('📶 Offline - error loading cache', 'error');
+                return false;
+            }
+        } else {
+            console.warn('⚠️ Offline manager not available');
+            if (skusListDiv) {
+                skusListDiv.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-warning text-center">
+                            <strong>📶 Offline mode</strong><br>
+                            Offline features not available. Please connect to the internet.
+                        </div>
+                    </div>
+                `;
+            }
+            if (loadingDiv) loadingDiv.style.display = 'none';
+            showToast('📶 Offline features not available', 'error');
+            return false;
+        }
+    }
+    
+    // Online - load from server and cache
+    try {
+        console.log('📡 Online - fetching from server...');
+        const response = await fetch('/api/get_all_skus');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log(`✅ Loaded ${data.length} SKUs from server`);
+        allSkus = data;
+        
+        // Cache for offline use (don't wait)
+        if (window.offlineManager && window.offlineManager.db) {
+            try {
+                await window.offlineManager.db.saveSkus(allSkus);
+                console.log('💾 SKUs cached for offline use');
+            } catch (cacheError) {
+                console.log('ℹ️ Cache save skipped:', cacheError.message);
+            }
+        }
+        
+        if (loadingDiv) loadingDiv.style.display = 'none';
+        applyFilters();
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Error loading SKUs:', error);
+        
+        // If online but fetch fails, try cache as fallback
+        if (window.offlineManager && window.offlineManager.db) {
+            try {
+                const cachedSkus = await window.offlineManager.db.getAllSkus();
+                if (cachedSkus && cachedSkus.length > 0) {
+                    console.log(`✅ Using ${cachedSkus.length} cached SKUs (fallback)`);
+                    allSkus = cachedSkus;
+                    if (loadingDiv) loadingDiv.style.display = 'none';
+                    applyFilters();
+                    showToast('📶 Using cached SKUs (server unavailable)', 'warning');
+                    return true;
+                }
+            } catch (cacheError) {
+                console.log('ℹ️ Cache fallback failed:', cacheError.message);
+            }
+        }
+        
+        if (skusListDiv) {
+            skusListDiv.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-danger text-center">
+                        <strong>❌ Error loading SKUs:</strong> ${error.message}
+                        <br><small>Please refresh the page or check your connection.</small>
+                    </div>
+                </div>
+            `;
+        }
+        if (loadingDiv) loadingDiv.style.display = 'none';
+        showToast('❌ Error loading SKUs: ' + error.message, 'error');
+        return false;
+    }
+}
+
+// ============================================
+// LOAD SKUS - ORIGINAL (PRESERVED)
 // ============================================
 function loadSkus(warehouse, dayCategory, itemCategory, search) {
     let loadingDiv = document.getElementById('loadingIndicator');
@@ -88,6 +219,11 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
             displaySkusWithPagination();
             if (loadingDiv) loadingDiv.style.display = 'none';
             updateDayCategories();
+            
+            // Cache SKUs for offline use (don't wait)
+            if (window.offlineManager && window.offlineManager.db) {
+                window.offlineManager.db.saveSkus(allSkus).catch(e => console.log('Cache save skipped:', e));
+            }
         })
         .catch(error => {
             console.error('❌ Error loading SKUs:', error);
@@ -99,7 +235,7 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
 }
 
 // ============================================
-// APPLY FILTERS
+// APPLY FILTERS - OFFLINE AWARE
 // ============================================
 function applyFilters() {
     let warehouse = document.getElementById('warehouse').value;
@@ -107,7 +243,68 @@ function applyFilters() {
     let itemCategory = document.getElementById('itemCategory').value;
     let search = document.getElementById('searchSku').value;
     
-    loadSkus(warehouse, dayCategory, itemCategory, search);
+    // Check if we're offline and SKUs are loaded
+    if (!navigator.onLine && allSkus.length === 0) {
+        // Try to load from cache first
+        loadSkusWithOfflineSupport().then(success => {
+            if (success) {
+                // Now apply filters on loaded SKUs
+                filterAndDisplaySkus(warehouse, dayCategory, itemCategory, search);
+            }
+        });
+        return;
+    }
+    
+    // Online or already have SKUs
+    if (allSkus.length === 0) {
+        // First time loading
+        loadSkusWithOfflineSupport().then(success => {
+            if (success) {
+                filterAndDisplaySkus(warehouse, dayCategory, itemCategory, search);
+            }
+        });
+        return;
+    }
+    
+    // SKUs already loaded - just filter
+    filterAndDisplaySkus(warehouse, dayCategory, itemCategory, search);
+}
+
+// ============================================
+// FILTER AND DISPLAY SKUS
+// ============================================
+function filterAndDisplaySkus(warehouse, dayCategory, itemCategory, search) {
+    let filtered = [...allSkus];
+    
+    // Filter by warehouse
+    if (warehouse === '5thFloor') {
+        filtered = filtered.filter(sku => FIFTH_FLOOR_CATEGORIES.includes(sku.description));
+    } else if (warehouse === 'Main') {
+        filtered = filtered.filter(sku => !FIFTH_FLOOR_CATEGORIES.includes(sku.description));
+    }
+    
+    // Filter by day category
+    if (dayCategory && dayCategory !== 'All' && dayCategory !== '-- All Day Categories --') {
+        filtered = filtered.filter(sku => sku.category === dayCategory);
+    }
+    
+    // Filter by item category
+    if (itemCategory && itemCategory !== 'All' && itemCategory !== '-- All Item Categories --') {
+        filtered = filtered.filter(sku => sku.description === itemCategory);
+    }
+    
+    // Filter by search
+    if (search && search.trim()) {
+        const searchTerm = search.trim().toLowerCase();
+        filtered = filtered.filter(sku => 
+            sku.sku.toLowerCase().includes(searchTerm) || 
+            (sku.description && sku.description.toLowerCase().includes(searchTerm))
+        );
+    }
+    
+    filteredSkus = filtered;
+    currentPage = 1;
+    displaySkusWithPagination();
 }
 
 // ============================================
@@ -1190,11 +1387,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.session_id) {
                     currentSessionId = data.session_id;
                 }
-                applyFilters();
+                // Load SKUs with offline support
+                loadSkusWithOfflineSupport();
             })
             .catch(error => {
                 console.error('Error checking active session:', error);
-                applyFilters();
+                loadSkusWithOfflineSupport();
             });
     }
 });
