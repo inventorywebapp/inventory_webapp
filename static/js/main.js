@@ -1,6 +1,6 @@
 /**
  * MAIN APPLICATION - Inventory Counting System
- * Version: 2.4 (FIXED - Initial Load Offline Check)
+ * Version: 2.5 (FULLY FIXED - Offline Save Working)
  */
 
 // ============================================
@@ -239,7 +239,7 @@ function filterAndDisplaySkus(warehouse, dayCategory, itemCategory, search) {
 }
 
 // ============================================
-// SAVE ALL COUNTS - FULLY FIXED FOR OFFLINE
+// SAVE ALL COUNTS - COMPLETELY FIXED FOR OFFLINE
 // ============================================
 function saveAllCounts() {
     let warehouse = document.getElementById('warehouse').value;
@@ -311,20 +311,20 @@ function saveAllCounts() {
     }
     
     // ==========================================
-    // CRITICAL FIX: Check if we're OFFLINE
+    // STEP 1: CHECK IF OFFLINE
     // ==========================================
     const isOffline = !navigator.onLine;
-    console.log('📶 Current network status:', isOffline ? 'OFFLINE' : 'ONLINE');
-    console.log('📶 offlineManager exists:', !!window.offlineManager);
-    console.log('📶 offlineManager ready:', window.offlineManager ? window.offlineManager.isInitialized : false);
+    console.log('📶 SAVE - Network status:', isOffline ? 'OFFLINE' : 'ONLINE');
     
-    // If OFFLINE - save to IndexedDB
+    // ==========================================
+    // STEP 2: IF OFFLINE - SAVE TO INDEXEDDB
+    // ==========================================
     if (isOffline) {
-        console.log('📶 OFFLINE - saving to IndexedDB');
+        console.log('📶 SAVE OFFLINE - saving to IndexedDB');
         
-        // Check if offlineManager is ready
+        // Check offline manager is ready
         if (!window.offlineManager || !window.offlineManager.isInitialized) {
-            showToast('⚠️ Offline features initializing, please try again in a moment...', 'warning');
+            alert('⚠️ Offline features are still initializing. Please try again in a moment.');
             if (saveBtn) {
                 saveBtn.disabled = false;
                 saveBtn.textContent = 'Save All Counts';
@@ -333,7 +333,7 @@ function saveAllCounts() {
         }
         
         // Save each count to IndexedDB
-        let offlineCount = 0;
+        let savedCount = 0;
         let promises = [];
         
         for (let skuId in counts) {
@@ -357,7 +357,7 @@ function saveAllCounts() {
         Promise.all(promises)
             .then(results => {
                 const successCount = results.filter(r => r && r.success).length;
-                console.log(`💾 Saved ${successCount} counts offline`);
+                console.log(`💾 OFFLINE SAVE: ${successCount} counts saved`);
                 showToast(`💾 ${successCount} counts saved offline - will sync when online`, 'success');
                 
                 // Update pending badge
@@ -375,20 +375,20 @@ function saveAllCounts() {
                 }
             })
             .catch(error => {
-                console.error('❌ Offline save error:', error);
-                showToast('❌ Error saving offline: ' + error.message, 'error');
+                console.error('❌ OFFLINE SAVE ERROR:', error);
+                alert('Error saving offline: ' + error.message);
                 if (saveBtn) {
                     saveBtn.disabled = false;
                     saveBtn.textContent = 'Save All Counts';
                 }
             });
-        return;
+        return; // ✅ EXIT HERE - DON'T TRY TO FETCH
     }
     
     // ==========================================
-    // ONLINE - save to server
+    // STEP 3: ONLINE - SAVE TO SERVER
     // ==========================================
-    console.log('📡 ONLINE - saving to server');
+    console.log('📡 ONLINE SAVE - saving to server');
     
     fetch('/counting', {
         method: 'POST',
@@ -408,6 +408,8 @@ function saveAllCounts() {
     .then(data => {
         if (data.success) {
             currentSessionId = data.session_id;
+            showToast(`✅ ${Object.keys(counts).length} counts saved!`, 'success');
+            
             if (data.recount_needed_count > 0) {
                 alert(`⚠️ ${data.recount_needed_count} SKU(s) need recount (discrepancy > 3)\n\nThe recount window will now open.`);
                 checkForRecounts();
@@ -424,12 +426,10 @@ function saveAllCounts() {
         }
     })
     .catch(error => {
-        console.error('❌ Online save error:', error);
+        console.error('❌ ONLINE SAVE ERROR:', error);
         
         // If online save fails, offer offline fallback
         if (confirm('⚠️ Connection error. Would you like to save offline instead?')) {
-            showToast('💾 Saving offline...', 'info');
-            
             if (!window.offlineManager || !window.offlineManager.isInitialized) {
                 alert('Offline features not available. Please try again.');
                 if (saveBtn) {
@@ -439,7 +439,7 @@ function saveAllCounts() {
                 return;
             }
             
-            let offlineCount = 0;
+            let savedCount = 0;
             let promises = [];
             for (let skuId in counts) {
                 const promise = window.offlineManager.saveCountOffline(
@@ -454,25 +454,13 @@ function saveAllCounts() {
                 .then(results => {
                     const successCount = results.filter(r => r && r.success).length;
                     showToast(`💾 ${successCount} counts saved offline - will sync when online`, 'success');
-                    if (saveBtn) {
-                        saveBtn.disabled = false;
-                        saveBtn.textContent = 'Save All Counts';
-                    }
                 })
                 .catch(err => {
                     console.error('Offline fallback error:', err);
                     alert('Error saving offline: ' + err.message);
-                    if (saveBtn) {
-                        saveBtn.disabled = false;
-                        saveBtn.textContent = 'Save All Counts';
-                    }
                 });
         } else {
             alert('Save cancelled.');
-            if (saveBtn) {
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'Save All Counts';
-            }
         }
     })
     .finally(() => {
