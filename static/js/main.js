@@ -141,7 +141,13 @@ async function loadSkusFromCache() {
                 console.log(`✅ Loaded ${cachedSkus.length} SKUs from cache (offline)`);
                 allSkus = cachedSkus;
                 if (loadingDiv) loadingDiv.style.display = 'none';
-                applyFilters();
+                // Apply filters on cached data
+                filterAndDisplaySkus(
+                    document.getElementById('warehouse').value,
+                    document.getElementById('dayCategory').value,
+                    document.getElementById('itemCategory').value,
+                    document.getElementById('searchSku').value
+                );
                 showToast('📶 Offline mode - using cached SKUs', 'warning');
                 return;
             } else {
@@ -171,6 +177,43 @@ async function loadSkusFromCache() {
         showToast('📶 Offline features not available', 'error');
         return;
     }
+}
+
+// ============================================
+// FILTER AND DISPLAY SKUS
+// ============================================
+function filterAndDisplaySkus(warehouse, dayCategory, itemCategory, search) {
+    let filtered = [...allSkus];
+    
+    // Filter by warehouse
+    if (warehouse === '5thFloor') {
+        filtered = filtered.filter(sku => FIFTH_FLOOR_CATEGORIES.includes(sku.description));
+    } else if (warehouse === 'Main') {
+        filtered = filtered.filter(sku => !FIFTH_FLOOR_CATEGORIES.includes(sku.description));
+    }
+    
+    // Filter by day category
+    if (dayCategory && dayCategory !== 'All' && dayCategory !== '-- All Day Categories --') {
+        filtered = filtered.filter(sku => sku.category === dayCategory);
+    }
+    
+    // Filter by item category
+    if (itemCategory && itemCategory !== 'All' && itemCategory !== '-- All Item Categories --') {
+        filtered = filtered.filter(sku => sku.description === itemCategory);
+    }
+    
+    // Filter by search
+    if (search && search.trim()) {
+        const searchTerm = search.trim().toLowerCase();
+        filtered = filtered.filter(sku => 
+            sku.sku.toLowerCase().includes(searchTerm) || 
+            (sku.description && sku.description.toLowerCase().includes(searchTerm))
+        );
+    }
+    
+    filteredSkus = filtered;
+    currentPage = 1;
+    displaySkusWithPagination();
 }
 
 // ============================================
