@@ -1,6 +1,6 @@
 /**
  * MAIN APPLICATION - Inventory Counting System
- * Version: 2.1 (Full Offline Support)
+ * Version: 2.2 (FIXED - No Duplicates)
  */
 
 // ============================================
@@ -14,6 +14,7 @@ let currentSessionId = null;
 let searchTimeout = null;
 let html5QrCode = null;
 let isScannerActive = false;
+let isOfflineMode = false;
 
 // ============================================
 // DAY CATEGORY ORDER
@@ -29,138 +30,7 @@ const FIFTH_FLOOR_CATEGORIES = [
 ];
 
 // ============================================
-// OFFLINE SKU LOADING - NEW
-// ============================================
-async function loadSkusWithOfflineSupport() {
-    console.log('🔍 Attempting to load SKUs...');
-    let loadingDiv = document.getElementById('loadingIndicator');
-    let skusListDiv = document.getElementById('skusList');
-    
-    if (loadingDiv) loadingDiv.style.display = 'block';
-    if (skusListDiv) {
-        skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-info text-center">Loading SKUs...</div></div>';
-    }
-    
-    // Check if offline
-    if (!navigator.onLine) {
-        console.log('📶 Offline mode detected - trying cache...');
-        
-        // Try to load from IndexedDB
-        if (window.offlineManager && window.offlineManager.db) {
-            try {
-                const cachedSkus = await window.offlineManager.db.getAllSkus();
-                if (cachedSkus && cachedSkus.length > 0) {
-                    console.log(`✅ Loaded ${cachedSkus.length} SKUs from cache (offline)`);
-                    allSkus = cachedSkus;
-                    if (loadingDiv) loadingDiv.style.display = 'none';
-                    applyFilters();
-                    showToast('📶 Offline mode - using cached SKUs', 'warning');
-                    return true;
-                } else {
-                    console.warn('⚠️ No SKUs in cache');
-                    if (skusListDiv) {
-                        skusListDiv.innerHTML = `
-                            <div class="col-12">
-                                <div class="alert alert-warning text-center">
-                                    <strong>📶 Offline mode</strong><br>
-                                    No cached SKUs available. Please connect to the internet to load SKUs first.
-                                </div>
-                            </div>
-                        `;
-                    }
-                    if (loadingDiv) loadingDiv.style.display = 'none';
-                    showToast('📶 Offline - no cached SKUs available', 'error');
-                    return false;
-                }
-            } catch (error) {
-                console.error('❌ Cache error:', error);
-                if (loadingDiv) loadingDiv.style.display = 'none';
-                showToast('📶 Offline - error loading cache', 'error');
-                return false;
-            }
-        } else {
-            console.warn('⚠️ Offline manager not available');
-            if (skusListDiv) {
-                skusListDiv.innerHTML = `
-                    <div class="col-12">
-                        <div class="alert alert-warning text-center">
-                            <strong>📶 Offline mode</strong><br>
-                            Offline features not available. Please connect to the internet.
-                        </div>
-                    </div>
-                `;
-            }
-            if (loadingDiv) loadingDiv.style.display = 'none';
-            showToast('📶 Offline features not available', 'error');
-            return false;
-        }
-    }
-    
-    // Online - load from server and cache
-    try {
-        console.log('📡 Online - fetching from server...');
-        const response = await fetch('/api/get_all_skus');
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log(`✅ Loaded ${data.length} SKUs from server`);
-        allSkus = data;
-        
-        // Cache for offline use (don't wait)
-        if (window.offlineManager && window.offlineManager.db) {
-            try {
-                await window.offlineManager.db.saveSkus(allSkus);
-                console.log('💾 SKUs cached for offline use');
-            } catch (cacheError) {
-                console.log('ℹ️ Cache save skipped:', cacheError.message);
-            }
-        }
-        
-        if (loadingDiv) loadingDiv.style.display = 'none';
-        applyFilters();
-        return true;
-        
-    } catch (error) {
-        console.error('❌ Error loading SKUs:', error);
-        
-        // If online but fetch fails, try cache as fallback
-        if (window.offlineManager && window.offlineManager.db) {
-            try {
-                const cachedSkus = await window.offlineManager.db.getAllSkus();
-                if (cachedSkus && cachedSkus.length > 0) {
-                    console.log(`✅ Using ${cachedSkus.length} cached SKUs (fallback)`);
-                    allSkus = cachedSkus;
-                    if (loadingDiv) loadingDiv.style.display = 'none';
-                    applyFilters();
-                    showToast('📶 Using cached SKUs (server unavailable)', 'warning');
-                    return true;
-                }
-            } catch (cacheError) {
-                console.log('ℹ️ Cache fallback failed:', cacheError.message);
-            }
-        }
-        
-        if (skusListDiv) {
-            skusListDiv.innerHTML = `
-                <div class="col-12">
-                    <div class="alert alert-danger text-center">
-                        <strong>❌ Error loading SKUs:</strong> ${error.message}
-                        <br><small>Please refresh the page or check your connection.</small>
-                    </div>
-                </div>
-            `;
-        }
-        if (loadingDiv) loadingDiv.style.display = 'none';
-        showToast('❌ Error loading SKUs: ' + error.message, 'error');
-        return false;
-    }
-}
-
-// ============================================
-// LOAD SKUS - ORIGINAL (PRESERVED)
+// LOAD SKUS - FIXED VERSION
 // ============================================
 function loadSkus(warehouse, dayCategory, itemCategory, search) {
     let loadingDiv = document.getElementById('loadingIndicator');
@@ -235,7 +105,7 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
 }
 
 // ============================================
-// APPLY FILTERS - OFFLINE AWARE
+// APPLY FILTERS
 // ============================================
 function applyFilters() {
     let warehouse = document.getElementById('warehouse').value;
@@ -243,68 +113,223 @@ function applyFilters() {
     let itemCategory = document.getElementById('itemCategory').value;
     let search = document.getElementById('searchSku').value;
     
-    // Check if we're offline and SKUs are loaded
+    // If offline and no SKUs loaded, try cache
     if (!navigator.onLine && allSkus.length === 0) {
-        // Try to load from cache first
-        loadSkusWithOfflineSupport().then(success => {
-            if (success) {
-                // Now apply filters on loaded SKUs
-                filterAndDisplaySkus(warehouse, dayCategory, itemCategory, search);
-            }
-        });
+        loadSkusFromCache();
         return;
     }
     
-    // Online or already have SKUs
-    if (allSkus.length === 0) {
-        // First time loading
-        loadSkusWithOfflineSupport().then(success => {
-            if (success) {
-                filterAndDisplaySkus(warehouse, dayCategory, itemCategory, search);
-            }
-        });
-        return;
-    }
-    
-    // SKUs already loaded - just filter
-    filterAndDisplaySkus(warehouse, dayCategory, itemCategory, search);
+    loadSkus(warehouse, dayCategory, itemCategory, search);
 }
 
 // ============================================
-// FILTER AND DISPLAY SKUS
+// LOAD SKUS FROM CACHE (OFFLINE FALLBACK)
 // ============================================
-function filterAndDisplaySkus(warehouse, dayCategory, itemCategory, search) {
-    let filtered = [...allSkus];
+async function loadSkusFromCache() {
+    let loadingDiv = document.getElementById('loadingIndicator');
+    let skusListDiv = document.getElementById('skusList');
     
-    // Filter by warehouse
-    if (warehouse === '5thFloor') {
-        filtered = filtered.filter(sku => FIFTH_FLOOR_CATEGORIES.includes(sku.description));
-    } else if (warehouse === 'Main') {
-        filtered = filtered.filter(sku => !FIFTH_FLOOR_CATEGORIES.includes(sku.description));
+    if (loadingDiv) loadingDiv.style.display = 'block';
+    if (skusListDiv) {
+        skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-info text-center">Loading cached SKUs...</div></div>';
     }
     
-    // Filter by day category
-    if (dayCategory && dayCategory !== 'All' && dayCategory !== '-- All Day Categories --') {
-        filtered = filtered.filter(sku => sku.category === dayCategory);
+    if (window.offlineManager && window.offlineManager.db) {
+        try {
+            const cachedSkus = await window.offlineManager.db.getAllSkus();
+            if (cachedSkus && cachedSkus.length > 0) {
+                console.log(`✅ Loaded ${cachedSkus.length} SKUs from cache (offline)`);
+                allSkus = cachedSkus;
+                if (loadingDiv) loadingDiv.style.display = 'none';
+                applyFilters();
+                showToast('📶 Offline mode - using cached SKUs', 'warning');
+                return;
+            } else {
+                console.warn('⚠️ No SKUs in cache');
+                if (skusListDiv) {
+                    skusListDiv.innerHTML = `
+                        <div class="col-12">
+                            <div class="alert alert-warning text-center">
+                                <strong>📶 Offline mode</strong><br>
+                                No cached SKUs available. Please connect to the internet first.
+                            </div>
+                        </div>
+                    `;
+                }
+                if (loadingDiv) loadingDiv.style.display = 'none';
+                showToast('📶 Offline - no cached SKUs available', 'error');
+                return;
+            }
+        } catch (error) {
+            console.error('❌ Cache error:', error);
+            if (loadingDiv) loadingDiv.style.display = 'none';
+            showToast('📶 Offline - error loading cache', 'error');
+            return;
+        }
+    } else {
+        if (loadingDiv) loadingDiv.style.display = 'none';
+        showToast('📶 Offline features not available', 'error');
+        return;
+    }
+}
+
+// ============================================
+// SAVE ALL COUNTS - FIXED
+// ============================================
+function saveAllCounts() {
+    let warehouse = document.getElementById('warehouse').value;
+    let warehouseDisplay = warehouse === '5thFloor' ? '5th Floor Warehouse' : (warehouse === 'Main' ? 'Main Warehouse' : 'All Warehouses');
+    
+    let countInputs = document.querySelectorAll('.initial-count');
+    let totalSkus = countInputs.length;
+    let countedSkus = 0;
+    let blankSkus = 0;
+    let invalidSkus = [];
+    let blankSkuNames = [];
+    
+    let hasInvalid = false;
+    for (let i = 0; i < countInputs.length; i++) {
+        let input = countInputs[i];
+        let value = input.value;
+        let row = input.closest('tr');
+        let skuName = row ? row.cells[0].innerText : 'Unknown SKU';
+        
+        if (value !== '' && value !== null) {
+            if (isNaN(value) || value.includes('.') || parseFloat(value) < 0 || !Number.isInteger(parseFloat(value))) {
+                hasInvalid = true;
+                invalidSkus.push(skuName);
+                input.style.border = '2px solid red';
+            } else {
+                input.style.border = '';
+                countedSkus++;
+            }
+        } else {
+            blankSkus++;
+            blankSkuNames.push(skuName);
+            input.style.border = '';
+        }
     }
     
-    // Filter by item category
-    if (itemCategory && itemCategory !== 'All' && itemCategory !== '-- All Item Categories --') {
-        filtered = filtered.filter(sku => sku.description === itemCategory);
+    if (hasInvalid) {
+        alert(`Cannot save. The following SKU(s) have invalid counts (decimals or negatives):\n\n${invalidSkus.map(s => `  • ${s}`).join('\n')}\n\nPlease correct these entries.`);
+        return;
     }
     
-    // Filter by search
-    if (search && search.trim()) {
-        const searchTerm = search.trim().toLowerCase();
-        filtered = filtered.filter(sku => 
-            sku.sku.toLowerCase().includes(searchTerm) || 
-            (sku.description && sku.description.toLowerCase().includes(searchTerm))
-        );
+    if (blankSkus > 0) {
+        let warningMsg = `⚠️ You have ${blankSkus} SKU(s) with NO count entered.\n\n`;
+        warningMsg += `Total SKUs: ${totalSkus}\nCounted: ${countedSkus}\nBlank: ${blankSkus}\n\n`;
+        warningMsg += `Are you sure you want to save with missing counts?`;
+        if (!confirm(warningMsg)) {
+            return;
+        }
     }
     
-    filteredSkus = filtered;
-    currentPage = 1;
-    displaySkusWithPagination();
+    let counts = {};
+    for (let i = 0; i < countInputs.length; i++) {
+        let input = countInputs[i];
+        let skuId = input.getAttribute('data-sku-id');
+        let count = input.value;
+        if (count && count !== '') {
+            counts[skuId] = { initial_count: parseInt(count, 10) };
+        }
+    }
+    
+    if (Object.keys(counts).length === 0) {
+        alert('No counts entered. Please enter at least one count before saving.');
+        return;
+    }
+    
+    let saveBtn = document.getElementById('saveCounts');
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+    }
+    
+    // Check if offline
+    if (!navigator.onLine) {
+        console.log('📶 Offline - saving to IndexedDB');
+        
+        // Save to IndexedDB
+        let offlineCount = 0;
+        let promises = [];
+        
+        for (let skuId in counts) {
+            if (window.offlineManager) {
+                const promise = window.offlineManager.saveCountOffline(
+                    parseInt(skuId), 
+                    counts[skuId].initial_count, 
+                    currentSessionId
+                );
+                promises.push(promise);
+            }
+        }
+        
+        if (promises.length > 0) {
+            Promise.all(promises)
+                .then(results => {
+                    const successCount = results.filter(r => r && r.success).length;
+                    showToast(`💾 ${successCount} counts saved offline`, 'info');
+                    if (saveBtn) {
+                        saveBtn.disabled = false;
+                        saveBtn.textContent = 'Save All Counts';
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ Offline save error:', error);
+                    showToast('❌ Error saving offline', 'error');
+                    if (saveBtn) {
+                        saveBtn.disabled = false;
+                        saveBtn.textContent = 'Save All Counts';
+                    }
+                });
+        } else {
+            showToast('⚠️ Offline manager not available', 'error');
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save All Counts';
+            }
+        }
+        return;
+    }
+    
+    // ONLINE - save to server
+    fetch('/counting', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            session_id: currentSessionId,
+            warehouse: warehouseDisplay,
+            counts: counts
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            currentSessionId = data.session_id;
+            if (data.recount_needed_count > 0) {
+                alert(`⚠️ ${data.recount_needed_count} SKU(s) need recount (discrepancy > 3)\n\nThe recount window will now open.`);
+                checkForRecounts();
+            } else {
+                let completeMsg = `✓ Counts saved successfully!\n\n`;
+                completeMsg += `Saved ${Object.keys(counts).length} SKU counts\n✅ No discrepancies found.\n\n`;
+                completeMsg += `Do you want to complete the counting session now?`;
+                if (confirm(completeMsg)) {
+                    completeCountingSession();
+                }
+            }
+        } else {
+            alert('Error saving counts');
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error);
+    })
+    .finally(() => {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save All Counts';
+        }
+    });
 }
 
 // ============================================
@@ -991,117 +1016,6 @@ function intelligentSkuSearch(scannedText) {
     }
 }
 
-// ============================================
-// SAVE COUNTS
-// ============================================
-function saveAllCounts() {
-    let warehouse = document.getElementById('warehouse').value;
-    let warehouseDisplay = warehouse === '5thFloor' ? '5th Floor Warehouse' : (warehouse === 'Main' ? 'Main Warehouse' : 'All Warehouses');
-    
-    let countInputs = document.querySelectorAll('.initial-count');
-    let totalSkus = countInputs.length;
-    let countedSkus = 0;
-    let blankSkus = 0;
-    let invalidSkus = [];
-    let blankSkuNames = [];
-    
-    let hasInvalid = false;
-    for (let i = 0; i < countInputs.length; i++) {
-        let input = countInputs[i];
-        let value = input.value;
-        let row = input.closest('tr');
-        let skuName = row ? row.cells[0].innerText : 'Unknown SKU';
-        
-        if (value !== '' && value !== null) {
-            if (isNaN(value) || value.includes('.') || parseFloat(value) < 0 || !Number.isInteger(parseFloat(value))) {
-                hasInvalid = true;
-                invalidSkus.push(skuName);
-                input.style.border = '2px solid red';
-            } else {
-                input.style.border = '';
-                countedSkus++;
-            }
-        } else {
-            blankSkus++;
-            blankSkuNames.push(skuName);
-            input.style.border = '';
-        }
-    }
-    
-    if (hasInvalid) {
-        alert(`Cannot save. The following SKU(s) have invalid counts (decimals or negatives):\n\n${invalidSkus.map(s => `  • ${s}`).join('\n')}\n\nPlease correct these entries.`);
-        return;
-    }
-    
-    if (blankSkus > 0) {
-        let warningMsg = `⚠️ You have ${blankSkus} SKU(s) with NO count entered.\n\n`;
-        warningMsg += `Total SKUs: ${totalSkus}\nCounted: ${countedSkus}\nBlank: ${blankSkus}\n\n`;
-        warningMsg += `Are you sure you want to save with missing counts?`;
-        if (!confirm(warningMsg)) {
-            return;
-        }
-    }
-    
-    let counts = {};
-    for (let i = 0; i < countInputs.length; i++) {
-        let input = countInputs[i];
-        let skuId = input.getAttribute('data-sku-id');
-        let count = input.value;
-        if (count && count !== '') {
-            counts[skuId] = { initial_count: parseInt(count, 10) };
-        }
-    }
-    
-    if (Object.keys(counts).length === 0) {
-        alert('No counts entered. Please enter at least one count before saving.');
-        return;
-    }
-    
-    let saveBtn = document.getElementById('saveCounts');
-    if (saveBtn) {
-        saveBtn.disabled = true;
-        saveBtn.textContent = 'Saving...';
-    }
-    
-    fetch('/counting', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            session_id: currentSessionId,
-            warehouse: warehouseDisplay,
-            counts: counts
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            currentSessionId = data.session_id;
-            if (data.recount_needed_count > 0) {
-                alert(`⚠️ ${data.recount_needed_count} SKU(s) need recount (discrepancy > 3)\n\nThe recount window will now open.`);
-                checkForRecounts();
-            } else {
-                let completeMsg = `✓ Counts saved successfully!\n\n`;
-                completeMsg += `Saved ${Object.keys(counts).length} SKU counts\n✅ No discrepancies found.\n\n`;
-                completeMsg += `Do you want to complete the counting session now?`;
-                if (confirm(completeMsg)) {
-                    completeCountingSession();
-                }
-            }
-        } else {
-            alert('Error saving counts');
-        }
-    })
-    .catch(error => {
-        alert('Error: ' + error);
-    })
-    .finally(() => {
-        if (saveBtn) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'Save All Counts';
-        }
-    });
-}
-
 function checkForRecounts() {
     if (!currentSessionId) return;
     fetch('/get_recount_list?session_id=' + currentSessionId)
@@ -1387,12 +1301,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.session_id) {
                     currentSessionId = data.session_id;
                 }
-                // Load SKUs with offline support
-                loadSkusWithOfflineSupport();
+                applyFilters();
             })
             .catch(error => {
                 console.error('Error checking active session:', error);
-                loadSkusWithOfflineSupport();
+                applyFilters();
             });
     }
 });
