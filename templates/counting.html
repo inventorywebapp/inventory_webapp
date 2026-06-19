@@ -1177,7 +1177,7 @@ function saveAllCounts() {
             currentSessionId = data.session_id;
             
             if (data.recount_needed_count > 0) {
-                alert(`⚠️ ${data.recount_needed_count} SKU(s) need recount (discrepancy > 3)\n\nThe recount window will now open.`);
+                alert(`⚠️ ${data.recount_needed_count} SKU(s) need recount (discrepancy > 5)\n\nThe recount window will now open.`);
                 checkForRecounts();
             } else {
                 let completeMsg = `✓ Counts saved successfully!\n\n`;
