@@ -1741,6 +1741,78 @@ def api_get_all_skus():
     return jsonify(result)
 
 # ============================================
+# DATABASE BACKUP & RESTORE (Admin Only)
+# ============================================
+@app.route('/admin/backup_database')
+@login_required
+def backup_database():
+    """Download database backup (admin only)"""
+    if current_user.role != 'admin':
+        flash('Admin access required', 'error')
+        return redirect(url_for('dashboard'))
+    
+    try:
+        db_path = app.config.get('SQLALCHEMY_DATABASE_URI', '').replace('sqlite:///', '')
+        if db_path == '' or db_path == ':memory:':
+            db_path = 'instance/inventory.db'
+        
+        if not os.path.exists(db_path):
+            flash('Database file not found', 'error')
+            return redirect(url_for('admin_dashboard'))
+        
+        return send_file(
+            db_path,
+            as_attachment=True,
+            download_name=f'inventory_backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db',
+            mimetype='application/octet-stream'
+        )
+    except Exception as e:
+        flash(f'Backup failed: {str(e)}', 'error')
+        return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/restore_database', methods=['GET', 'POST'])
+@login_required
+def restore_database():
+    """Upload and restore database backup (admin only)"""
+    if current_user.role != 'admin':
+        flash('Admin access required', 'error')
+        return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        try:
+            if 'backup_file' not in request.files:
+                flash('No file selected', 'error')
+                return redirect(url_for('restore_database'))
+            
+            file = request.files['backup_file']
+            if file.filename == '':
+                flash('No file selected', 'error')
+                return redirect(url_for('restore_database'))
+            
+            if not file.filename.endswith('.db'):
+                flash('Invalid file format. Please upload a .db file.', 'error')
+                return redirect(url_for('restore_database'))
+            
+            db_path = app.config.get('SQLALCHEMY_DATABASE_URI', '').replace('sqlite:///', '')
+            if db_path == '' or db_path == ':memory:':
+                db_path = 'instance/inventory.db'
+            
+            # Backup current database before restore
+            if os.path.exists(db_path):
+                backup_name = f'inventory_backup_before_restore_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db'
+                os.rename(db_path, os.path.join(os.path.dirname(db_path), backup_name))
+            
+            file.save(db_path)
+            flash('✅ Database restored successfully! The app will reload automatically.', 'success')
+            return redirect(url_for('admin_dashboard'))
+            
+        except Exception as e:
+            flash(f'Restore failed: {str(e)}', 'error')
+            return redirect(url_for('restore_database'))
+    
+    return render_template('admin_restore.html')
+
+# ============================================
 # MAIN ENTRY POINT
 # ============================================
 if __name__ == '__main__':
