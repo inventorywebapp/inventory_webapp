@@ -21,7 +21,7 @@ def get_ph_time():
 
 def check_recount_needed(initial_count, expected_count, kenneth_count):
     """
-    Check if recount is needed based on discrepancy > 3 or < -3
+    Check if recount is needed based on discrepancy > 5 or < -5
     NEGATIVE VALUES in expected_count or kenneth_count are TREATED AS 0
     """
     if initial_count is None:
@@ -60,8 +60,8 @@ def check_recount_needed(initial_count, expected_count, kenneth_count):
     # Compare with Kenneth's Inventory (which is now 0 if negative)
     diff_kenneth = abs(initial - kenneth)
     
-    # If either difference is greater than 3, recount needed
-    if diff_expected > 3 or diff_kenneth > 3:
+    # If either difference is greater than 5, recount needed
+    if diff_expected > 5 or diff_kenneth > 5:
         return True
     
     return False
@@ -322,7 +322,7 @@ def sync_data_from_drive():
                     sku.sku_status = str(row[column_mapping['sku_status']]) if pd.notna(row[column_mapping['sku_status']]) else ''
                 
                 # Set bypass recount for specific Item Categories
-                if sku.description in ['Console/Armrest', 'Armrest', 'Wiper', 'Armrest category', 'Wiper category']:
+                if sku.description in ['Console/Armrest', 'Armrest', 'Wiper', 'Armrest category', 'Wiper category', 'Trunk Tray']:
                     sku.bypass_recount = True
                 
                 # Update timestamp
@@ -497,7 +497,7 @@ def import_excel_data(file_path):
                 sku.sku_status = str(row[column_mapping['sku_status']]) if pd.notna(row[column_mapping['sku_status']]) else ''
             
             # Set bypass recount for specific Item Categories
-            if sku.description in ['Console/Armrest', 'Armrest', 'Wiper', 'Armrest category', 'Wiper category']:
+            if sku.description in ['Console/Armrest', 'Armrest', 'Wiper', 'Armrest category', 'Wiper category', 'Trunk Tray']:
                 sku.bypass_recount = True
             
             sku.updated_at = get_ph_time()
