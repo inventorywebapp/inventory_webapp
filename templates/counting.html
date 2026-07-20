@@ -37,13 +37,24 @@
             </div>
         </div>
         <div class="row mt-2">
-            <div class="col-md-12">
+            <div class="col-md-12 d-flex flex-wrap gap-2">
                 <button id="applyFilters" class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
                 <button id="saveCounts" class="btn btn-success" onclick="saveAllCounts()">Save All Counts</button>
-                <button id="completeCounting" class="btn btn-danger" onclick="completeCounting()">Complete Counting Session</button>
+                <button id="completeCounting" class="btn btn-danger" onclick="completeCounting()">Complete Session</button>
                 <button id="scanBarcodeBtn" class="btn btn-info" onclick="startBarcodeScanner()">
-                    <i class="bi bi-upc-scan"></i> Scan Barcode/QR
+                    <i class="bi bi-upc-scan"></i> Scan
                 </button>
+                <button id="printLabelBtn" class="btn btn-warning" onclick="openPrintLabelModal()">
+                    <i class="bi bi-tag"></i> Print Label
+                </button>
+                <div class="dropdown ms-auto">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-layout-three-columns"></i> Columns
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end p-2" id="columnToggleMenu" style="max-height: 400px; overflow-y: auto; min-width: 200px;">
+                        <!-- Column toggles will be populated by JavaScript -->
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
@@ -69,6 +80,60 @@
     </div>
 </div>
 
+<!-- Print Label Modal -->
+<div class="modal fade" id="printLabelModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="bi bi-tag"></i> Print Sticker Label</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">SKU / Description</label>
+                    <div style="position: relative;">
+                        <input type="text" id="printSkuInput" class="form-control" placeholder="Type SKU or Description..." autocomplete="off">
+                        <div id="printSkuSuggestions" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-top: none; z-index: 1000; max-height: 200px; overflow-y: auto; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
+                    </div>
+                    <small class="text-muted">Type to search, or enter custom text (e.g., "14" instead of "Wiper-Banana 14")</small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Label Width (mm)</label>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button class="btn btn-outline-secondary btn-sm size-preset" data-width="40" onclick="setLabelSize(40, 30)">40×30</button>
+                        <button class="btn btn-outline-secondary btn-sm size-preset" data-width="50" onclick="setLabelSize(50, 30)">50×30</button>
+                        <button class="btn btn-outline-secondary btn-sm size-preset" data-width="60" onclick="setLabelSize(60, 40)">60×40</button>
+                        <button class="btn btn-outline-secondary btn-sm size-preset" data-width="70" onclick="setLabelSize(70, 40)">70×40</button>
+                        <div class="d-flex gap-1">
+                            <input type="number" id="customWidth" class="form-control form-control-sm" style="width: 60px;" placeholder="W" min="20" max="120">
+                            <span class="align-self-center">×</span>
+                            <input type="number" id="customHeight" class="form-control form-control-sm" style="width: 60px;" placeholder="H" min="20" max="80">
+                            <button class="btn btn-sm btn-primary" onclick="applyCustomSize()">Apply</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Quantity</label>
+                    <input type="number" id="printQuantity" class="form-control" value="1" min="1" max="50">
+                </div>
+                <div class="form-check mb-3">
+                    <input type="checkbox" class="form-check-input" id="printBarcode" checked>
+                    <label class="form-check-label" for="printBarcode">Include Barcode</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-primary" onclick="generatePrintLabels()">
+                    <i class="bi bi-printer"></i> Generate & Print
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Print Preview Container (hidden) -->
+<div id="printPreviewContainer" style="display: none;"></div>
+
 <!-- Manual SKU Selection Modal -->
 <div class="modal fade" id="manualSkuModal" tabindex="-1">
     <div class="modal-dialog">
@@ -80,6 +145,27 @@
             <div class="modal-body">
                 <p>Multiple SKUs match the scanned code. Please select the correct one:</p>
                 <div id="manualSkuList" class="list-group"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Unsaved Changes Warning Modal -->
+<div class="modal fade" id="unsavedWarningModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Unsaved Counts</h5>
+                <button type="button" class="btn-close" onclick="closeUnsavedWarning('cancel')"></button>
+            </div>
+            <div class="modal-body">
+                <p>You have <strong id="unsavedCountText">0</strong> SKU(s) with unsaved counts.</p>
+                <p>What would you like to do?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeUnsavedWarning('cancel')">Cancel</button>
+                <button class="btn btn-warning" onclick="closeUnsavedWarning('discard')">Discard Changes</button>
+                <button class="btn btn-success" onclick="closeUnsavedWarning('save')">Save & Continue</button>
             </div>
         </div>
     </div>
@@ -109,6 +195,83 @@
 </div>
 
 <style>
+/* ===== COLUMN VISIBILITY ===== */
+.column-hidden {
+    display: none !important;
+}
+
+/* ===== PRINT LABEL STYLES ===== */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #printLabels {
+        visibility: visible !important;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        background: white;
+    }
+    #printLabels * {
+        visibility: visible !important;
+    }
+    .label-item {
+        page-break-after: avoid;
+        display: inline-block;
+        margin: 2px;
+        padding: 4px;
+        border: 1px solid #ddd;
+        border-radius: 2px;
+        text-align: center;
+    }
+    .label-item .label-sku {
+        font-size: 12px;
+        font-weight: bold;
+    }
+    .label-item .label-barcode {
+        margin: 2px auto;
+    }
+    .label-item .label-desc {
+        font-size: 10px;
+        color: #666;
+    }
+    .no-print {
+        display: none !important;
+    }
+}
+
+/* Print label preview styling */
+.label-item {
+    display: inline-block;
+    margin: 4px;
+    padding: 6px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    text-align: center;
+    background: white;
+}
+.label-item .label-sku {
+    font-size: 14px;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+}
+.label-item .label-barcode svg {
+    display: block;
+    margin: 2px auto;
+}
+.label-item .label-desc {
+    font-size: 10px;
+    color: #666;
+}
+.label-item .label-size-40 { width: 40mm; height: 30mm; }
+.label-item .label-size-50 { width: 50mm; height: 30mm; }
+.label-item .label-size-60 { width: 60mm; height: 40mm; }
+.label-item .label-size-70 { width: 70mm; height: 40mm; }
+
+/* ===== OTHER STYLES ===== */
 .suggestion-item:hover {
     background-color: #f0f0f0;
 }
@@ -196,25 +359,45 @@
     max-height: 150px;
     overflow-y: auto;
 }
+
+/* Print suggestions */
+#printSkuSuggestions .suggestion-item {
+    padding: 6px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+}
+#printSkuSuggestions .suggestion-item:hover {
+    background-color: #f0f7ff;
+}
+
+/* Size preset active state */
+.size-preset.active {
+    background-color: #0d6efd !important;
+    color: white !important;
+    border-color: #0d6efd !important;
+}
 </style>
 
 <!-- Load html5-qrcode library -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
+<!-- Load JsBarcode for barcode generation -->
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+
 <script>
-// Day Category order mapping
+// ============================================
+// EXISTING VARIABLES (unchanged)
+// ============================================
 const DAY_ORDER = {
     'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
 };
 
-// Define which Item Categories belong to 5th Floor Warehouse
 const FIFTH_FLOOR_CATEGORIES = [
     'Console/Armrest', 'Deep Dish-3D', 'Deep Dish-5D', 'Deep Dish-5D-CF',
     'Deep Dish-DL', 'Deep Dish-DM', 'Deep Dish-ROHS', 'Deep Dish-TPE-CF',
     'Deep Dish-UN', 'Trunk Tray'
 ];
 
-// Store all data from server
 let allItemCategories = {{ item_categories|tojson }};
 let allDayCategoriesRaw = {{ day_categories|tojson }};
 let allSkus = [];
@@ -226,13 +409,444 @@ let searchTimeout = null;
 let html5QrCode = null;
 let isScannerActive = false;
 
-// Sort day categories
 let allDayCategories = [...allDayCategoriesRaw].sort((a, b) => {
     let orderA = DAY_ORDER[a] || 999;
     let orderB = DAY_ORDER[b] || 999;
     return orderA - orderB;
 });
 
+// ============================================
+// COLUMN VISIBILITY
+// ============================================
+const COLUMNS = [
+    { key: 'sku', label: 'SKU' },
+    { key: 'description', label: 'Description (Item Category)' },
+    { key: 'day_category', label: 'Day Category' },
+    { key: 'last_count_date', label: 'Last Count Date' },
+    { key: 'last_count', label: 'Last Count' },
+    { key: 'container_qty', label: 'Container Qty' },
+    { key: 'container_details', label: 'Container Details' },
+    { key: 'final_expected', label: 'Final Expected' },
+    { key: 'kenneth', label: "Kenneth's Inv" },
+    { key: 'current_count', label: 'Current Count' },
+    { key: 'last_counted_date', label: 'Last Counted Date' },
+    { key: 'previous_count', label: 'Previous Count' },
+    { key: 'status', label: 'Status' }
+];
+
+const COLUMN_CLASSES = {
+    sku: 'col-sku',
+    description: 'col-description',
+    day_category: 'col-day-category',
+    last_count_date: 'col-last-count-date',
+    last_count: 'col-last-count',
+    container_qty: 'col-container-qty',
+    container_details: 'col-container-details',
+    final_expected: 'col-final-expected',
+    kenneth: 'col-kenneth',
+    current_count: 'col-current-count',
+    last_counted_date: 'col-last-counted-date',
+    previous_count: 'col-previous-count',
+    status: 'col-status'
+};
+
+function getColumnPreferences() {
+    try {
+        const prefs = localStorage.getItem('columnVisibility');
+        if (prefs) return JSON.parse(prefs);
+    } catch (e) {}
+    // Default: all visible
+    const defaults = {};
+    COLUMNS.forEach(c => defaults[c.key] = true);
+    return defaults;
+}
+
+function saveColumnPreferences(prefs) {
+    try {
+        localStorage.setItem('columnVisibility', JSON.stringify(prefs));
+    } catch (e) {}
+}
+
+function initColumnToggleMenu() {
+    const menu = document.getElementById('columnToggleMenu');
+    const prefs = getColumnPreferences();
+    
+    menu.innerHTML = '';
+    COLUMNS.forEach(col => {
+        const li = document.createElement('li');
+        li.className = 'dropdown-item';
+        li.style.cursor = 'pointer';
+        li.style.padding = '4px 8px';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'form-check-input me-2';
+        checkbox.id = `col-toggle-${col.key}`;
+        checkbox.checked = prefs[col.key] !== false;
+        checkbox.onchange = function() {
+            const newPrefs = getColumnPreferences();
+            newPrefs[col.key] = this.checked;
+            saveColumnPreferences(newPrefs);
+            applyColumnVisibility();
+        };
+        
+        const label = document.createElement('label');
+        label.htmlFor = `col-toggle-${col.key}`;
+        label.textContent = col.label;
+        label.style.cursor = 'pointer';
+        
+        li.appendChild(checkbox);
+        li.appendChild(label);
+        menu.appendChild(li);
+    });
+}
+
+function applyColumnVisibility() {
+    const prefs = getColumnPreferences();
+    COLUMNS.forEach(col => {
+        const className = COLUMN_CLASSES[col.key];
+        const elements = document.querySelectorAll(`.${className}`);
+        const isVisible = prefs[col.key] !== false;
+        elements.forEach(el => {
+            if (isVisible) {
+                el.classList.remove('column-hidden');
+            } else {
+                el.classList.add('column-hidden');
+            }
+        });
+    });
+}
+
+// ============================================
+// PRINT LABEL FUNCTIONS
+// ============================================
+let printSkuTimeout = null;
+let selectedPrintSku = null;
+let printLabelWidth = 40;
+let printLabelHeight = 30;
+
+function openPrintLabelModal() {
+    document.getElementById('printSkuInput').value = '';
+    document.getElementById('printSkuSuggestions').style.display = 'none';
+    document.getElementById('printQuantity').value = 1;
+    document.getElementById('printBarcode').checked = true;
+    selectedPrintSku = null;
+    
+    // Reset size presets
+    document.querySelectorAll('.size-preset').forEach(b => b.classList.remove('active'));
+    document.querySelector('.size-preset[data-width="40"]')?.classList.add('active');
+    printLabelWidth = 40;
+    printLabelHeight = 30;
+    
+    const modal = new bootstrap.Modal(document.getElementById('printLabelModal'));
+    modal.show();
+    setTimeout(() => document.getElementById('printSkuInput').focus(), 300);
+}
+
+function setupPrintSkuSearch() {
+    const input = document.getElementById('printSkuInput');
+    const suggestions = document.getElementById('printSkuSuggestions');
+    
+    input.addEventListener('input', function() {
+        const term = this.value.trim();
+        
+        if (printSkuTimeout) clearTimeout(printSkuTimeout);
+        
+        if (term.length < 1) {
+            suggestions.style.display = 'none';
+            selectedPrintSku = null;
+            return;
+        }
+        
+        printSkuTimeout = setTimeout(() => {
+            // Search in allSkus
+            const matches = [];
+            const seen = new Set();
+            const termLower = term.toLowerCase();
+            
+            // First try exact matches
+            for (const sku of allSkus) {
+                if (!seen.has(sku.sku) && sku.sku.toLowerCase() === termLower) {
+                    seen.add(sku.sku);
+                    matches.push({ sku: sku, score: 100 });
+                }
+            }
+            
+            // Then contains matches
+            for (const sku of allSkus) {
+                if (!seen.has(sku.sku) && sku.sku.toLowerCase().includes(termLower)) {
+                    seen.add(sku.sku);
+                    matches.push({ sku: sku, score: 80 });
+                }
+            }
+            
+            // Then description matches
+            for (const sku of allSkus) {
+                if (!seen.has(sku.sku) && sku.description && sku.description.toLowerCase().includes(termLower)) {
+                    seen.add(sku.sku);
+                    matches.push({ sku: sku, score: 60 });
+                }
+            }
+            
+            // Limit to 10 results
+            const topMatches = matches.slice(0, 10);
+            
+            if (topMatches.length > 0) {
+                suggestions.innerHTML = topMatches.map(m => `
+                    <div class="suggestion-item" onclick="selectPrintSku('${escapeHtml(m.sku.sku)}', ${m.sku.id})">
+                        <strong>${escapeHtml(m.sku.sku)}</strong>
+                        <small class="text-muted ms-2">${escapeHtml(m.sku.description || '')}</small>
+                    </div>
+                `).join('');
+                suggestions.style.display = 'block';
+            } else {
+                suggestions.innerHTML = `<div class="suggestion-item text-muted">No matches found. Enter custom text.</div>`;
+                suggestions.style.display = 'block';
+            }
+        }, 250);
+    });
+    
+    input.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            suggestions.style.display = 'none';
+            if (selectedPrintSku) {
+                this.value = selectedPrintSku.sku;
+            }
+        }
+    });
+    
+    document.addEventListener('click', function(e) {
+        if (e.target !== input && !suggestions.contains(e.target)) {
+            suggestions.style.display = 'none';
+        }
+    });
+}
+
+function selectPrintSku(skuCode, skuId) {
+    const input = document.getElementById('printSkuInput');
+    input.value = skuCode;
+    selectedPrintSku = allSkus.find(s => s.id === skuId) || { sku: skuCode };
+    document.getElementById('printSkuSuggestions').style.display = 'none';
+}
+
+function setLabelSize(width, height) {
+    printLabelWidth = width;
+    printLabelHeight = height;
+    document.querySelectorAll('.size-preset').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.size-preset[data-width="${width}"]`)?.classList.add('active');
+    document.getElementById('customWidth').value = '';
+    document.getElementById('customHeight').value = '';
+}
+
+function applyCustomSize() {
+    const w = parseInt(document.getElementById('customWidth').value);
+    const h = parseInt(document.getElementById('customHeight').value);
+    if (w > 0 && h > 0) {
+        printLabelWidth = w;
+        printLabelHeight = h;
+        document.querySelectorAll('.size-preset').forEach(b => b.classList.remove('active'));
+    }
+}
+
+function generatePrintLabels() {
+    const input = document.getElementById('printSkuInput');
+    const skuText = input.value.trim();
+    const quantity = parseInt(document.getElementById('printQuantity').value) || 1;
+    const includeBarcode = document.getElementById('printBarcode').checked;
+    
+    if (!skuText) {
+        alert('Please enter or select a SKU.');
+        return;
+    }
+    
+    // Determine what to print
+    let displaySku = skuText;
+    let displayDesc = '';
+    
+    if (selectedPrintSku && selectedPrintSku.sku === skuText) {
+        // User selected a SKU from suggestions
+        displayDesc = selectedPrintSku.description || '';
+    } else {
+        // User entered custom text - use it as-is
+        displaySku = skuText;
+        displayDesc = '';
+    }
+    
+    // Build label HTML
+    let labelsHtml = `<div id="printLabels" style="padding: 10px; background: white;">`;
+    
+    for (let i = 0; i < quantity; i++) {
+        labelsHtml += `
+            <div class="label-item label-size-${printLabelWidth}" style="width: ${printLabelWidth}mm; height: ${printLabelHeight}mm; display: inline-block; margin: 2px; padding: 4px; border: 1px solid #ddd; border-radius: 2px; text-align: center; box-sizing: border-box;">
+                <div class="label-sku" style="font-size: ${printLabelWidth >= 60 ? '16px' : '12px'}; font-weight: bold; font-family: 'Courier New', monospace;">${escapeHtml(displaySku)}</div>
+                ${displayDesc ? `<div class="label-desc" style="font-size: 10px; color: #666; margin-top: 2px;">${escapeHtml(displayDesc)}</div>` : ''}
+                ${includeBarcode ? `
+                    <div class="label-barcode" style="margin: 2px auto;">
+                        <svg id="barcode-${i}" style="width: ${Math.min(printLabelWidth * 0.9, 70)}px; height: ${Math.min(printLabelHeight * 0.4, 20)}px;"></svg>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+    
+    labelsHtml += `</div>`;
+    
+    // Hide modal and show print preview
+    const modal = bootstrap.Modal.getInstance(document.getElementById('printLabelModal'));
+    modal.hide();
+    
+    const container = document.getElementById('printPreviewContainer');
+    container.style.display = 'block';
+    container.innerHTML = labelsHtml;
+    
+    // Generate barcodes
+    if (includeBarcode) {
+        setTimeout(() => {
+            for (let i = 0; i < quantity; i++) {
+                const svg = document.getElementById(`barcode-${i}`);
+                if (svg) {
+                    try {
+                        JsBarcode(svg, displaySku, {
+                            format: 'CODE128',
+                            width: 1.5,
+                            height: 30,
+                            displayValue: false,
+                            fontSize: 10,
+                            margin: 2
+                        });
+                    } catch (e) {
+                        console.warn('Barcode generation failed:', e);
+                    }
+                }
+            }
+            // Trigger print after a short delay for barcodes to render
+            setTimeout(() => {
+                window.print();
+                // Reset after print
+                setTimeout(() => {
+                    container.style.display = 'none';
+                    container.innerHTML = '';
+                }, 500);
+            }, 300);
+        }, 100);
+    } else {
+        // Trigger print immediately
+        setTimeout(() => {
+            window.print();
+            setTimeout(() => {
+                container.style.display = 'none';
+                container.innerHTML = '';
+            }, 500);
+        }, 100);
+    }
+}
+
+// ============================================
+// UNSAVED CHANGES WARNING
+// ============================================
+let pendingNavigation = null;
+let unsavedCounts = [];
+
+function checkForUnsavedCounts() {
+    const inputs = document.querySelectorAll('.initial-count');
+    unsavedCounts = [];
+    
+    inputs.forEach(input => {
+        const skuId = input.getAttribute('data-sku-id');
+        const value = input.value.trim();
+        if (value && value !== '') {
+            unsavedCounts.push({
+                skuId: skuId,
+                value: value,
+                input: input
+            });
+        }
+    });
+    
+    return unsavedCounts.length;
+}
+
+function showUnsavedWarning(action) {
+    pendingNavigation = action;
+    const count = unsavedCounts.length;
+    document.getElementById('unsavedCountText').textContent = count;
+    const modal = new bootstrap.Modal(document.getElementById('unsavedWarningModal'));
+    modal.show();
+}
+
+function closeUnsavedWarning(choice) {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('unsavedWarningModal'));
+    if (modal) modal.hide();
+    
+    if (choice === 'save') {
+        // Save counts first
+        const saveBtn = document.getElementById('saveCounts');
+        if (saveBtn) {
+            saveBtn.click();
+            // After save, execute pending navigation
+            setTimeout(() => {
+                executePendingNavigation();
+            }, 500);
+        }
+    } else if (choice === 'discard') {
+        // Just navigate without saving
+        executePendingNavigation();
+    }
+    // 'cancel' = do nothing
+}
+
+function executePendingNavigation() {
+    if (pendingNavigation === 'next') {
+        doNextPage();
+    } else if (pendingNavigation === 'prev') {
+        doPreviousPage();
+    }
+    pendingNavigation = null;
+}
+
+// ============================================
+// MODIFIED PAGINATION FUNCTIONS
+// ============================================
+function previousPage() {
+    if (currentPage > 1) {
+        const unsaved = checkForUnsavedCounts();
+        if (unsaved > 0) {
+            pendingNavigation = 'prev';
+            showUnsavedWarning('prev');
+            return;
+        }
+        doPreviousPage();
+    }
+}
+
+function doPreviousPage() {
+    currentPage--;
+    displaySkusWithPagination();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function nextPage() {
+    let totalPages = Math.ceil(filteredSkus.length / itemsPerPage);
+    if (currentPage < totalPages) {
+        const unsaved = checkForUnsavedCounts();
+        if (unsaved > 0) {
+            pendingNavigation = 'next';
+            showUnsavedWarning('next');
+            return;
+        }
+        doNextPage();
+    }
+}
+
+function doNextPage() {
+    currentPage++;
+    displaySkusWithPagination();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ============================================
+// EXISTING FUNCTIONS (unchanged below)
+// ============================================
 function getUrlParameter(name) {
     let urlParams = new URLSearchParams(window.location.search);
     return urlParams.get(name);
@@ -260,15 +874,16 @@ function showToast(message, type = 'info') {
     setTimeout(() => toast.remove(), 4000);
 }
 
-// ============ QR/BARCODE SCANNER FUNCTIONS ============
-
+// ============================================
+// QR/BARCODE SCANNER FUNCTIONS (unchanged)
+// ============================================
 async function startBarcodeScanner() {
+    // ... (existing code - unchanged)
     if (isScannerActive) {
         showToast("Scanner is already running", "warning");
         return;
     }
     
-    // FORCE LOAD ALL SKUs from server using the new endpoint
     showToast("Loading all SKUs from database...", "info");
     const resultContainer = document.getElementById('qr-reader-results');
     if (resultContainer) {
@@ -276,13 +891,11 @@ async function startBarcodeScanner() {
     }
     
     try {
-        // USE THE NEW ENDPOINT that returns ALL SKUs (no 1000 limit)
         const response = await fetch('/api/get_all_skus');
         const data = await response.json();
         allSkus = data;
         console.log(`✅ Loaded ${allSkus.length} SKUs into memory`);
         
-        // Verify Visor SKUs are loaded
         let visorSkus = allSkus.filter(s => s.sku && s.sku.toLowerCase().includes("visor"));
         console.log(`Found ${visorSkus.length} Visor SKUs:`, visorSkus.map(s => s.sku));
         
@@ -296,7 +909,6 @@ async function startBarcodeScanner() {
         return;
     }
     
-    // Rest of the camera initialization code remains the same...
     const scannerModal = new bootstrap.Modal(document.getElementById('scannerModal'));
     scannerModal.show();
     
@@ -341,7 +953,6 @@ async function startBarcodeScanner() {
             { facingMode: "environment" },
             config,
             (decodedText, decodedResult) => {
-                // Clean the scanned text
                 let cleanedText = decodedText.trim().replace(/[\n\r]/g, '');
                 console.log(`📸 SCANNED: "${cleanedText}"`);
                 
@@ -400,9 +1011,7 @@ function manualBarcodeEntry() {
     }
 }
 
-// FIXED: Simple exact match with cleaned text
 function intelligentSkuSearch(scannedText) {
-    // Clean the scanned text
     let cleanedScan = scannedText.trim().replace(/[\n\r]/g, '');
     
     console.log("=== SEARCHING FOR:", cleanedScan);
@@ -413,7 +1022,6 @@ function intelligentSkuSearch(scannedText) {
         return;
     }
     
-    // Find exact match (case-insensitive)
     let exactMatch = null;
     
     for (let sku of allSkus) {
@@ -425,7 +1033,6 @@ function intelligentSkuSearch(scannedText) {
     }
     
     if (exactMatch) {
-        // Jump to the SKU
         document.getElementById('searchSku').value = exactMatch.sku;
         document.getElementById('warehouse').value = 'All';
         document.getElementById('dayCategory').value = 'All';
@@ -458,7 +1065,6 @@ function intelligentSkuSearch(scannedText) {
         return;
     }
     
-    // Not found - show helpful message with similar SKUs
     let similar = [];
     for (let sku of allSkus) {
         if (sku.sku && sku.sku.toLowerCase().includes(cleanedScan.toLowerCase().substring(0, 8))) {
@@ -474,8 +1080,9 @@ function intelligentSkuSearch(scannedText) {
     }
 }
 
-// ============ END OF QR SCANNER ============
-
+// ============================================
+// EXISTING FUNCTIONS (unchanged - preserved)
+// ============================================
 function filterItemCategoriesByWarehouse() {
     let warehouse = document.getElementById('warehouse').value;
     let itemCategorySelect = document.getElementById('itemCategory');
@@ -882,6 +1489,9 @@ function loadExistingCountsForSkus() {
         .catch(error => console.error('Error loading existing counts:', error));
 }
 
+// ============================================
+// MODIFIED displaySkus - Added column classes and Print Label button
+// ============================================
 function displaySkus(skus) {
     let skusListDiv = document.getElementById('skusList');
     
@@ -898,21 +1508,33 @@ function displaySkus(skus) {
     let html = '<div class="col-12"><div class="table-responsive"><table class="table table-bordered table-hover table-striped">';
     html += '<thead class="table-dark">';
     html += '<tr>';
-    html += '<th>SKU</th>';
-    html += '<th>Description (Item Category)</th>';
-    html += '<th>Day Category</th>';
-    html += '<th>Last Count Date</th>';
-    html += '<th>Last Count</th>';
-    html += '<th>Container Qty</th>';
-    html += '<th>Container Details</th>';
-    html += '<th>Final Expected</th>';
-    html += '<th>Kenneth\'s Inv</th>';
-    html += '<th>Current Count</th>';
-    html += '<th>Last Counted Date</th>';
-    html += '<th>Previous Count</th>';
-    html += '<th>Status</th>';
-    html += '</tr>';
-    html += '</thead><tbody>';
+    
+    // Column headers with classes
+    const columnHeaders = [
+        { key: 'sku', label: 'SKU' },
+        { key: 'description', label: 'Description (Item Category)' },
+        { key: 'day_category', label: 'Day Category' },
+        { key: 'last_count_date', label: 'Last Count Date' },
+        { key: 'last_count', label: 'Last Count' },
+        { key: 'container_qty', label: 'Container Qty' },
+        { key: 'container_details', label: 'Container Details' },
+        { key: 'final_expected', label: 'Final Expected' },
+        { key: 'kenneth', label: "Kenneth's Inv" },
+        { key: 'current_count', label: 'Current Count' },
+        { key: 'last_counted_date', label: 'Last Counted Date' },
+        { key: 'previous_count', label: 'Previous Count' },
+        { key: 'status', label: 'Status' }
+    ];
+    
+    const prefs = getColumnPreferences();
+    columnHeaders.forEach(col => {
+        const isVisible = prefs[col.key] !== false;
+        const className = COLUMN_CLASSES[col.key];
+        html += `<th class="${className} ${isVisible ? '' : 'column-hidden'}">${col.label}</th>`;
+    });
+    
+    html += `<th class="no-print">Actions</th>`;
+    html += '</tr></thead><tbody>';
     
     for (let i = 0; i < skus.length; i++) {
         let sku = skus[i];
@@ -930,12 +1552,12 @@ function displaySkus(skus) {
             finalCountValue = sku.final_count;
             isCompleted = true;
             rowClass = 'sku-completed';
-            statusBadge = '<span class="badge bg-success">Completed (ready for next count)</span>';
+            statusBadge = '<span class="badge bg-success">Completed</span>';
         }
         else if (sku.is_expired === true) {
             isExpired = true;
             rowClass = 'sku-needs-count';
-            statusBadge = '<span class="badge bg-warning">Expired - Needs Recount</span>';
+            statusBadge = '<span class="badge bg-warning">Expired</span>';
         }
         else if (sku.in_progress === true || (sku.has_count === true && sku.current_count !== undefined && sku.current_count !== null && sku.current_count !== '')) {
             existingCountValue = sku.current_count;
@@ -947,7 +1569,7 @@ function displaySkus(skus) {
         }
         
         if (sku.bypass_recount) {
-            statusBadge = '<span class="badge bg-warning">Bypass Recount</span>';
+            statusBadge = '<span class="badge bg-warning">Bypass</span>';
         }
         
         let containerDetails = sku.container_details || '-';
@@ -963,44 +1585,41 @@ function displaySkus(skus) {
         let inputValue = (isInProgress && existingCountValue) ? existingCountValue : '';
         let inputPlaceholder = 'Enter count';
         
-        let lastCountClass = 'fw-bold text-dark';
-        let finalExpectedClass = 'fw-bold text-dark';
-        let kennethClass = 'fw-bold text-dark';
-        
         let rowId = `sku-row-${sku.id}`;
         
         html += `<tr id="${rowId}" class="${rowClass}" data-in-progress="${isInProgress}" data-completed="${isCompleted}" data-expired="${isExpired}">`;
-        html += '<td><strong>' + escapeHtml(sku.sku) + '</strong></td>';
-        html += '<td>' + escapeHtml(sku.description || '-') + '</td>';
-        html += '<td>' + escapeHtml(sku.category || '-') + '</td>';
-        html += '<td class="text-nowrap">' + escapeHtml(lastCountDate) + '</td>';
-        html += '<td class="' + lastCountClass + '">' + (sku.last_count || 0) + '</td>';
-        html += '<td>' + (sku.total_container_qty || 0) + '</td>';
-        html += '<td><small>' + escapeHtml(containerDetails) + '</small></td>';
-        html += '<td class="' + finalExpectedClass + '">' + (sku.final_expected_count || 0) + '</td>';
-        html += '<td class="' + kennethClass + '">' + (sku.kenneth_inventory || 0) + '</td>';
-        html += '<td>';
-        html += `<input type="text" class="form-control initial-count" data-sku-id="${sku.id}" style="min-width: 100px; width: 100px;" placeholder="${inputPlaceholder}" inputmode="numeric"`;
-        if (inputValue) {
-            html += ` value="${inputValue}"`;
-        }
-        html += '>';
-        html += '</td>';
-        html += '<td>';
-        if (existingCountTime && !isExpired) {
-            html += `<span id="last-counted-${sku.id}" style="color: #0d6efd; font-weight: bold;">${existingCountTime}</span>`;
-        } else {
-            html += `<span id="last-counted-${sku.id}">-</span>`;
-        }
-        html += '</td>';
-        html += '<td>';
-        if (finalCountValue && !isExpired) {
-            html += `<span id="last-count-value-${sku.id}" style="color: #0d6efd; font-weight: bold;">${finalCountValue}</span>`;
-        } else {
-            html += `<span id="last-count-value-${sku.id}">-</span>`;
-        }
-        html += '</td>';
-        html += '<td>' + statusBadge + '</td>';
+        
+        // Row data with column classes
+        const rowData = [
+            { key: 'sku', value: `<strong>${escapeHtml(sku.sku)}</strong>` },
+            { key: 'description', value: escapeHtml(sku.description || '-') },
+            { key: 'day_category', value: escapeHtml(sku.category || '-') },
+            { key: 'last_count_date', value: `<span class="text-nowrap">${escapeHtml(lastCountDate)}</span>` },
+            { key: 'last_count', value: sku.last_count || 0 },
+            { key: 'container_qty', value: sku.total_container_qty || 0 },
+            { key: 'container_details', value: `<small>${escapeHtml(containerDetails)}</small>` },
+            { key: 'final_expected', value: `<span class="fw-bold text-dark">${sku.final_expected_count || 0}</span>` },
+            { key: 'kenneth', value: `<span class="fw-bold text-dark">${sku.kenneth_inventory || 0}</span>` },
+            { key: 'current_count', value: `<input type="text" class="form-control initial-count" data-sku-id="${sku.id}" style="min-width: 80px; width: 100px;" placeholder="${inputPlaceholder}" inputmode="numeric" value="${escapeHtml(inputValue)}">` },
+            { key: 'last_counted_date', value: (existingCountTime && !isExpired) ? `<span style="color: #0d6efd; font-weight: bold;">${escapeHtml(existingCountTime)}</span>` : '-' },
+            { key: 'previous_count', value: (finalCountValue && !isExpired) ? `<span style="color: #0d6efd; font-weight: bold;">${escapeHtml(finalCountValue)}</span>` : '-' },
+            { key: 'status', value: statusBadge }
+        ];
+        
+        const prefsRow = getColumnPreferences();
+        rowData.forEach(col => {
+            const isVisible = prefsRow[col.key] !== false;
+            const className = COLUMN_CLASSES[col.key];
+            html += `<td class="${className} ${isVisible ? '' : 'column-hidden'}">${col.value}</td>`;
+        });
+        
+        // Actions column (print label button)
+        html += `<td class="no-print">
+            <button class="btn btn-sm btn-outline-warning" onclick="printSingleLabel('${escapeHtml(sku.sku)}')" title="Print Label">
+                <i class="bi bi-tag"></i>
+            </button>
+        </td>`;
+        
         html += '</tr>';
     }
     
@@ -1059,27 +1678,36 @@ function displaySkus(skus) {
         });
         
         highlightSkusStatus();
+        applyColumnVisibility();
     }, 100);
 }
 
-function previousPage() {
-    if (currentPage > 1) {
-        currentPage--;
-        displaySkusWithPagination();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+// ============================================
+// Print Single Label from Table Row
+// ============================================
+function printSingleLabel(skuCode) {
+    // Find the SKU in allSkus
+    const sku = allSkus.find(s => s.sku === skuCode);
+    if (sku) {
+        document.getElementById('printSkuInput').value = sku.sku;
+        selectedPrintSku = sku;
+    } else {
+        document.getElementById('printSkuInput').value = skuCode;
+        selectedPrintSku = null;
     }
+    document.getElementById('printQuantity').value = 1;
+    document.getElementById('printBarcode').checked = true;
+    
+    const modal = new bootstrap.Modal(document.getElementById('printLabelModal'));
+    modal.show();
+    setTimeout(() => document.getElementById('printSkuInput').focus(), 300);
 }
 
-function nextPage() {
-    let totalPages = Math.ceil(filteredSkus.length / itemsPerPage);
-    if (currentPage < totalPages) {
-        currentPage++;
-        displaySkusWithPagination();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-}
-
+// ============================================
+// EXISTING FUNCTIONS (unchanged below)
+// ============================================
 function saveAllCounts() {
+    // ... (existing code - unchanged)
     let warehouse = document.getElementById('warehouse').value;
     let warehouseDisplay = warehouse === '5thFloor' ? '5th Floor Warehouse' : (warehouse === 'Main' ? 'Main Warehouse' : 'All Warehouses');
     
@@ -1205,6 +1833,7 @@ function saveAllCounts() {
 }
 
 function checkForRecounts() {
+    // ... (existing code - unchanged)
     if (!currentSessionId) return;
     
     fetch('/get_recount_list?session_id=' + currentSessionId)
@@ -1227,7 +1856,8 @@ function checkForRecounts() {
 }
 
 function showRecountModal(recountItems) {
-    console.log("Recount Items:", recountItems); // Debug log
+    // ... (existing code - unchanged)
+    console.log("Recount Items:", recountItems);
     
     let html = '<div class="table-responsive"><table class="table table-bordered">';
     html += '<thead class="table-dark">';
@@ -1239,7 +1869,7 @@ function showRecountModal(recountItems) {
     html += '<th>Kenneth\'s Inventory</th>';
     html += '<th>Recount Count</th>';
     html += '<th>Remarks (Optional)</th>';
-    html += '</tr></thead><tbody>';  // ← FIXED: removed extra </table>
+    html += '</tr></thead><tbody>';
     
     for (let i = 0; i < recountItems.length; i++) {
         let item = recountItems[i];
@@ -1270,7 +1900,7 @@ function showRecountModal(recountItems) {
                     </div>
                     <div class="modal-body">
                         <div class="alert alert-danger">
-                            <strong>Important:</strong> The following SKUs have discrepancies greater than 3 units.
+                            <strong>Important:</strong> The following SKUs have discrepancies greater than 5 units.
                             Please recount and enter the correct quantity.
                         </div>
                         ${html}
@@ -1287,7 +1917,6 @@ function showRecountModal(recountItems) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
-    // Bind events for recount inputs
     document.querySelectorAll('.recount-count').forEach(input => {
         input.addEventListener('blur', function() {
             let value = this.value;
@@ -1336,6 +1965,7 @@ function closeRecountModal() {
 }
 
 function saveRecounts() {
+    // ... (existing code - unchanged)
     let recounts = [];
     let countInputs = document.querySelectorAll('.recount-count');
     let hasError = false;
@@ -1465,7 +2095,9 @@ function completeCounting() {
         });
 }
 
-// Event listeners with null checks
+// ============================================
+// DOCUMENT READY - Initialize
+// ============================================
 document.addEventListener('DOMContentLoaded', function() {
     const warehouseSelect = document.getElementById('warehouse');
     const itemCategorySelect = document.getElementById('itemCategory');
@@ -1493,6 +2125,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     filterItemCategoriesByWarehouse();
     setupSmartSearch();
+    initColumnToggleMenu();
+    setupPrintSkuSearch();
     
     let sessionIdFromUrl = getUrlParameter('session_id');
     if (sessionIdFromUrl) {
