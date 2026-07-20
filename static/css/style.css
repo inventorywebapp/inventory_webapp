@@ -565,3 +565,106 @@ body {
         max-width: 100% !important;
     }
 }
+
+/* ============================================
+   PRINT LABEL STYLES
+   ============================================ */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #printLabels {
+        visibility: visible !important;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        background: white;
+    }
+    #printLabels * {
+        visibility: visible !important;
+    }
+    .label-item {
+        page-break-after: avoid;
+        display: inline-block;
+        margin: 2px;
+        padding: 4px;
+        border: 1px solid #ddd;
+        border-radius: 2px;
+        text-align: center;
+    }
+    .label-item .label-sku {
+        font-size: 12px;
+        font-weight: bold;
+    }
+    .label-item .label-barcode {
+        margin: 2px auto;
+    }
+    .label-item .label-desc {
+        font-size: 10px;
+        color: #666;
+    }
+    .no-print {
+        display: none !important;
+    }
+}
+
+/* ============================================
+   COLUMN VISIBILITY
+   ============================================ */
+.column-hidden {
+    display: none !important;
+}
+
+/* ============================================
+   PRINT LABEL PREVIEW
+   ============================================ */
+.label-item {
+    display: inline-block;
+    margin: 4px;
+    padding: 6px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    text-align: center;
+    background: white;
+}
+.label-item .label-sku {
+    font-size: 14px;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+}
+.label-item .label-barcode svg {
+    display: block;
+    margin: 2px auto;
+}
+.label-item .label-desc {
+    font-size: 10px;
+    color: #666;
+}
+.label-item .label-size-40 { width: 40mm; height: 30mm; }
+.label-item .label-size-50 { width: 50mm; height: 30mm; }
+.label-item .label-size-60 { width: 60mm; height: 40mm; }
+.label-item .label-size-70 { width: 70mm; height: 40mm; }
+
+/* ============================================
+   SIZE PRESET ACTIVE STATE
+   ============================================ */
+.size-preset.active {
+    background-color: #0d6efd !important;
+    color: white !important;
+    border-color: #0d6efd !important;
+}
+
+/* ============================================
+   PRINT SUGGESTIONS
+   ============================================ */
+#printSkuSuggestions .suggestion-item {
+    padding: 6px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+}
+#printSkuSuggestions .suggestion-item:hover {
+    background-color: #f0f7ff;
+}
