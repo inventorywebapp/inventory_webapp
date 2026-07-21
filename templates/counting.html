@@ -708,154 +708,132 @@ function intelligentSkuSearch(scannedText) {
 }
 
 // ============================================
-// EXISTING FUNCTIONS (unchanged - preserved)
+// FILTER FUNCTIONS - FIXED!
 // ============================================
-function filterItemCategoriesByWarehouse() {
-    let warehouse = document.getElementById('warehouse').value;
-    let itemCategorySelect = document.getElementById('itemCategory');
+
+// NEW: Filter Item Categories by both Warehouse AND Day Category
+function filterItemCategoriesByWarehouseAndDay() {
+    const warehouse = document.getElementById('warehouse').value;
+    const dayCategory = document.getElementById('dayCategory').value;
+    const itemCategorySelect = document.getElementById('itemCategory');
     if (!itemCategorySelect) return;
     
-    let currentValue = itemCategorySelect.value;
+    const currentValue = itemCategorySelect.value;
     
+    // Get all SKUs that match the current warehouse and day category
+    let matchingSkus = allSkus;
+    
+    // Filter by warehouse
+    if (warehouse === '5thFloor') {
+        matchingSkus = matchingSkus.filter(sku => FIFTH_FLOOR_CATEGORIES.includes(sku.description));
+    } else if (warehouse === 'Main') {
+        matchingSkus = matchingSkus.filter(sku => !FIFTH_FLOOR_CATEGORIES.includes(sku.description));
+    }
+    // 'All' warehouse = no filter
+    
+    // Filter by day category (if not 'All')
+    if (dayCategory !== 'All') {
+        matchingSkus = matchingSkus.filter(sku => sku.category === dayCategory);
+    }
+    
+    // Get unique item categories from matching SKUs
+    const categorySet = new Set();
+    matchingSkus.forEach(sku => {
+        if (sku.description) {
+            categorySet.add(sku.description);
+        }
+    });
+    
+    // Build dropdown
     itemCategorySelect.innerHTML = '<option value="All">-- All Item Categories --</option>';
     
-    let filteredCategories = [];
-    
-    if (warehouse === '5thFloor') {
-        filteredCategories = allItemCategories.filter(cat => FIFTH_FLOOR_CATEGORIES.includes(cat));
-    } else if (warehouse === 'Main') {
-        filteredCategories = allItemCategories.filter(cat => !FIFTH_FLOOR_CATEGORIES.includes(cat));
-    } else {
-        filteredCategories = [...allItemCategories];
-    }
-    
-    filteredCategories.sort();
-    
-    for (let i = 0; i < filteredCategories.length; i++) {
-        let option = document.createElement('option');
-        option.value = filteredCategories[i];
-        option.textContent = filteredCategories[i];
+    const sortedCategories = Array.from(categorySet).sort();
+    sortedCategories.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat;
+        option.textContent = cat;
         itemCategorySelect.appendChild(option);
-    }
+    });
     
-    if (currentValue !== 'All' && filteredCategories.includes(currentValue)) {
+    // Restore selected value if it's still valid
+    if (currentValue !== 'All' && categorySet.has(currentValue)) {
         itemCategorySelect.value = currentValue;
     }
-    
+}
+
+// Modified: Filter item categories and update day categories
+function filterItemCategoriesByWarehouse() {
+    // First filter by warehouse + day
+    filterItemCategoriesByWarehouseAndDay();
+    // Then update day categories based on the selected item category
     updateDayCategories();
 }
 
+// Modified: Update day categories based on selected item category AND warehouse
 function updateDayCategories() {
-    let selectedItemCategory = document.getElementById('itemCategory').value;
-    let dayCategorySelect = document.getElementById('dayCategory');
+    const selectedItemCategory = document.getElementById('itemCategory').value;
+    const warehouse = document.getElementById('warehouse').value;
+    const dayCategorySelect = document.getElementById('dayCategory');
     if (!dayCategorySelect) return;
     
-    let currentValue = dayCategorySelect.value;
+    const currentValue = dayCategorySelect.value;
     
-    dayCategorySelect.innerHTML = '<option value="All">-- All Day Categories --</option>';
+    // Get all SKUs that match the current warehouse
+    let matchingSkus = allSkus;
     
-    let filteredDayCategories = [];
-    
-    if (selectedItemCategory !== 'All' && allSkus.length > 0) {
-        let daySet = new Set();
-        for (let i = 0; i < allSkus.length; i++) {
-            if (allSkus[i].description === selectedItemCategory && allSkus[i].category) {
-                daySet.add(allSkus[i].category);
-            }
-        }
-        filteredDayCategories = Array.from(daySet);
-    } else {
-        filteredDayCategories = [...allDayCategories];
+    if (warehouse === '5thFloor') {
+        matchingSkus = matchingSkus.filter(sku => FIFTH_FLOOR_CATEGORIES.includes(sku.description));
+    } else if (warehouse === 'Main') {
+        matchingSkus = matchingSkus.filter(sku => !FIFTH_FLOOR_CATEGORIES.includes(sku.description));
     }
     
-    filteredDayCategories.sort((a, b) => {
-        let orderA = DAY_ORDER[a] || 999;
-        let orderB = DAY_ORDER[b] || 999;
+    // Filter by item category if selected
+    if (selectedItemCategory !== 'All') {
+        matchingSkus = matchingSkus.filter(sku => sku.description === selectedItemCategory);
+    }
+    
+    // Get unique day categories
+    const daySet = new Set();
+    matchingSkus.forEach(sku => {
+        if (sku.category) {
+            daySet.add(sku.category);
+        }
+    });
+    
+    // Build dropdown
+    dayCategorySelect.innerHTML = '<option value="All">-- All Day Categories --</option>';
+    
+    const sortedDays = Array.from(daySet).sort((a, b) => {
+        const orderA = DAY_ORDER[a] || 999;
+        const orderB = DAY_ORDER[b] || 999;
         return orderA - orderB;
     });
     
-    for (let i = 0; i < filteredDayCategories.length; i++) {
-        if (filteredDayCategories[i]) {
-            let option = document.createElement('option');
-            option.value = filteredDayCategories[i];
-            option.textContent = filteredDayCategories[i];
-            dayCategorySelect.appendChild(option);
-        }
-    }
-    
-    if (currentValue !== 'All' && filteredDayCategories.includes(currentValue)) {
-        dayCategorySelect.value = currentValue;
-    }
-    
-    // NEW: Filter Item Categories based on selected Day Category
-    filterItemCategoriesByDay();
-}
-
-// ============================================
-// NEW FUNCTION: Filter Item Categories by Day Category
-// ============================================
-function filterItemCategoriesByDay() {
-    let dayCategory = document.getElementById('dayCategory').value;
-    let itemCategorySelect = document.getElementById('itemCategory');
-    if (!itemCategorySelect) return;
-    
-    // Don't filter if "All" is selected
-    if (dayCategory === 'All' || dayCategory === '-- All Day Categories --') {
-        // Reset to all item categories (but still respect warehouse filter)
-        filterItemCategoriesByWarehouse();
-        return;
-    }
-    
-    let currentValue = itemCategorySelect.value;
-    
-    // Get all SKUs for the selected day category
-    let skusInDay = allSkus.filter(s => s.category === dayCategory);
-    
-    // Get unique item categories from those SKUs
-    let dayItemCategories = new Set();
-    skusInDay.forEach(sku => {
-        if (sku.description) {
-            dayItemCategories.add(sku.description);
-        }
+    sortedDays.forEach(day => {
+        const option = document.createElement('option');
+        option.value = day;
+        option.textContent = day;
+        dayCategorySelect.appendChild(option);
     });
     
-    // Also respect warehouse filter if applied
-    let warehouse = document.getElementById('warehouse').value;
-    let filteredCategories = [];
-    
-    if (warehouse === '5thFloor') {
-        // 5th Floor: only categories in FIFTH_FLOOR_CATEGORIES
-        filteredCategories = [...dayItemCategories].filter(cat => FIFTH_FLOOR_CATEGORIES.includes(cat));
-    } else if (warehouse === 'Main') {
-        // Main: exclude 5th Floor categories
-        filteredCategories = [...dayItemCategories].filter(cat => !FIFTH_FLOOR_CATEGORIES.includes(cat));
-    } else {
-        // All: all categories
-        filteredCategories = [...dayItemCategories];
+    // Restore selected value if valid
+    if (currentValue !== 'All' && daySet.has(currentValue)) {
+        dayCategorySelect.value = currentValue;
     }
-    
-    // Sort alphabetically
-    filteredCategories.sort();
-    
-    // Update dropdown
-    itemCategorySelect.innerHTML = '<option value="All">-- All Item Categories --</option>';
-    
-    for (let i = 0; i < filteredCategories.length; i++) {
-        let option = document.createElement('option');
-        option.value = filteredCategories[i];
-        option.textContent = filteredCategories[i];
-        itemCategorySelect.appendChild(option);
-    }
-    
-    // Restore previous selection if still valid
-    if (currentValue !== 'All' && filteredCategories.includes(currentValue)) {
-        itemCategorySelect.value = currentValue;
-    }
-    
-    // ✅ FIX: Do NOT call filterItemCategoriesByWarehouse() here - it would override the filter!
-    // The line below is REMOVED to prevent overriding
-    // filterItemCategoriesByWarehouse();  // ← REMOVED!
 }
+
+// Modified: When warehouse changes, update everything
+function filterItemCategoriesByWarehouseOriginal() {
+    filterItemCategoriesByWarehouseAndDay();
+    updateDayCategories();
+}
+
+// Keep the original function name for compatibility
+const filterItemCategoriesByWarehouse = filterItemCategoriesByWarehouseOriginal;
+
+// ============================================
+// EXISTING FUNCTIONS (unchanged below)
+// ============================================
 
 function highlightSkusStatus() {
     let countInputs = document.querySelectorAll('.initial-count');
@@ -1186,7 +1164,7 @@ function loadExistingCountsForSkus() {
 }
 
 // ============================================
-// MODIFIED displaySkus - Added column classes (Print Label button removed)
+// MODIFIED displaySkus - Added column classes
 // ============================================
 function displaySkus(skus) {
     let skusListDiv = document.getElementById('skusList');
@@ -1764,11 +1742,23 @@ function completeCounting() {
 document.addEventListener('DOMContentLoaded', function() {
     const warehouseSelect = document.getElementById('warehouse');
     const itemCategorySelect = document.getElementById('itemCategory');
+    const dayCategorySelect = document.getElementById('dayCategory');
     const scannerModal = document.getElementById('scannerModal');
     
     if (warehouseSelect) {
         warehouseSelect.addEventListener('change', function() {
             filterItemCategoriesByWarehouse();
+            applyFilters();
+        });
+    }
+    
+    if (dayCategorySelect) {
+        dayCategorySelect.addEventListener('change', function() {
+            // When day category changes, update item categories
+            filterItemCategoriesByWarehouseAndDay();
+            // Then update day categories (to ensure consistency)
+            updateDayCategories();
+            // Then apply filters
             applyFilters();
         });
     }
