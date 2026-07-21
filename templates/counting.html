@@ -44,9 +44,6 @@
                 <button id="scanBarcodeBtn" class="btn btn-info" onclick="startBarcodeScanner()">
                     <i class="bi bi-upc-scan"></i> Scan
                 </button>
-                <button id="printLabelBtn" class="btn btn-warning" onclick="openPrintLabelModal()">
-                    <i class="bi bi-tag"></i> Print Label
-                </button>
                 <div class="dropdown ms-auto">
                     <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                         <i class="bi bi-layout-three-columns"></i> Columns
@@ -79,60 +76,6 @@
         </div>
     </div>
 </div>
-
-<!-- Print Label Modal -->
-<div class="modal fade" id="printLabelModal" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-warning">
-                <h5 class="modal-title"><i class="bi bi-tag"></i> Print Sticker Label</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">SKU / Description</label>
-                    <div style="position: relative;">
-                        <input type="text" id="printSkuInput" class="form-control" placeholder="Type SKU or Description..." autocomplete="off">
-                        <div id="printSkuSuggestions" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-top: none; z-index: 1000; max-height: 200px; overflow-y: auto; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
-                    </div>
-                    <small class="text-muted">Type to search, or enter custom text (e.g., "14" instead of "Wiper-Banana 14")</small>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Label Width (mm)</label>
-                    <div class="d-flex gap-2 flex-wrap">
-                        <button class="btn btn-outline-secondary btn-sm size-preset" data-width="40" onclick="setLabelSize(40, 30)">40×30</button>
-                        <button class="btn btn-outline-secondary btn-sm size-preset" data-width="50" onclick="setLabelSize(50, 30)">50×30</button>
-                        <button class="btn btn-outline-secondary btn-sm size-preset" data-width="60" onclick="setLabelSize(60, 40)">60×40</button>
-                        <button class="btn btn-outline-secondary btn-sm size-preset" data-width="70" onclick="setLabelSize(70, 40)">70×40</button>
-                        <div class="d-flex gap-1">
-                            <input type="number" id="customWidth" class="form-control form-control-sm" style="width: 60px;" placeholder="W" min="20" max="120">
-                            <span class="align-self-center">×</span>
-                            <input type="number" id="customHeight" class="form-control form-control-sm" style="width: 60px;" placeholder="H" min="20" max="80">
-                            <button class="btn btn-sm btn-primary" onclick="applyCustomSize()">Apply</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Quantity</label>
-                    <input type="number" id="printQuantity" class="form-control" value="1" min="1" max="50">
-                </div>
-                <div class="form-check mb-3">
-                    <input type="checkbox" class="form-check-input" id="printBarcode" checked>
-                    <label class="form-check-label" for="printBarcode">Include Barcode</label>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button class="btn btn-primary" onclick="generatePrintLabels()">
-                    <i class="bi bi-printer"></i> Generate & Print
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Print Preview Container (hidden) -->
-<div id="printPreviewContainer" style="display: none;"></div>
 
 <!-- Manual SKU Selection Modal -->
 <div class="modal fade" id="manualSkuModal" tabindex="-1">
@@ -199,77 +142,6 @@
 .column-hidden {
     display: none !important;
 }
-
-/* ===== PRINT LABEL STYLES ===== */
-@media print {
-    body * {
-        visibility: hidden;
-    }
-    #printLabels {
-        visibility: visible !important;
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        margin: 0;
-        padding: 0;
-        background: white;
-    }
-    #printLabels * {
-        visibility: visible !important;
-    }
-    .label-item {
-        page-break-after: avoid;
-        display: inline-block;
-        margin: 2px;
-        padding: 4px;
-        border: 1px solid #ddd;
-        border-radius: 2px;
-        text-align: center;
-    }
-    .label-item .label-sku {
-        font-size: 12px;
-        font-weight: bold;
-    }
-    .label-item .label-barcode {
-        margin: 2px auto;
-    }
-    .label-item .label-desc {
-        font-size: 10px;
-        color: #666;
-    }
-    .no-print {
-        display: none !important;
-    }
-}
-
-/* Print label preview styling */
-.label-item {
-    display: inline-block;
-    margin: 4px;
-    padding: 6px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    text-align: center;
-    background: white;
-}
-.label-item .label-sku {
-    font-size: 14px;
-    font-weight: bold;
-    font-family: 'Courier New', monospace;
-}
-.label-item .label-barcode svg {
-    display: block;
-    margin: 2px auto;
-}
-.label-item .label-desc {
-    font-size: 10px;
-    color: #666;
-}
-.label-item .label-size-40 { width: 40mm; height: 30mm; }
-.label-item .label-size-50 { width: 50mm; height: 30mm; }
-.label-item .label-size-60 { width: 60mm; height: 40mm; }
-.label-item .label-size-70 { width: 70mm; height: 40mm; }
 
 /* ===== OTHER STYLES ===== */
 .suggestion-item:hover {
@@ -359,30 +231,10 @@
     max-height: 150px;
     overflow-y: auto;
 }
-
-/* Print suggestions */
-#printSkuSuggestions .suggestion-item {
-    padding: 6px 12px;
-    cursor: pointer;
-    border-bottom: 1px solid #eee;
-}
-#printSkuSuggestions .suggestion-item:hover {
-    background-color: #f0f7ff;
-}
-
-/* Size preset active state */
-.size-preset.active {
-    background-color: #0d6efd !important;
-    color: white !important;
-    border-color: #0d6efd !important;
-}
 </style>
 
 <!-- Load html5-qrcode library -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-
-<!-- Load JsBarcode for barcode generation -->
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 
 <script>
 // ============================================
@@ -515,230 +367,6 @@ function applyColumnVisibility() {
             }
         });
     });
-}
-
-// ============================================
-// PRINT LABEL FUNCTIONS
-// ============================================
-let printSkuTimeout = null;
-let selectedPrintSku = null;
-let printLabelWidth = 40;
-let printLabelHeight = 30;
-
-function openPrintLabelModal() {
-    document.getElementById('printSkuInput').value = '';
-    document.getElementById('printSkuSuggestions').style.display = 'none';
-    document.getElementById('printQuantity').value = 1;
-    document.getElementById('printBarcode').checked = true;
-    selectedPrintSku = null;
-    
-    // Reset size presets
-    document.querySelectorAll('.size-preset').forEach(b => b.classList.remove('active'));
-    document.querySelector('.size-preset[data-width="40"]')?.classList.add('active');
-    printLabelWidth = 40;
-    printLabelHeight = 30;
-    
-    const modal = new bootstrap.Modal(document.getElementById('printLabelModal'));
-    modal.show();
-    setTimeout(() => document.getElementById('printSkuInput').focus(), 300);
-}
-
-function setupPrintSkuSearch() {
-    const input = document.getElementById('printSkuInput');
-    const suggestions = document.getElementById('printSkuSuggestions');
-    
-    input.addEventListener('input', function() {
-        const term = this.value.trim();
-        
-        if (printSkuTimeout) clearTimeout(printSkuTimeout);
-        
-        if (term.length < 1) {
-            suggestions.style.display = 'none';
-            selectedPrintSku = null;
-            return;
-        }
-        
-        printSkuTimeout = setTimeout(() => {
-            // Search in allSkus
-            const matches = [];
-            const seen = new Set();
-            const termLower = term.toLowerCase();
-            
-            // First try exact matches
-            for (const sku of allSkus) {
-                if (!seen.has(sku.sku) && sku.sku.toLowerCase() === termLower) {
-                    seen.add(sku.sku);
-                    matches.push({ sku: sku, score: 100 });
-                }
-            }
-            
-            // Then contains matches
-            for (const sku of allSkus) {
-                if (!seen.has(sku.sku) && sku.sku.toLowerCase().includes(termLower)) {
-                    seen.add(sku.sku);
-                    matches.push({ sku: sku, score: 80 });
-                }
-            }
-            
-            // Then description matches
-            for (const sku of allSkus) {
-                if (!seen.has(sku.sku) && sku.description && sku.description.toLowerCase().includes(termLower)) {
-                    seen.add(sku.sku);
-                    matches.push({ sku: sku, score: 60 });
-                }
-            }
-            
-            // Limit to 10 results
-            const topMatches = matches.slice(0, 10);
-            
-            if (topMatches.length > 0) {
-                suggestions.innerHTML = topMatches.map(m => `
-                    <div class="suggestion-item" onclick="selectPrintSku('${escapeHtml(m.sku.sku)}', ${m.sku.id})">
-                        <strong>${escapeHtml(m.sku.sku)}</strong>
-                        <small class="text-muted ms-2">${escapeHtml(m.sku.description || '')}</small>
-                    </div>
-                `).join('');
-                suggestions.style.display = 'block';
-            } else {
-                suggestions.innerHTML = `<div class="suggestion-item text-muted">No matches found. Enter custom text.</div>`;
-                suggestions.style.display = 'block';
-            }
-        }, 250);
-    });
-    
-    input.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            suggestions.style.display = 'none';
-            if (selectedPrintSku) {
-                this.value = selectedPrintSku.sku;
-            }
-        }
-    });
-    
-    document.addEventListener('click', function(e) {
-        if (e.target !== input && !suggestions.contains(e.target)) {
-            suggestions.style.display = 'none';
-        }
-    });
-}
-
-function selectPrintSku(skuCode, skuId) {
-    const input = document.getElementById('printSkuInput');
-    input.value = skuCode;
-    selectedPrintSku = allSkus.find(s => s.id === skuId) || { sku: skuCode };
-    document.getElementById('printSkuSuggestions').style.display = 'none';
-}
-
-function setLabelSize(width, height) {
-    printLabelWidth = width;
-    printLabelHeight = height;
-    document.querySelectorAll('.size-preset').forEach(b => b.classList.remove('active'));
-    document.querySelector(`.size-preset[data-width="${width}"]`)?.classList.add('active');
-    document.getElementById('customWidth').value = '';
-    document.getElementById('customHeight').value = '';
-}
-
-function applyCustomSize() {
-    const w = parseInt(document.getElementById('customWidth').value);
-    const h = parseInt(document.getElementById('customHeight').value);
-    if (w > 0 && h > 0) {
-        printLabelWidth = w;
-        printLabelHeight = h;
-        document.querySelectorAll('.size-preset').forEach(b => b.classList.remove('active'));
-    }
-}
-
-function generatePrintLabels() {
-    const input = document.getElementById('printSkuInput');
-    const skuText = input.value.trim();
-    const quantity = parseInt(document.getElementById('printQuantity').value) || 1;
-    const includeBarcode = document.getElementById('printBarcode').checked;
-    
-    if (!skuText) {
-        alert('Please enter or select a SKU.');
-        return;
-    }
-    
-    // Determine what to print
-    let displaySku = skuText;
-    let displayDesc = '';
-    
-    if (selectedPrintSku && selectedPrintSku.sku === skuText) {
-        // User selected a SKU from suggestions
-        displayDesc = selectedPrintSku.description || '';
-    } else {
-        // User entered custom text - use it as-is
-        displaySku = skuText;
-        displayDesc = '';
-    }
-    
-    // Build label HTML
-    let labelsHtml = `<div id="printLabels" style="padding: 10px; background: white;">`;
-    
-    for (let i = 0; i < quantity; i++) {
-        labelsHtml += `
-            <div class="label-item label-size-${printLabelWidth}" style="width: ${printLabelWidth}mm; height: ${printLabelHeight}mm; display: inline-block; margin: 2px; padding: 4px; border: 1px solid #ddd; border-radius: 2px; text-align: center; box-sizing: border-box;">
-                <div class="label-sku" style="font-size: ${printLabelWidth >= 60 ? '16px' : '12px'}; font-weight: bold; font-family: 'Courier New', monospace;">${escapeHtml(displaySku)}</div>
-                ${displayDesc ? `<div class="label-desc" style="font-size: 10px; color: #666; margin-top: 2px;">${escapeHtml(displayDesc)}</div>` : ''}
-                ${includeBarcode ? `
-                    <div class="label-barcode" style="margin: 2px auto;">
-                        <svg id="barcode-${i}" style="width: ${Math.min(printLabelWidth * 0.9, 70)}px; height: ${Math.min(printLabelHeight * 0.4, 20)}px;"></svg>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-    }
-    
-    labelsHtml += `</div>`;
-    
-    // Hide modal and show print preview
-    const modal = bootstrap.Modal.getInstance(document.getElementById('printLabelModal'));
-    modal.hide();
-    
-    const container = document.getElementById('printPreviewContainer');
-    container.style.display = 'block';
-    container.innerHTML = labelsHtml;
-    
-    // Generate barcodes
-    if (includeBarcode) {
-        setTimeout(() => {
-            for (let i = 0; i < quantity; i++) {
-                const svg = document.getElementById(`barcode-${i}`);
-                if (svg) {
-                    try {
-                        JsBarcode(svg, displaySku, {
-                            format: 'CODE128',
-                            width: 1.5,
-                            height: 30,
-                            displayValue: false,
-                            fontSize: 10,
-                            margin: 2
-                        });
-                    } catch (e) {
-                        console.warn('Barcode generation failed:', e);
-                    }
-                }
-            }
-            // Trigger print after a short delay for barcodes to render
-            setTimeout(() => {
-                window.print();
-                // Reset after print
-                setTimeout(() => {
-                    container.style.display = 'none';
-                    container.innerHTML = '';
-                }, 500);
-            }, 300);
-        }, 100);
-    } else {
-        // Trigger print immediately
-        setTimeout(() => {
-            window.print();
-            setTimeout(() => {
-                container.style.display = 'none';
-                container.innerHTML = '';
-            }, 500);
-        }, 100);
-    }
 }
 
 // ============================================
@@ -878,7 +506,6 @@ function showToast(message, type = 'info') {
 // QR/BARCODE SCANNER FUNCTIONS (unchanged)
 // ============================================
 async function startBarcodeScanner() {
-    // ... (existing code - unchanged)
     if (isScannerActive) {
         showToast("Scanner is already running", "warning");
         return;
@@ -1490,7 +1117,7 @@ function loadExistingCountsForSkus() {
 }
 
 // ============================================
-// MODIFIED displaySkus - Added column classes and Print Label button
+// MODIFIED displaySkus - Added column classes (Print Label button removed)
 // ============================================
 function displaySkus(skus) {
     let skusListDiv = document.getElementById('skusList');
@@ -1533,7 +1160,6 @@ function displaySkus(skus) {
         html += `<th class="${className} ${isVisible ? '' : 'column-hidden'}">${col.label}</th>`;
     });
     
-    html += `<th class="no-print">Actions</th>`;
     html += '</tr></thead><tbody>';
     
     for (let i = 0; i < skus.length; i++) {
@@ -1613,13 +1239,6 @@ function displaySkus(skus) {
             html += `<td class="${className} ${isVisible ? '' : 'column-hidden'}">${col.value}</td>`;
         });
         
-        // Actions column (print label button)
-        html += `<td class="no-print">
-            <button class="btn btn-sm btn-outline-warning" onclick="printSingleLabel('${escapeHtml(sku.sku)}')" title="Print Label">
-                <i class="bi bi-tag"></i>
-            </button>
-        </td>`;
-        
         html += '</tr>';
     }
     
@@ -1683,31 +1302,9 @@ function displaySkus(skus) {
 }
 
 // ============================================
-// Print Single Label from Table Row
-// ============================================
-function printSingleLabel(skuCode) {
-    // Find the SKU in allSkus
-    const sku = allSkus.find(s => s.sku === skuCode);
-    if (sku) {
-        document.getElementById('printSkuInput').value = sku.sku;
-        selectedPrintSku = sku;
-    } else {
-        document.getElementById('printSkuInput').value = skuCode;
-        selectedPrintSku = null;
-    }
-    document.getElementById('printQuantity').value = 1;
-    document.getElementById('printBarcode').checked = true;
-    
-    const modal = new bootstrap.Modal(document.getElementById('printLabelModal'));
-    modal.show();
-    setTimeout(() => document.getElementById('printSkuInput').focus(), 300);
-}
-
-// ============================================
 // EXISTING FUNCTIONS (unchanged below)
 // ============================================
 function saveAllCounts() {
-    // ... (existing code - unchanged)
     let warehouse = document.getElementById('warehouse').value;
     let warehouseDisplay = warehouse === '5thFloor' ? '5th Floor Warehouse' : (warehouse === 'Main' ? 'Main Warehouse' : 'All Warehouses');
     
@@ -1833,7 +1430,6 @@ function saveAllCounts() {
 }
 
 function checkForRecounts() {
-    // ... (existing code - unchanged)
     if (!currentSessionId) return;
     
     fetch('/get_recount_list?session_id=' + currentSessionId)
@@ -1856,7 +1452,6 @@ function checkForRecounts() {
 }
 
 function showRecountModal(recountItems) {
-    // ... (existing code - unchanged)
     console.log("Recount Items:", recountItems);
     
     let html = '<div class="table-responsive"><table class="table table-bordered">';
@@ -1965,7 +1560,6 @@ function closeRecountModal() {
 }
 
 function saveRecounts() {
-    // ... (existing code - unchanged)
     let recounts = [];
     let countInputs = document.querySelectorAll('.recount-count');
     let hasError = false;
@@ -2126,7 +1720,6 @@ document.addEventListener('DOMContentLoaded', function() {
     filterItemCategoriesByWarehouse();
     setupSmartSearch();
     initColumnToggleMenu();
-    setupPrintSkuSearch();
     
     let sessionIdFromUrl = getUrlParameter('session_id');
     if (sessionIdFromUrl) {
