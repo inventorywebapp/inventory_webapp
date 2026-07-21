@@ -851,6 +851,10 @@ function filterItemCategoriesByDay() {
     if (currentValue !== 'All' && filteredCategories.includes(currentValue)) {
         itemCategorySelect.value = currentValue;
     }
+    
+    // ✅ FIX: Do NOT call filterItemCategoriesByWarehouse() here - it would override the filter!
+    // The line below is REMOVED to prevent overriding
+    // filterItemCategoriesByWarehouse();  // ← REMOVED!
 }
 
 function highlightSkusStatus() {
