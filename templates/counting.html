@@ -786,6 +786,71 @@ function updateDayCategories() {
     if (currentValue !== 'All' && filteredDayCategories.includes(currentValue)) {
         dayCategorySelect.value = currentValue;
     }
+    
+    // NEW: Filter Item Categories based on selected Day Category
+    filterItemCategoriesByDay();
+}
+
+// ============================================
+// NEW FUNCTION: Filter Item Categories by Day Category
+// ============================================
+function filterItemCategoriesByDay() {
+    let dayCategory = document.getElementById('dayCategory').value;
+    let itemCategorySelect = document.getElementById('itemCategory');
+    if (!itemCategorySelect) return;
+    
+    // Don't filter if "All" is selected
+    if (dayCategory === 'All' || dayCategory === '-- All Day Categories --') {
+        // Reset to all item categories (but still respect warehouse filter)
+        filterItemCategoriesByWarehouse();
+        return;
+    }
+    
+    let currentValue = itemCategorySelect.value;
+    
+    // Get all SKUs for the selected day category
+    let skusInDay = allSkus.filter(s => s.category === dayCategory);
+    
+    // Get unique item categories from those SKUs
+    let dayItemCategories = new Set();
+    skusInDay.forEach(sku => {
+        if (sku.description) {
+            dayItemCategories.add(sku.description);
+        }
+    });
+    
+    // Also respect warehouse filter if applied
+    let warehouse = document.getElementById('warehouse').value;
+    let filteredCategories = [];
+    
+    if (warehouse === '5thFloor') {
+        // 5th Floor: only categories in FIFTH_FLOOR_CATEGORIES
+        filteredCategories = [...dayItemCategories].filter(cat => FIFTH_FLOOR_CATEGORIES.includes(cat));
+    } else if (warehouse === 'Main') {
+        // Main: exclude 5th Floor categories
+        filteredCategories = [...dayItemCategories].filter(cat => !FIFTH_FLOOR_CATEGORIES.includes(cat));
+    } else {
+        // All: all categories
+        filteredCategories = [...dayItemCategories];
+    }
+    
+    // Sort alphabetically
+    filteredCategories.sort();
+    
+    // Update dropdown
+    itemCategorySelect.innerHTML = '<option value="All">-- All Item Categories --</option>';
+    
+    for (let i = 0; i < filteredCategories.length; i++) {
+        let option = document.createElement('option');
+        option.value = filteredCategories[i];
+        option.textContent = filteredCategories[i];
+        itemCategorySelect.appendChild(option);
+    }
+    
+    // Restore previous selection if still valid
+    if (currentValue !== 'All' && filteredCategories.includes(currentValue)) {
+        itemCategorySelect.value = currentValue;
+    }
 }
 
 function highlightSkusStatus() {
