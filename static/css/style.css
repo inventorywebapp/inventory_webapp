@@ -616,29 +616,42 @@ body {
 }
 
 /* ============================================
-   FILTER AUTO-APPLY INDICATOR
+   RESPONSIVE MOBILE FIXES
    ============================================ */
-.filter-auto-indicator {
-    font-size: 12px;
-    color: #6c757d;
-    margin-top: 4px;
-}
-
-.filter-auto-indicator .bi {
-    color: #0d6efd;
-}
-
-/* ============================================
-   RESPONSIVE COLUMN TOGGLE
-   ============================================ */
-@media (max-width: 768px) {
-    .column-toggle-btn {
-        font-size: 12px;
-        padding: 6px 10px;
-        min-width: 60px;
+@media (max-width: 576px) {
+    .btn-sm {
+        font-size: 0.7rem;
+        padding: 4px 6px;
     }
-    
-    .column-toggle-btn .badge {
-        display: none;
+    .btn-sm i {
+        font-size: 0.85rem;
+    }
+    .form-select-sm {
+        font-size: 0.75rem;
+        padding: 4px 6px;
+    }
+    .form-control-sm {
+        font-size: 0.75rem;
+        padding: 4px 6px;
+    }
+    .gap-1 {
+        gap: 0.15rem !important;
+    }
+    #skusList .table td,
+    #skusList .table th {
+        padding: 3px 4px;
+        font-size: 0.7rem;
+    }
+    .initial-count {
+        min-width: 50px !important;
+        width: 50px !important;
+        font-size: 0.7rem;
+        padding: 2px 3px;
+    }
+    .modal-dialog {
+        margin: 5px;
+    }
+    .modal-body {
+        padding: 12px;
     }
 }
