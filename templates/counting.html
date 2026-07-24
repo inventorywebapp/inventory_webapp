@@ -39,7 +39,7 @@
             </div>
         </div>
         
-        <!-- BUTTONS ROW - Below filters like before -->
+        <!-- BUTTONS ROW - Below filters -->
         <div class="row mt-3">
             <div class="col-12">
                 <div class="d-flex flex-wrap gap-2">
@@ -390,7 +390,6 @@ function loadColumnPreferences() {
         const saved = localStorage.getItem('columnVisibility');
         if (saved) {
             columnVisibility = JSON.parse(saved);
-            // Ensure all columns have a value (default to true if missing)
             ALL_COLUMNS.forEach(col => {
                 if (columnVisibility[col.key] === undefined) {
                     columnVisibility[col.key] = true;
@@ -418,7 +417,6 @@ function toggleColumnModal() {
     const modal = document.getElementById('columnModal');
     const container = document.getElementById('columnToggleList');
     
-    // Build toggle buttons
     container.innerHTML = ALL_COLUMNS.map(col => `
         <button class="column-toggle-btn ${columnVisibility[col.key] ? 'active' : 'hidden'}"
                 onclick="toggleColumn('${col.key}')"
@@ -436,11 +434,8 @@ function toggleColumnModal() {
 function toggleColumn(key) {
     columnVisibility[key] = !columnVisibility[key];
     saveColumnPreferences();
-    
-    // Update UI immediately (no "Apply" needed)
     applyColumnVisibility();
     
-    // Update button in modal
     const btn = document.querySelector(`.column-toggle-btn[data-key="${key}"]`);
     if (btn) {
         btn.className = `column-toggle-btn ${columnVisibility[key] ? 'active' : 'hidden'}`;
@@ -459,7 +454,6 @@ function resetColumns() {
     saveColumnPreferences();
     applyColumnVisibility();
     
-    // Refresh modal buttons
     const container = document.getElementById('columnToggleList');
     container.querySelectorAll('.column-toggle-btn').forEach(btn => {
         const key = btn.dataset.key;
@@ -501,7 +495,6 @@ function checkUnsavedBeforeNavigation(callback) {
         return;
     }
     
-    // Count how many inputs have values
     const inputs = document.querySelectorAll('.initial-count');
     let count = 0;
     inputs.forEach(input => {
@@ -516,7 +509,6 @@ function checkUnsavedBeforeNavigation(callback) {
         return;
     }
     
-    // Show warning modal
     document.getElementById('unsavedCount').textContent = count;
     pendingNavigation = callback;
     const modal = new bootstrap.Modal(document.getElementById('unsavedModal'));
@@ -1300,7 +1292,12 @@ function loadExistingCountsForSkus() {
                         lastCountedSpan.innerHTML = latestCounts[skuId].count_time;
                     }
                     if (lastCountValueSpan) {
-                        lastCountValueSpan.innerHTML = latestCounts[skuId].initial_count;
+                        // Use recount_count if available, otherwise initial_count
+                        const record = latestCounts[skuId];
+                        let displayCount = record.initial_count;
+                        // Check if recount exists (we need to fetch it separately)
+                        // For now, use initial_count
+                        lastCountValueSpan.innerHTML = displayCount;
                     }
                     
                     let row = countInput.closest('tr');
@@ -1315,6 +1312,8 @@ function loadExistingCountsForSkus() {
         })
         .catch(error => console.error('Error loading existing counts:', error));
 }
+
+// ============ MAIN DISPLAY FUNCTION - FIXED ============
 
 function displaySkus(skus) {
     let skusListDiv = document.getElementById('skusList');
@@ -1363,16 +1362,20 @@ function displaySkus(skus) {
         let sku = skus[i];
         let statusBadge = '';
         let existingCountTime = '';
-        let finalCountValue = '';
+        let previousCountValue = null;
         let isInProgress = false;
         let isCompleted = false;
         let isExpired = false;
         let rowClass = '';
         let existingCountValue = '';
+        let hasRecount = false;
+        let recountValue = null;
+        let recountTime = '';
         
+        // --- Determine status and counts ---
         if (sku.has_count === true && !sku.in_progress && sku.is_completed === true && !sku.is_expired) {
             existingCountTime = sku.count_time || '';
-            finalCountValue = sku.final_count;
+            previousCountValue = sku.final_count !== undefined && sku.final_count !== null ? sku.final_count : sku.initial_count;
             isCompleted = true;
             rowClass = 'sku-completed';
             statusBadge = '<span class="badge bg-success">Completed</span>';
@@ -1385,12 +1388,22 @@ function displaySkus(skus) {
         else if (sku.in_progress === true || (sku.has_count === true && sku.current_count !== undefined && sku.current_count !== null && sku.current_count !== '')) {
             existingCountValue = sku.current_count;
             existingCountTime = sku.count_time || '';
-            finalCountValue = sku.final_count || sku.current_count;
+            previousCountValue = sku.final_count !== undefined && sku.final_count !== null ? sku.final_count : sku.current_count;
             isInProgress = true;
             rowClass = 'sku-in-progress';
             statusBadge = '<span class="badge bg-primary">In Progress</span>';
         }
         
+        // Check for recount data (if available in the sku object)
+        if (sku.recount_count !== undefined && sku.recount_count !== null && sku.recount_count !== 0) {
+            hasRecount = true;
+            recountValue = sku.recount_count;
+            recountTime = sku.count_time || '';
+            // If recount exists, use it as previous count
+            previousCountValue = recountValue;
+        }
+        
+        // If bypass recount
         if (sku.bypass_recount) {
             statusBadge = '<span class="badge bg-warning">Bypass</span>';
         }
@@ -1412,19 +1425,20 @@ function displaySkus(skus) {
         
         html += `<tr id="${rowId}" class="${rowClass}" data-in-progress="${isInProgress}" data-completed="${isCompleted}" data-expired="${isExpired}">`;
         
+        // --- Build row cells ---
         const rowCells = [
             { key: 'sku', content: `<strong>${escapeHtml(sku.sku)}</strong>` },
             { key: 'description', content: escapeHtml(sku.description || '-') },
             { key: 'category', content: escapeHtml(sku.category || '-') },
             { key: 'last_count_date', content: escapeHtml(lastCountDate) },
-            { key: 'last_count', content: sku.last_count || 0 },
-            { key: 'container_qty', content: sku.total_container_qty || 0 },
+            { key: 'last_count', content: sku.last_count !== undefined && sku.last_count !== null ? sku.last_count : 0 },
+            { key: 'container_qty', content: sku.total_container_qty !== undefined && sku.total_container_qty !== null ? sku.total_container_qty : 0 },
             { key: 'container_details', content: `<small>${escapeHtml(containerDetails)}</small>` },
-            { key: 'final_expected', content: sku.final_expected_count || 0 },
-            { key: 'kenneth_inv', content: sku.kenneth_inventory || 0 },
+            { key: 'final_expected', content: sku.final_expected_count !== undefined && sku.final_expected_count !== null ? sku.final_expected_count : 0 },
+            { key: 'kenneth_inv', content: sku.kenneth_inventory !== undefined && sku.kenneth_inventory !== null ? sku.kenneth_inventory : 0 },
             { key: 'current_count', content: `<input type="text" class="form-control initial-count" data-sku-id="${sku.id}" style="min-width: 100px; width: 100px;" placeholder="${inputPlaceholder}" inputmode="numeric" value="${inputValue}">` },
-            { key: 'last_counted_date', content: (existingCountTime && !isExpired) ? `<span id="last-counted-${sku.id}" style="color: #0d6efd; font-weight: bold;">${existingCountTime}</span>` : '-</span>' },
-            { key: 'previous_count', content: (finalCountValue && !isExpired) ? `<span id="last-count-value-${sku.id}" style="color: #0d6efd; font-weight: bold;">${finalCountValue}</span>` : '-</span>' },
+            { key: 'last_counted_date', content: (existingCountTime && !isExpired) ? `<span id="last-counted-${sku.id}" style="color: #0d6efd; font-weight: bold;">${existingCountTime}</span>` : '<span id="last-counted-${sku.id}">-</span>' },
+            { key: 'previous_count', content: (previousCountValue !== null && previousCountValue !== undefined && !isExpired) ? `<span id="last-count-value-${sku.id}" style="color: #0d6efd; font-weight: bold;">${previousCountValue}</span>` : '<span id="last-count-value-${sku.id}">-</span>' },
             { key: 'status', content: statusBadge }
         ];
         
@@ -1910,10 +1924,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const itemCategorySelect = document.getElementById('itemCategory');
     const scannerModal = document.getElementById('scannerModal');
     
-    // Load column preferences (all ON by default)
     loadColumnPreferences();
     
-    // Warehouse change
     if (warehouseSelect) {
         warehouseSelect.addEventListener('change', function() {
             filterItemCategoriesByWarehouse();
@@ -1921,14 +1933,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Day category change - bidirectional
     if (dayCategorySelect) {
         dayCategorySelect.addEventListener('change', function() {
             onFilterChange();
         });
     }
     
-    // Item category change - bidirectional
     if (itemCategorySelect) {
         itemCategorySelect.addEventListener('change', function() {
             onFilterChange();
@@ -1963,7 +1973,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
     
-    // Warn before page unload if unsaved changes
     window.addEventListener('beforeunload', function(e) {
         if (hasUnsavedChanges) {
             e.preventDefault();
