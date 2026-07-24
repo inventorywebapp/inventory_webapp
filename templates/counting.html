@@ -1370,12 +1370,10 @@ function displaySkus(skus) {
         let existingCountValue = '';
         let hasRecount = false;
         let recountValue = null;
-        let recountTime = '';
         
         // --- Determine status and counts ---
         if (sku.has_count === true && !sku.in_progress && sku.is_completed === true && !sku.is_expired) {
             existingCountTime = sku.count_time || '';
-            previousCountValue = sku.final_count !== undefined && sku.final_count !== null ? sku.final_count : sku.initial_count;
             isCompleted = true;
             rowClass = 'sku-completed';
             statusBadge = '<span class="badge bg-success">Completed</span>';
@@ -1388,19 +1386,40 @@ function displaySkus(skus) {
         else if (sku.in_progress === true || (sku.has_count === true && sku.current_count !== undefined && sku.current_count !== null && sku.current_count !== '')) {
             existingCountValue = sku.current_count;
             existingCountTime = sku.count_time || '';
-            previousCountValue = sku.final_count !== undefined && sku.final_count !== null ? sku.final_count : sku.current_count;
             isInProgress = true;
             rowClass = 'sku-in-progress';
             statusBadge = '<span class="badge bg-primary">In Progress</span>';
         }
         
-        // Check for recount data (if available in the sku object)
+        // CRITICAL FIX: Determine Previous Count (should be the LAST VALIDATED count)
+        // Priority: recount_count > final_count > initial_count > last_count
+        // But wait - let's check what's available:
+        // - If recount exists, use recount_count as previous count
+        // - If no recount but final_count exists, use final_count
+        // - Otherwise use initial_count
+        // - If no count at all, use last_count from Excel
+        
         if (sku.recount_count !== undefined && sku.recount_count !== null && sku.recount_count !== 0) {
+            // Recount exists - use it as the previous count
+            previousCountValue = sku.recount_count;
             hasRecount = true;
             recountValue = sku.recount_count;
-            recountTime = sku.count_time || '';
-            // If recount exists, use it as previous count
-            previousCountValue = recountValue;
+            console.log(`✅ Recount found for ${sku.sku}: ${previousCountValue}`);
+        } else if (sku.final_count !== undefined && sku.final_count !== null && sku.final_count !== 0) {
+            // No recount, but final_count exists
+            previousCountValue = sku.final_count;
+            console.log(`📌 Final count for ${sku.sku}: ${previousCountValue}`);
+        } else if (sku.initial_count !== undefined && sku.initial_count !== null && sku.initial_count !== 0) {
+            // No recount, no final_count, but initial_count exists
+            previousCountValue = sku.initial_count;
+            console.log(`📌 Initial count for ${sku.sku}: ${previousCountValue}`);
+        } else if (sku.last_count !== undefined && sku.last_count !== null) {
+            // No count at all - use reference count from Excel
+            previousCountValue = sku.last_count;
+            console.log(`📌 Last count (Excel) for ${sku.sku}: ${previousCountValue}`);
+        } else {
+            // Nothing - default to 0
+            previousCountValue = 0;
         }
         
         // If bypass recount
@@ -1509,7 +1528,7 @@ function displaySkus(skus) {
         highlightSkusStatus();
     }, 100);
 }
-
+    
 function previousPage() {
     if (currentPage > 1) {
         checkUnsavedBeforeNavigation(() => {
