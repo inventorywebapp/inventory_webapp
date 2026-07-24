@@ -1368,13 +1368,13 @@ function displaySkus(skus) {
         let isExpired = false;
         let rowClass = '';
         let existingCountValue = '';
-        let hasRecount = false;
-        let recountValue = null;
+        let hasValidCount = false;  // ← NEW: Track if there's a valid completed count
         
-        // --- Determine status and counts ---
+        // --- Determine status ---
         if (sku.has_count === true && !sku.in_progress && sku.is_completed === true && !sku.is_expired) {
             existingCountTime = sku.count_time || '';
             isCompleted = true;
+            hasValidCount = true;  // ← This is a valid completed count
             rowClass = 'sku-completed';
             statusBadge = '<span class="badge bg-success">Completed</span>';
         }
@@ -1389,37 +1389,36 @@ function displaySkus(skus) {
             isInProgress = true;
             rowClass = 'sku-in-progress';
             statusBadge = '<span class="badge bg-primary">In Progress</span>';
+            // ⚠️ In-progress counts are NOT validated yet, so don't show as completed
+            hasValidCount = false;
         }
         
-        // CRITICAL FIX: Determine Previous Count (should be the LAST VALIDATED count)
+        // --- Determine Previous Count ---
         // Priority: recount_count > final_count > initial_count > last_count
-        // But wait - let's check what's available:
-        // - If recount exists, use recount_count as previous count
-        // - If no recount but final_count exists, use final_count
-        // - Otherwise use initial_count
-        // - If no count at all, use last_count from Excel
-        
-        if (sku.recount_count !== undefined && sku.recount_count !== null && sku.recount_count !== 0) {
-            // Recount exists - use it as the previous count
+        if (sku.recount_count !== undefined && sku.recount_count !== null) {
             previousCountValue = sku.recount_count;
-            hasRecount = true;
-            recountValue = sku.recount_count;
-            console.log(`✅ Recount found for ${sku.sku}: ${previousCountValue}`);
-        } else if (sku.final_count !== undefined && sku.final_count !== null && sku.final_count !== 0) {
-            // No recount, but final_count exists
+            // If recount exists, it's a valid count
+            if (sku.recount_count !== 0 || sku.recount_count !== null) {
+                hasValidCount = true;
+            }
+        } else if (sku.final_count !== undefined && sku.final_count !== null) {
             previousCountValue = sku.final_count;
-            console.log(`📌 Final count for ${sku.sku}: ${previousCountValue}`);
-        } else if (sku.initial_count !== undefined && sku.initial_count !== null && sku.initial_count !== 0) {
-            // No recount, no final_count, but initial_count exists
+            if (sku.final_count !== 0 || sku.final_count !== null) {
+                hasValidCount = true;
+            }
+        } else if (sku.initial_count !== undefined && sku.initial_count !== null) {
             previousCountValue = sku.initial_count;
-            console.log(`📌 Initial count for ${sku.sku}: ${previousCountValue}`);
+            // Only consider it valid if session is completed
+            if (isCompleted) {
+                hasValidCount = true;
+            }
         } else if (sku.last_count !== undefined && sku.last_count !== null) {
-            // No count at all - use reference count from Excel
             previousCountValue = sku.last_count;
-            console.log(`📌 Last count (Excel) for ${sku.sku}: ${previousCountValue}`);
+            // Excel reference counts are not "validated" counts
+            hasValidCount = false;
         } else {
-            // Nothing - default to 0
             previousCountValue = 0;
+            hasValidCount = false;
         }
         
         // If bypass recount
@@ -1456,8 +1455,10 @@ function displaySkus(skus) {
             { key: 'final_expected', content: sku.final_expected_count !== undefined && sku.final_expected_count !== null ? sku.final_expected_count : 0 },
             { key: 'kenneth_inv', content: sku.kenneth_inventory !== undefined && sku.kenneth_inventory !== null ? sku.kenneth_inventory : 0 },
             { key: 'current_count', content: `<input type="text" class="form-control initial-count" data-sku-id="${sku.id}" style="min-width: 100px; width: 100px;" placeholder="${inputPlaceholder}" inputmode="numeric" value="${inputValue}">` },
-            { key: 'last_counted_date', content: (existingCountTime && !isExpired) ? `<span id="last-counted-${sku.id}" style="color: #0d6efd; font-weight: bold;">${existingCountTime}</span>` : '<span id="last-counted-${sku.id}">-</span>' },
-            { key: 'previous_count', content: (previousCountValue !== null && previousCountValue !== undefined && !isExpired) ? `<span id="last-count-value-${sku.id}" style="color: #0d6efd; font-weight: bold;">${previousCountValue}</span>` : '<span id="last-count-value-${sku.id}">-</span>' },
+            // ✅ FIXED: Only show blue text if there's a VALID count
+            { key: 'last_counted_date', content: (hasValidCount && existingCountTime && !isExpired) ? `<span id="last-counted-${sku.id}" style="color: #0d6efd; font-weight: bold;">${existingCountTime}</span>` : '<span id="last-counted-${sku.id}">-</span>' },
+            // ✅ FIXED: Only show blue text if there's a VALID previous count
+            { key: 'previous_count', content: (hasValidCount && previousCountValue !== null && previousCountValue !== undefined && !isExpired) ? `<span id="last-count-value-${sku.id}" style="color: #0d6efd; font-weight: bold;">${previousCountValue}</span>` : '<span id="last-count-value-${sku.id}">-</span>' },
             { key: 'status', content: statusBadge }
         ];
         
