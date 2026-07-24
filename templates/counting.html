@@ -5,67 +5,58 @@
 
 <div class="card mb-3">
     <div class="card-body">
-        <div class="row g-2">
-            <!-- Warehouse - 2 columns on mobile, 2 on desktop -->
-            <div class="col-6 col-md-2">
-                <label class="form-label small fw-bold">Warehouse</label>
-                <select id="warehouse" class="form-select form-select-sm">
-                    <option value="All">-- All --</option>
+        <div class="row">
+            <div class="col-md-3 col-sm-6 mb-2">
+                <label>Select Warehouse</label>
+                <select id="warehouse" class="form-control">
+                    <option value="All">-- All Warehouses --</option>
                     <option value="Main">Main Warehouse</option>
-                    <option value="5thFloor">5th Floor</option>
+                    <option value="5thFloor">5th Floor Warehouse</option>
                 </select>
-                <small class="text-muted d-none d-md-block" style="font-size: 10px;">Filters SKUs</small>
+                <small class="text-muted">Filters SKUs by warehouse</small>
             </div>
-            
-            <!-- Day Category - 2 columns on mobile, 2 on desktop -->
-            <div class="col-6 col-md-2">
-                <label class="form-label small fw-bold">Day</label>
-                <select id="dayCategory" class="form-select form-select-sm">
-                    <option value="All">-- All --</option>
+            <div class="col-md-3 col-sm-6 mb-2">
+                <label>Day Category</label>
+                <select id="dayCategory" class="form-control">
+                    <option value="All">-- All Day Categories --</option>
                 </select>
-                <small class="text-muted d-none d-md-block" style="font-size: 10px;">Auto-filters both ways</small>
+                <small class="text-muted">Auto-filters both ways</small>
             </div>
-            
-            <!-- Item Category - 2 columns on mobile, 2 on desktop -->
-            <div class="col-6 col-md-2">
-                <label class="form-label small fw-bold">Item</label>
-                <select id="itemCategory" class="form-select form-select-sm">
-                    <option value="All">-- All --</option>
+            <div class="col-md-3 col-sm-6 mb-2">
+                <label>Item Category</label>
+                <select id="itemCategory" class="form-control">
+                    <option value="All">-- All Item Categories --</option>
                 </select>
-                <small class="text-muted d-none d-md-block" style="font-size: 10px;">Auto-filters both ways</small>
+                <small class="text-muted">Auto-filters both ways</small>
             </div>
-            
-            <!-- Search - full width on mobile, 3 columns on desktop -->
-            <div class="col-12 col-md-3">
-                <label class="form-label small fw-bold">Search</label>
+            <div class="col-md-3 col-sm-6 mb-2">
+                <label>Search SKU</label>
                 <div style="position: relative;">
-                    <input type="text" id="searchSku" class="form-control form-control-sm" placeholder="SKU or description..." autocomplete="off">
+                    <input type="text" id="searchSku" class="form-control" placeholder="Type to search..." autocomplete="off">
                     <div id="suggestions" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-top: none; z-index: 1000; max-height: 200px; overflow-y: auto; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
                 </div>
-                <small class="text-muted d-none d-md-block" style="font-size: 10px;">Type for suggestions</small>
+                <small class="text-muted">Smart search - type for suggestions</small>
             </div>
-            
-            <!-- Action Buttons - full width on mobile, 3 columns on desktop -->
-            <div class="col-12 col-md-3">
-                <label class="form-label small fw-bold d-none d-md-block">&nbsp;</label>
-                <div class="d-flex flex-wrap gap-1">
-                    <button class="btn btn-outline-secondary btn-sm" onclick="toggleColumnModal()" title="Show/Hide Columns">
-                        <i class="bi bi-layout-three-columns"></i>
+        </div>
+        
+        <!-- BUTTONS ROW - Below filters like before -->
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="d-flex flex-wrap gap-2">
+                    <button id="saveCounts" class="btn btn-success" onclick="saveAllCounts()">
+                        <i class="bi bi-save"></i> Save All
                     </button>
-                    <button id="applyFilters" class="btn btn-primary btn-sm" onclick="applyFilters()">
-                        <i class="bi bi-arrow-repeat"></i>
+                    <button id="completeCounting" class="btn btn-danger" onclick="completeCounting()">
+                        <i class="bi bi-check2-circle"></i> Complete
                     </button>
-                    <button id="saveCounts" class="btn btn-success btn-sm" onclick="saveAllCounts()">
-                        <i class="bi bi-save"></i>
+                    <button id="scanBarcodeBtn" class="btn btn-info" onclick="startBarcodeScanner()">
+                        <i class="bi bi-upc-scan"></i> Scan
                     </button>
-                    <button id="completeCounting" class="btn btn-danger btn-sm" onclick="completeCounting()">
-                        <i class="bi bi-check2-circle"></i>
-                    </button>
-                    <button id="scanBarcodeBtn" class="btn btn-info btn-sm text-white" onclick="startBarcodeScanner()">
-                        <i class="bi bi-upc-scan"></i>
+                    <button class="btn btn-secondary" onclick="toggleColumnModal()">
+                        <i class="bi bi-layout-three-columns"></i> Columns
                     </button>
                 </div>
-                <small class="text-muted d-none d-md-block" style="font-size: 10px;">Apply, Save, Complete, Scan</small>
+                <small class="text-muted d-block mt-1">Filters auto-apply when changed</small>
             </div>
         </div>
     </div>
@@ -87,7 +78,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary btn-sm" onclick="resetColumns()">Reset to Default</button>
-                <button class="btn btn-primary btn-sm" data-bs-dismiss="modal">Apply</button>
+                <button class="btn btn-primary btn-sm" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -294,36 +285,16 @@
 .col-hidden {
     display: none !important;
 }
-/* Mobile responsive button fixes */
+/* Mobile Responsive for buttons */
 @media (max-width: 576px) {
-    .btn-sm {
-        font-size: 0.75rem;
-        padding: 4px 8px;
+    .d-flex.gap-2 {
+        gap: 6px !important;
     }
-    .btn-sm i {
-        font-size: 0.9rem;
-    }
-    .form-select-sm {
-        font-size: 0.8rem;
-        padding: 4px 8px;
-    }
-    .form-control-sm {
-        font-size: 0.8rem;
-        padding: 4px 8px;
-    }
-    .gap-1 {
-        gap: 0.2rem !important;
-    }
-    #skusList .table td,
-    #skusList .table th {
-        padding: 4px 6px;
-        font-size: 0.75rem;
-    }
-    .initial-count {
-        min-width: 60px !important;
-        width: 60px !important;
-        font-size: 0.75rem;
-        padding: 2px 4px;
+    .d-flex.gap-2 .btn {
+        font-size: 12px;
+        padding: 6px 10px;
+        flex: 1 1 auto;
+        min-width: 60px;
     }
 }
 </style>
@@ -344,7 +315,7 @@ const FIFTH_FLOOR_CATEGORIES = [
     'Deep Dish-UN', 'Trunk Tray'
 ];
 
-// Column definitions for toggle
+// Column definitions for toggle (ALL ON by default)
 const ALL_COLUMNS = [
     { key: 'sku', label: 'SKU', default: true },
     { key: 'description', label: 'Description', default: true },
@@ -352,7 +323,7 @@ const ALL_COLUMNS = [
     { key: 'last_count_date', label: 'Last Count Date', default: true },
     { key: 'last_count', label: 'Last Count', default: true },
     { key: 'container_qty', label: 'Container Qty', default: true },
-    { key: 'container_details', label: 'Container Details', default: false },
+    { key: 'container_details', label: 'Container Details', default: true },
     { key: 'final_expected', label: 'Final Expected', default: true },
     { key: 'kenneth_inv', label: 'Kenneth\'s Inv', default: true },
     { key: 'current_count', label: 'Current Count', default: true },
@@ -419,19 +390,20 @@ function loadColumnPreferences() {
         const saved = localStorage.getItem('columnVisibility');
         if (saved) {
             columnVisibility = JSON.parse(saved);
+            // Ensure all columns have a value (default to true if missing)
             ALL_COLUMNS.forEach(col => {
                 if (columnVisibility[col.key] === undefined) {
-                    columnVisibility[col.key] = col.default;
+                    columnVisibility[col.key] = true;
                 }
             });
         } else {
             ALL_COLUMNS.forEach(col => {
-                columnVisibility[col.key] = col.default;
+                columnVisibility[col.key] = true;
             });
         }
     } catch (e) {
         ALL_COLUMNS.forEach(col => {
-            columnVisibility[col.key] = col.default;
+            columnVisibility[col.key] = true;
         });
     }
 }
@@ -446,6 +418,7 @@ function toggleColumnModal() {
     const modal = document.getElementById('columnModal');
     const container = document.getElementById('columnToggleList');
     
+    // Build toggle buttons
     container.innerHTML = ALL_COLUMNS.map(col => `
         <button class="column-toggle-btn ${columnVisibility[col.key] ? 'active' : 'hidden'}"
                 onclick="toggleColumn('${col.key}')"
@@ -463,8 +436,11 @@ function toggleColumnModal() {
 function toggleColumn(key) {
     columnVisibility[key] = !columnVisibility[key];
     saveColumnPreferences();
+    
+    // Update UI immediately (no "Apply" needed)
     applyColumnVisibility();
     
+    // Update button in modal
     const btn = document.querySelector(`.column-toggle-btn[data-key="${key}"]`);
     if (btn) {
         btn.className = `column-toggle-btn ${columnVisibility[key] ? 'active' : 'hidden'}`;
@@ -478,11 +454,12 @@ function toggleColumn(key) {
 
 function resetColumns() {
     ALL_COLUMNS.forEach(col => {
-        columnVisibility[col.key] = col.default;
+        columnVisibility[col.key] = true;
     });
     saveColumnPreferences();
     applyColumnVisibility();
     
+    // Refresh modal buttons
     const container = document.getElementById('columnToggleList');
     container.querySelectorAll('.column-toggle-btn').forEach(btn => {
         const key = btn.dataset.key;
@@ -494,20 +471,11 @@ function resetColumns() {
         `;
     });
     
-    showToast('Columns reset to default', 'info');
+    showToast('All columns restored', 'info');
 }
 
 function applyColumnVisibility() {
-    document.querySelectorAll('.col-toggle').forEach(el => {
-        const key = el.dataset.colKey;
-        if (columnVisibility[key] === false) {
-            el.classList.add('col-hidden');
-        } else {
-            el.classList.remove('col-hidden');
-        }
-    });
-    
-    document.querySelectorAll('thead th.col-toggle').forEach(el => {
+    document.querySelectorAll('td.col-toggle, th.col-toggle').forEach(el => {
         const key = el.dataset.colKey;
         if (columnVisibility[key] === false) {
             el.classList.add('col-hidden');
@@ -533,6 +501,7 @@ function checkUnsavedBeforeNavigation(callback) {
         return;
     }
     
+    // Count how many inputs have values
     const inputs = document.querySelectorAll('.initial-count');
     let count = 0;
     inputs.forEach(input => {
@@ -547,6 +516,7 @@ function checkUnsavedBeforeNavigation(callback) {
         return;
     }
     
+    // Show warning modal
     document.getElementById('unsavedCount').textContent = count;
     pendingNavigation = callback;
     const modal = new bootstrap.Modal(document.getElementById('unsavedModal'));
@@ -732,7 +702,7 @@ async function stopBarcodeScanner() {
     isScannerActive = false;
     
     if (html5QrCode) {
-        try { await html5QrCode.stop(); } catch(err) {}
+        try { await html5QrCode.stop(); } catch(e) {}
         html5QrCode = null;
     }
     
@@ -766,7 +736,7 @@ function intelligentSkuSearch(scannedText) {
     console.log("Total SKUs in memory:", allSkus.length);
     
     if (allSkus.length === 0) {
-        alert("SKU data not loaded. Please click 'Apply Filters' first, then try scanning.");
+        alert("SKU data not loaded. Please refresh the page.");
         return;
     }
     
@@ -994,14 +964,13 @@ function updateDayCategories() {
 }
 
 function onFilterChange() {
-    const dayCat = document.getElementById('dayCategory').value;
-    const itemCat = document.getElementById('itemCategory').value;
+    const activeElement = document.activeElement;
     
-    if (document.activeElement === document.getElementById('dayCategory')) {
+    if (activeElement && activeElement.id === 'dayCategory') {
         filterItemCategoriesByDay();
     }
     
-    if (document.activeElement === document.getElementById('itemCategory')) {
+    if (activeElement && activeElement.id === 'itemCategory') {
         filterDayCategoriesByItem();
     }
     
@@ -1360,21 +1329,7 @@ function displaySkus(skus) {
         return;
     }
     
-    const colClasses = {
-        'sku': 'col-toggle',
-        'description': 'col-toggle',
-        'category': 'col-toggle',
-        'last_count_date': 'col-toggle',
-        'last_count': 'col-toggle',
-        'container_qty': 'col-toggle',
-        'container_details': 'col-toggle',
-        'final_expected': 'col-toggle',
-        'kenneth_inv': 'col-toggle',
-        'current_count': 'col-toggle',
-        'last_counted_date': 'col-toggle',
-        'previous_count': 'col-toggle',
-        'status': 'col-toggle'
-    };
+    const colClasses = 'col-toggle';
     
     let html = '<div class="col-12"><div class="table-responsive"><table class="table table-bordered table-hover table-striped">';
     html += '<thead class="table-dark">';
@@ -1389,7 +1344,7 @@ function displaySkus(skus) {
         { key: 'container_qty', label: 'Container Qty' },
         { key: 'container_details', label: 'Container Details' },
         { key: 'final_expected', label: 'Final Expected' },
-        { key: 'kenneth_inv', label: 'Kenneth\'s Inv' },
+        { key: 'kenneth_inv', label: "Kenneth's Inv" },
         { key: 'current_count', label: 'Current Count' },
         { key: 'last_counted_date', label: 'Last Counted Date' },
         { key: 'previous_count', label: 'Previous Count' },
@@ -1398,7 +1353,7 @@ function displaySkus(skus) {
     
     headers.forEach(h => {
         const hidden = columnVisibility[h.key] === false;
-        html += `<th class="${colClasses[h.key]} ${hidden ? 'col-hidden' : ''}" data-col-key="${h.key}">${h.label}</th>`;
+        html += `<th class="${colClasses} ${hidden ? 'col-hidden' : ''}" data-col-key="${h.key}">${h.label}</th>`;
     });
     
     html += '</tr>';
@@ -1468,14 +1423,14 @@ function displaySkus(skus) {
             { key: 'final_expected', content: sku.final_expected_count || 0 },
             { key: 'kenneth_inv', content: sku.kenneth_inventory || 0 },
             { key: 'current_count', content: `<input type="text" class="form-control initial-count" data-sku-id="${sku.id}" style="min-width: 100px; width: 100px;" placeholder="${inputPlaceholder}" inputmode="numeric" value="${inputValue}">` },
-            { key: 'last_counted_date', content: (existingCountTime && !isExpired) ? `<span id="last-counted-${sku.id}" style="color: #0d6efd; font-weight: bold;">${existingCountTime}</span>` : '<span id="last-counted-${sku.id}">-</span>' },
-            { key: 'previous_count', content: (finalCountValue && !isExpired) ? `<span id="last-count-value-${sku.id}" style="color: #0d6efd; font-weight: bold;">${finalCountValue}</span>` : '<span id="last-count-value-${sku.id}">-</span>' },
+            { key: 'last_counted_date', content: (existingCountTime && !isExpired) ? `<span id="last-counted-${sku.id}" style="color: #0d6efd; font-weight: bold;">${existingCountTime}</span>` : '-</span>' },
+            { key: 'previous_count', content: (finalCountValue && !isExpired) ? `<span id="last-count-value-${sku.id}" style="color: #0d6efd; font-weight: bold;">${finalCountValue}</span>` : '-</span>' },
             { key: 'status', content: statusBadge }
         ];
         
         rowCells.forEach(cell => {
             const hidden = columnVisibility[cell.key] === false;
-            html += `<td class="${colClasses[cell.key]} ${hidden ? 'col-hidden' : ''}" data-col-key="${cell.key}">${cell.content}</td>`;
+            html += `<td class="${colClasses} ${hidden ? 'col-hidden' : ''}" data-col-key="${cell.key}">${cell.content}</td>`;
         });
         
         html += '</tr>';
@@ -1955,8 +1910,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const itemCategorySelect = document.getElementById('itemCategory');
     const scannerModal = document.getElementById('scannerModal');
     
+    // Load column preferences (all ON by default)
     loadColumnPreferences();
     
+    // Warehouse change
     if (warehouseSelect) {
         warehouseSelect.addEventListener('change', function() {
             filterItemCategoriesByWarehouse();
@@ -1964,12 +1921,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Day category change - bidirectional
     if (dayCategorySelect) {
         dayCategorySelect.addEventListener('change', function() {
             onFilterChange();
         });
     }
     
+    // Item category change - bidirectional
     if (itemCategorySelect) {
         itemCategorySelect.addEventListener('change', function() {
             onFilterChange();
@@ -2004,6 +1963,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
     
+    // Warn before page unload if unsaved changes
     window.addEventListener('beforeunload', function(e) {
         if (hasUnsavedChanges) {
             e.preventDefault();
