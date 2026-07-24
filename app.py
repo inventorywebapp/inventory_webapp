@@ -1813,61 +1813,6 @@ def restore_database():
     return render_template('admin_restore.html')
 
 # ============================================
-# SKU SUGGESTIONS FOR PRINT LABEL
-# ============================================
-@app.route('/api/sku_suggestions')
-@login_required
-def api_sku_suggestions():
-    """Get SKU suggestions for print label autocomplete"""
-    term = request.args.get('term', '').strip()
-    if len(term) < 1:
-        return jsonify([])
-    
-    term_lower = term.lower()
-    results = []
-    seen = set()
-    
-    # Search in all active SKUs
-    skus = SKU.query.filter_by(is_active=True).all()
-    
-    # First: exact matches
-    for sku in skus:
-        if sku.sku.lower() == term_lower:
-            results.append({
-                'id': sku.id,
-                'sku': sku.sku,
-                'description': sku.description or ''
-            })
-            seen.add(sku.id)
-    
-    # Second: contains matches
-    for sku in skus:
-        if sku.id not in seen and term_lower in sku.sku.lower():
-            results.append({
-                'id': sku.id,
-                'sku': sku.sku,
-                'description': sku.description or ''
-            })
-            seen.add(sku.id)
-            if len(results) >= 10:
-                break
-    
-    # Third: description matches (if less than 10)
-    if len(results) < 10:
-        for sku in skus:
-            if sku.id not in seen and sku.description and term_lower in sku.description.lower():
-                results.append({
-                    'id': sku.id,
-                    'sku': sku.sku,
-                    'description': sku.description or ''
-                })
-                seen.add(sku.id)
-                if len(results) >= 10:
-                    break
-    
-    return jsonify(results)
-
-# ============================================
 # MAIN ENTRY POINT
 # ============================================
 if __name__ == '__main__':
