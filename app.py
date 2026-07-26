@@ -345,21 +345,31 @@ def get_skus():
         has_count = False
         is_completed = False
         is_expired = False
+        recount_completed = False
+        current_count = None
+        final_count_value = None
         
         if latest_record:
             has_count = True
+            recount_completed = latest_record.recount_completed
+            current_count = latest_record.initial_count
+            
             if latest_record.count_time:
                 count_time_naive = latest_record.count_time.replace(tzinfo=None) if hasattr(latest_record.count_time, 'replace') else latest_record.count_time
                 count_time = latest_record.count_time.strftime('%Y-%m-%d %H:%M:%S')
             else:
                 count_time_naive = None
             
-            if latest_record.recount_count and latest_record.recount_count > 0:
-                final_count = latest_record.recount_count
-            elif latest_record.final_count and latest_record.final_count > 0:
-                final_count = latest_record.final_count
+            # ============================================================
+            # FIX: Properly handle recount count
+            # If recount was completed, use recount_count as final (even if 0)
+            # ============================================================
+            if latest_record.recount_completed:
+                final_count_value = latest_record.recount_count
+            elif latest_record.final_count is not None and latest_record.final_count != '':
+                final_count_value = latest_record.final_count
             else:
-                final_count = latest_record.initial_count
+                final_count_value = latest_record.initial_count
             
             session = CountingSession.query.get(latest_record.session_id)
             if session and session.is_completed:
@@ -384,10 +394,12 @@ def get_skus():
             'stock_status': sku.stock_status,
             'bypass_recount': sku.bypass_recount,
             'has_count': has_count,
-            'final_count': final_count if not is_expired else None,
+            'final_count': final_count_value if not is_expired else None,
             'count_time': count_time if not is_expired else None,
             'is_completed': is_completed and not is_expired,
-            'is_expired': is_expired
+            'is_expired': is_expired,
+            'recount_completed': recount_completed,
+            'current_count': current_count
         })
     
     return jsonify(result)
@@ -563,7 +575,7 @@ def get_recount_list():
         'final_expected_count': r.sku.final_expected_count,
         'kenneth_inventory': r.sku.kenneth_inventory, 
         'remarks': r.remarks,
-        'bypass_recount': r.sku.bypass_recount  # Add this
+        'recount_count': r.recount_count
     } for r in records]
     
     return jsonify(result)
@@ -634,10 +646,7 @@ def get_latest_counts():
             result[sku_id] = {
                 'initial_count': latest.initial_count,
                 'version': latest.version,
-                'count_time': latest.count_time.strftime('%Y-%m-%d %H:%M:%S'),
-                'recount_count': latest.recount_count if latest.recount_count else None,
-                'final_count': latest.final_count if latest.final_count else None,
-                'recount_completed': latest.recount_completed
+                'count_time': latest.count_time.strftime('%Y-%m-%d %H:%M:%S')
             }
     
     return jsonify(result)
@@ -963,7 +972,13 @@ def export_counts():
                 sheets_data[day_category] = []
             
             if count_record and session_obj:
-                if count_record.recount_count and count_record.recount_count > 0:
+                # ============================================================
+                # FIX: Properly handle recount count of 0 in export
+                # ============================================================
+                # If recount was completed, use recount_count as final (even if 0)
+                if count_record.recount_completed:
+                    final_count = count_record.recount_count
+                elif count_record.recount_count and count_record.recount_count > 0:
                     final_count = count_record.recount_count
                 else:
                     final_count = count_record.initial_count
@@ -974,7 +989,8 @@ def export_counts():
                     'Day Category': str(day_category),
                     'Count Status': 'COMPLETED',
                     'Initial Count': count_record.initial_count,
-                    'Recount Count': count_record.recount_count if count_record.recount_count else '',
+                    # FIX: Only show recount count if recount was actually performed
+                    'Recount Count': count_record.recount_count if (count_record.recount_completed and count_record.recount_count is not None) else '',
                     'Final Count': final_count,
                     'Remarks': str(count_record.remarks) if count_record.remarks else '',
                     'Date/Time Counted': count_record.count_time.strftime('%Y-%m-%d %H:%M:%S') if count_record.count_time else '',
