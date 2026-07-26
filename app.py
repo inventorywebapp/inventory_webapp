@@ -562,7 +562,8 @@ def get_recount_list():
         'initial_count': r.initial_count, 
         'final_expected_count': r.sku.final_expected_count,
         'kenneth_inventory': r.sku.kenneth_inventory, 
-        'remarks': r.remarks
+        'remarks': r.remarks,
+        'bypass_recount': r.sku.bypass_recount  # Add this
     } for r in records]
     
     return jsonify(result)
@@ -633,7 +634,10 @@ def get_latest_counts():
             result[sku_id] = {
                 'initial_count': latest.initial_count,
                 'version': latest.version,
-                'count_time': latest.count_time.strftime('%Y-%m-%d %H:%M:%S')
+                'count_time': latest.count_time.strftime('%Y-%m-%d %H:%M:%S'),
+                'recount_count': latest.recount_count if latest.recount_count else None,
+                'final_count': latest.final_count if latest.final_count else None,
+                'recount_completed': latest.recount_completed
             }
     
     return jsonify(result)
