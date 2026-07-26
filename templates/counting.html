@@ -1667,10 +1667,13 @@ function saveRecounts() {
                 if (bsModal) bsModal.hide();
                 modal.remove();
             }
+            
             // ============================================================
-            // FIX: Stay on counting page instead of going to Dashboard
+            // FIX: Clear unsaved flag before refreshing
             // ============================================================
             showToast('✅ Recounts saved successfully!', 'success');
+            // Clear the unsaved changes flag before refreshing
+            hasUnsavedChanges = false;
             // Refresh the current page to show updated counts
             applyFilters();
             
