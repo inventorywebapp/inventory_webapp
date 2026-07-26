@@ -1667,16 +1667,7 @@ function saveRecounts() {
                 if (bsModal) bsModal.hide();
                 modal.remove();
             }
-            
-            // ============================================================
-            // FIX: Clear unsaved flag before refreshing
-            // ============================================================
-            showToast('✅ Recounts saved successfully!', 'success');
-            // Clear the unsaved changes flag before refreshing
-            hasUnsavedChanges = false;
-            // Refresh the current page to show updated counts
-            applyFilters();
-            
+            completeCountingSession();
         } else {
             alert('Error saving recounts');
             if (saveBtn) {
@@ -1715,7 +1706,10 @@ function completeCountingSession() {
     .then(data => {
         if (data.success) {
             alert('✓ Counting session completed successfully!');
-            window.location.href = '/dashboard';
+            // Reset session ID so a new session starts
+            currentSessionId = null;
+            // Refresh the page to clear counted items and start fresh
+            location.reload();
         } else {
             alert(data.message || 'Error completing session');
             isNavigatingAway = false;
