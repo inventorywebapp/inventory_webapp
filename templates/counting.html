@@ -1439,28 +1439,43 @@ function saveAllCounts() {
             counts: counts
         })
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            currentSessionId = data.session_id;
-            hasUnsavedChanges = false;
-            updateUnsavedStatus();
-            if (data.recount_needed_count > 0) {
-                alert(`⚠️ ${data.recount_needed_count} SKU(s) need recount (discrepancy > 5)\n\nThe recount window will now open.`);
-                checkForRecounts();
-            } else {
-                let completeMsg = `✓ Counts saved successfully!\n\n`;
-                completeMsg += `Saved ${Object.keys(counts).length} SKU counts\n`;
-                completeMsg += `✅ No discrepancies found.\n\n`;
-                completeMsg += `Do you want to complete the counting session now?`;
-                if (confirm(completeMsg)) {
-                    completeCountingSession();
-                }
-            }
-        } else {
-            alert('Error saving counts');
+.then(response => response.json())
+.then(data => {
+    if (data.success) {
+        currentSessionId = data.session_id;
+        hasUnsavedChanges = false;
+        updateUnsavedStatus();
+        
+        // ============================================================
+        // FIX: Refresh SKU data to show updated Previous Count
+        // ============================================================
+        // Check if we're on the counting page and reload SKU data
+        if (filteredSkus.length > 0) {
+            // Reload current SKUs to get updated data
+            const warehouse = document.getElementById('warehouse').value;
+            const dayCategory = document.getElementById('dayCategory').value;
+            const itemCategory = document.getElementById('itemCategory').value;
+            const search = document.getElementById('searchSku').value;
+            loadSkus(warehouse, dayCategory, itemCategory, search);
         }
-    })
+        
+        if (data.recount_needed_count > 0) {
+            alert(`⚠️ ${data.recount_needed_count} SKU(s) need recount (discrepancy > 5)\n\nThe recount window will now open.`);
+            checkForRecounts();
+        } else {
+            let completeMsg = `✓ Counts saved successfully!\n\n`;
+            completeMsg += `Saved ${Object.keys(counts).length} SKU counts\n`;
+            completeMsg += `✅ No discrepancies found.\n\n`;
+            completeMsg += `Do you want to complete the counting session now?`;
+            
+            if (confirm(completeMsg)) {
+                completeCountingSession();
+            }
+        }
+    } else {
+        alert('Error saving counts');
+    }
+})
     .catch(error => {
         alert('Error: ' + error);
     })
