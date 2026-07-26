@@ -1178,6 +1178,10 @@ function displaySkus(skus) {
         else if (sku.in_progress === true || (sku.has_count === true && sku.current_count !== undefined && sku.current_count !== null && sku.current_count !== '')) {
             existingCountValue = sku.current_count;
             existingCountTime = sku.count_time || '';
+            // ============================================================
+            // FIX: Properly handle recount count of 0
+            // If final_count exists (even 0), use it instead of falling back
+            // ============================================================
             if (sku.final_count !== undefined && sku.final_count !== null && sku.final_count !== '') {
                 finalCountValue = sku.final_count;
             } else {
@@ -1471,9 +1475,6 @@ function checkForRecounts() {
         });
 }
 
-// ============================================================
-// FIX: Updated showRecountModal with auto-refresh for bypass
-// ============================================================
 function showRecountModal(recountItems) {
     // Filter out bypass recount SKUs
     const filteredItems = recountItems.filter(item => {
@@ -1483,7 +1484,7 @@ function showRecountModal(recountItems) {
     
     if (filteredItems.length === 0) {
         alert('✅ All recount-needed SKUs are marked as "Bypass Recount". No action needed.');
-        // Auto-refresh the page to show updated status
+        // Refresh the page to show updated status
         location.reload();
         return;
     }
@@ -1700,7 +1701,11 @@ function completeCountingSession() {
             alert('✓ Counting session completed successfully!');
             // Reset session ID so a new session starts
             currentSessionId = null;
-            // Refresh the page to clear counted items and start fresh
+            // Clear all count inputs
+            document.querySelectorAll('.initial-count').forEach(input => {
+                input.value = '';
+            });
+            // Refresh the page to start fresh
             location.reload();
         } else {
             alert(data.message || 'Error completing session');
