@@ -1667,7 +1667,13 @@ function saveRecounts() {
                 if (bsModal) bsModal.hide();
                 modal.remove();
             }
-            completeCountingSession();
+            // ============================================================
+            // FIX: Stay on counting page instead of going to Dashboard
+            // ============================================================
+            showToast('✅ Recounts saved successfully!', 'success');
+            // Refresh the current page to show updated counts
+            applyFilters();
+            
         } else {
             alert('Error saving recounts');
             if (saveBtn) {
