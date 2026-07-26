@@ -91,6 +91,12 @@ body {
     box-shadow: 0 8px 25px rgba(13, 110, 253, 0.4);
 }
 
+.btn-primary:disabled {
+    transform: none;
+    box-shadow: none;
+    opacity: 0.65;
+}
+
 .btn-success {
     background: linear-gradient(135deg, #198754, #157347);
     border: none;
@@ -102,6 +108,12 @@ body {
     box-shadow: 0 8px 25px rgba(25, 135, 84, 0.4);
 }
 
+.btn-success:disabled {
+    transform: none;
+    box-shadow: none;
+    opacity: 0.65;
+}
+
 .btn-danger {
     background: linear-gradient(135deg, #dc3545, #b02a37);
     border: none;
@@ -111,6 +123,12 @@ body {
 .btn-danger:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(220, 53, 69, 0.4);
+}
+
+.btn-danger:disabled {
+    transform: none;
+    box-shadow: none;
+    opacity: 0.65;
 }
 
 .btn-info {
@@ -126,6 +144,12 @@ body {
     color: white;
 }
 
+.btn-info:disabled {
+    transform: none;
+    box-shadow: none;
+    opacity: 0.65;
+}
+
 .btn-secondary {
     background: #6c757d;
     border: none;
@@ -134,6 +158,29 @@ body {
 .btn-secondary:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(108, 117, 125, 0.3);
+}
+
+.btn-secondary:disabled {
+    transform: none;
+    box-shadow: none;
+    opacity: 0.65;
+}
+
+.btn-outline-secondary {
+    border: 2px solid #6c757d;
+    color: #6c757d;
+    background: transparent;
+}
+
+.btn-outline-secondary:hover {
+    background: #6c757d;
+    color: white;
+    transform: translateY(-2px);
+}
+
+.btn-outline-secondary:disabled {
+    transform: none;
+    opacity: 0.65;
 }
 
 /* ============================================
@@ -194,6 +241,59 @@ body {
     background-color: rgba(13, 110, 253, 0.05);
 }
 
+/* Column visibility - hidden columns */
+.column-hidden {
+    display: none !important;
+}
+
+/* ============================================
+   SKU STATUS COLORS
+   ============================================ */
+.sku-completed {
+    background-color: #d1e7dd !important;
+    border-left: 4px solid #198754;
+}
+.sku-completed:hover {
+    background-color: #b6dbc8 !important;
+}
+
+.sku-in-progress {
+    background-color: #cfe2ff !important;
+    border-left: 4px solid #0d6efd;
+}
+.sku-in-progress:hover {
+    background-color: #b6d4fe !important;
+}
+
+.sku-needs-count {
+    background-color: #fff3cd !important;
+    border-left: 4px solid #ffc107;
+}
+.sku-needs-count:hover {
+    background-color: #ffe69e !important;
+}
+
+.sku-typing {
+    background-color: #ffe69e !important;
+    border-left: 4px solid #ffc107;
+}
+
+.sku-pre-counted {
+    background-color: #cfe2ff !important;
+    border-left: 4px solid #0d6efd;
+}
+.sku-pre-counted:hover {
+    background-color: #b6d4fe !important;
+}
+
+.sku-recounted {
+    background-color: #d1e7dd !important;
+    border-left: 4px solid #28a745;
+}
+.sku-recounted:hover {
+    background-color: #b6dbc8 !important;
+}
+
 /* ============================================
    BADGES
    ============================================ */
@@ -203,6 +303,39 @@ body {
     border-radius: 20px;
     font-size: 0.75rem;
     letter-spacing: 0.2px;
+}
+
+.uncounted-badge {
+    display: inline-block;
+    background-color: #ffc107;
+    color: #856404;
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-left: 10px;
+}
+
+.counted-badge {
+    display: inline-block;
+    background-color: #198754;
+    color: white;
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-left: 10px;
+}
+
+.inprogress-badge {
+    display: inline-block;
+    background-color: #0d6efd;
+    color: white;
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-left: 10px;
 }
 
 /* ============================================
@@ -232,6 +365,27 @@ body {
 .alert-info {
     background-color: #cfe2ff;
     color: #084298;
+}
+
+/* Toast notifications */
+.alert.position-fixed {
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+    padding: 16px 24px;
+    font-weight: 500;
+    max-width: 500px;
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* ============================================
@@ -266,74 +420,165 @@ body {
 }
 
 /* ============================================
-   MOBILE RESPONSIVE
+   SUGGESTIONS DROPDOWN
    ============================================ */
-@media (max-width: 768px) {
-    .container {
-        padding-left: 10px;
-        padding-right: 10px;
-    }
-
-    .table-responsive {
-        font-size: 0.8rem;
-    }
-
-    .btn {
-        margin-bottom: 5px;
-        width: 100%;
-        font-size: 0.85rem;
-    }
-
-    .form-control, .form-select {
-        font-size: 16px; /* Prevents zoom on mobile */
-    }
-
-    .card-body {
-        padding: 16px;
-    }
-
-    .navbar-brand {
-        font-size: 1rem;
-    }
-
-    .navbar .nav-link {
-        font-size: 0.85rem;
-        padding: 6px 12px;
-    }
-
-    .badge {
-        font-size: 0.65rem;
-        padding: 3px 8px;
-    }
-
-    .table td, .table th {
-        padding: 6px 8px;
-    }
-
-    .modal-dialog {
-        max-width: 95%;
-        margin: 10px;
-    }
-
-    .container.mt-3 {
-        margin-top: 0.75rem !important;
-    }
+#suggestions {
+    max-height: 300px;
+    overflow-y: auto;
+    border-radius: 0 0 12px 12px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+    border: 2px solid #e9ecef;
+    border-top: none;
 }
 
-@media (max-width: 576px) {
-    .card-header {
-        padding: 14px 16px;
-        font-size: 1rem;
-    }
+.suggestion-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+    border-bottom: 1px solid #f0f0f0;
+}
 
-    .card-body {
-        padding: 12px;
-    }
+.suggestion-item:hover {
+    background-color: #f0f7ff;
+}
 
-    .btn-lg {
-        font-size: 1rem;
-        padding: 10px 16px;
-    }
+.suggestion-item:last-child {
+    border-bottom: none;
+}
+
+/* ============================================
+   QR SCANNER
+   ============================================ */
+#qr-reader {
+    min-height: 400px;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+#qr-reader__scan_region {
+    background: #000;
+}
+
+#qr-reader-results {
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+/* ============================================
+   COLUMN TOGGLE DROPDOWN
+   ============================================ */
+#columnToggleGroup .dropdown-menu {
+    padding: 8px 0;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    border: 1px solid #e9ecef;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+#columnToggleMenu .dropdown-item {
+    padding: 6px 20px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background-color 0.15s ease;
+}
+
+#columnToggleMenu .dropdown-item:hover {
+    background-color: #f0f7ff;
+}
+
+#columnToggleMenu .dropdown-item input[type="checkbox"] {
+    margin-right: 10px;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #0d6efd;
+}
+
+#columnToggleMenu .dropdown-item label {
+    cursor: pointer;
+    margin: 0;
+}
+
+/* ============================================
+   MODAL
+   ============================================ */
+.modal-content {
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+    border-bottom: 1px solid #e9ecef;
+    padding: 18px 24px;
+}
+
+.modal-body {
+    padding: 24px;
+}
+
+.modal-footer {
+    border-top: 1px solid #e9ecef;
+    padding: 16px 24px;
+}
+
+.modal-xl .modal-dialog {
+    max-width: 90%;
+}
+
+/* Recount modal specific */
+#recountModal .modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+#recountModal .table td {
+    padding: 8px 12px;
+    vertical-align: middle;
+}
+
+#recountModal .recount-count {
+    width: 120px;
+    min-width: 80px;
+}
+
+#recountModal .recount-remarks {
+    width: 250px;
+    min-width: 150px;
+    resize: vertical;
+}
+
+/* ============================================
+   PAGINATION
+   ============================================ */
+#paginationControls .btn {
+    min-width: 100px;
+}
+
+#paginationControls .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#pageInfo {
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.95rem;
+}
+
+/* ============================================
+   FILTER SECTION
+   ============================================ */
+#filterSection .form-control,
+#filterSection .form-select {
+    font-size: 0.9rem;
+}
+
+#filterSection label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #495057;
 }
 
 /* ============================================
@@ -389,147 +634,21 @@ body {
 }
 
 /* ============================================
-   MODAL
+   LOADING INDICATOR
    ============================================ */
-.modal-content {
-    border: none;
-    border-radius: 16px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+#loadingIndicator {
+    padding: 40px 20px;
 }
 
-.modal-header {
-    border-bottom: 1px solid #e9ecef;
-    padding: 18px 24px;
+#loadingIndicator .spinner-border {
+    width: 3rem;
+    height: 3rem;
 }
 
-.modal-body {
-    padding: 24px;
-}
-
-.modal-footer {
-    border-top: 1px solid #e9ecef;
-    padding: 16px 24px;
-}
-
-/* ============================================
-   SKU STATUS COLORS (Existing)
-   ============================================ */
-.sku-completed {
-    background-color: #d1e7dd !important;
-    border-left: 4px solid #198754;
-}
-.sku-completed:hover {
-    background-color: #b6dbc8 !important;
-}
-
-.sku-in-progress {
-    background-color: #cfe2ff !important;
-    border-left: 4px solid #0d6efd;
-}
-.sku-in-progress:hover {
-    background-color: #b6d4fe !important;
-}
-
-.sku-needs-count {
-    background-color: #fff3cd !important;
-    border-left: 4px solid #ffc107;
-}
-.sku-needs-count:hover {
-    background-color: #ffe69e !important;
-}
-
-.sku-typing {
-    background-color: #ffe69e !important;
-    border-left: 4px solid #ffc107;
-}
-
-.sku-pre-counted {
-    background-color: #cfe2ff !important;
-    border-left: 4px solid #0d6efd;
-}
-.sku-pre-counted:hover {
-    background-color: #b6d4fe !important;
-}
-
-/* ============================================
-   BADGES (SKU Status)
-   ============================================ */
-.uncounted-badge {
-    display: inline-block;
-    background-color: #ffc107;
-    color: #856404;
-    padding: 3px 12px;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    margin-left: 10px;
-}
-
-.counted-badge {
-    display: inline-block;
-    background-color: #198754;
-    color: white;
-    padding: 3px 12px;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    margin-left: 10px;
-}
-
-.inprogress-badge {
-    display: inline-block;
-    background-color: #0d6efd;
-    color: white;
-    padding: 3px 12px;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    margin-left: 10px;
-}
-
-/* ============================================
-   SUGGESTIONS DROPDOWN
-   ============================================ */
-#suggestions {
-    max-height: 300px;
-    overflow-y: auto;
-    border-radius: 0 0 12px 12px;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
-    border: 2px solid #e9ecef;
-    border-top: none;
-}
-
-.suggestion-item {
-    padding: 10px 14px;
-    cursor: pointer;
-    transition: background-color 0.15s ease;
-    border-bottom: 1px solid #f0f0f0;
-}
-
-.suggestion-item:hover {
-    background-color: #f0f7ff;
-}
-
-.suggestion-item:last-child {
-    border-bottom: none;
-}
-
-/* ============================================
-   QR SCANNER
-   ============================================ */
-#qr-reader {
-    min-height: 400px;
-    border-radius: 12px;
-    overflow: hidden;
-}
-
-#qr-reader__scan_region {
-    background: #000;
-}
-
-#qr-reader-results {
-    max-height: 150px;
-    overflow-y: auto;
+#loadingIndicator p {
+    margin-top: 16px;
+    color: #6c757d;
+    font-weight: 500;
 }
 
 /* ============================================
@@ -540,6 +659,10 @@ body {
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+}
+
+.fw-bold.text-dark {
+    color: #1a1a2e !important;
 }
 
 /* ============================================
@@ -554,201 +677,290 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.pulse {
+    animation: pulse 0.3s ease-in-out;
+}
+
+/* ============================================
+   MOBILE RESPONSIVE
+   ============================================ */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    .table-responsive {
+        font-size: 0.8rem;
+    }
+
+    .btn {
+        margin-bottom: 5px;
+        width: 100%;
+        font-size: 0.85rem;
+        padding: 8px 16px;
+    }
+
+    /* Button group on mobile - stack vertically */
+    #filterSection .col-md-12 .btn {
+        width: 100%;
+        margin-bottom: 6px;
+    }
+
+    .btn-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .btn-group .btn {
+        flex: 1;
+        min-width: 60px;
+    }
+
+    .form-control, .form-select {
+        font-size: 16px; /* Prevents zoom on mobile */
+    }
+
+    .card-body {
+        padding: 16px;
+    }
+
+    .navbar-brand {
+        font-size: 1rem;
+    }
+
+    .navbar .nav-link {
+        font-size: 0.85rem;
+        padding: 6px 12px;
+    }
+
+    .badge {
+        font-size: 0.65rem;
+        padding: 3px 8px;
+    }
+
+    .table td, .table th {
+        padding: 6px 8px;
+    }
+
+    .modal-dialog {
+        max-width: 95%;
+        margin: 10px;
+    }
+
+    .modal-xl .modal-dialog {
+        max-width: 95%;
+        margin: 10px;
+    }
+
+    .container.mt-3 {
+        margin-top: 0.75rem !important;
+    }
+
+    .stat-card .stat-number {
+        font-size: 22px;
+    }
+
+    #paginationControls .btn {
+        min-width: 80px;
+        font-size: 0.85rem;
+        padding: 8px 12px;
+    }
+
+    #pageInfo {
+        font-size: 0.85rem;
+    }
+
+    #columnToggleGroup .dropdown-menu {
+        max-height: 250px;
+    }
+
+    /* Stack filter selects on mobile */
+    #filterSection .row .col-md-3 {
+        margin-bottom: 8px;
+    }
+
+    /* Toast on mobile */
+    .alert.position-fixed {
+        bottom: 10px !important;
+        right: 10px !important;
+        left: 10px !important;
+        max-width: none;
+        font-size: 0.85rem;
+        padding: 12px 16px;
+    }
+
+    /* Recount modal on mobile */
+    #recountModal .table-responsive {
+        font-size: 0.75rem;
+    }
+
+    #recountModal .recount-count {
+        width: 80px;
+        min-width: 60px;
+    }
+
+    #recountModal .recount-remarks {
+        width: 120px;
+        min-width: 80px;
+    }
+
+    #recountModal .modal-footer .btn {
+        width: auto;
+        padding: 8px 16px;
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .card-header {
+        padding: 14px 16px;
+        font-size: 1rem;
+    }
+
+    .card-body {
+        padding: 12px;
+    }
+
+    .btn-lg {
+        font-size: 1rem;
+        padding: 10px 16px;
+    }
+
+    .table td, .table th {
+        padding: 4px 6px;
+        font-size: 0.7rem;
+    }
+
+    .badge {
+        font-size: 0.6rem;
+        padding: 2px 6px;
+    }
+
+    h2 {
+        font-size: 1.2rem;
+    }
+
+    .modal-body {
+        padding: 16px;
+    }
+
+    .modal-header {
+        padding: 14px 16px;
+    }
+
+    .modal-footer {
+        padding: 12px 16px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .modal-footer .btn {
+        flex: 1;
+        min-width: 80px;
+        font-size: 0.8rem;
+        padding: 8px 12px;
+    }
+
+    #paginationControls .btn {
+        min-width: 60px;
+        font-size: 0.75rem;
+        padding: 6px 10px;
+    }
+
+    .stat-card .stat-number {
+        font-size: 18px;
+    }
+
+    .stat-card .stat-label {
+        font-size: 12px;
+    }
+
+    /* Column toggle on mobile */
+    #columnToggleGroup .dropdown-menu {
+        max-height: 200px;
+    }
+
+    #columnToggleMenu .dropdown-item {
+        font-size: 0.8rem;
+        padding: 4px 14px;
+    }
+}
+
 /* ============================================
    PRINT STYLES
    ============================================ */
 @media print {
-    .navbar, .btn, .no-print {
+    .navbar, .btn, .no-print, 
+    #paginationControls, #columnToggleGroup,
+    #scanBarcodeBtn, #saveCounts, #completeCounting,
+    #applyFilters, #clearFilters {
         display: none !important;
     }
     .container {
         max-width: 100% !important;
     }
+    .table-responsive {
+        overflow: visible !important;
+    }
+    .table {
+        font-size: 10px !important;
+    }
+    .column-hidden {
+        display: table-cell !important;
+    }
 }
 
 /* ============================================
-   COLUMN VISIBILITY - NEW FEATURE
+   HIGH DPI / RETINA DISPLAYS
    ============================================ */
-
-/* Column hidden state */
-.column-hidden {
-    display: none !important;
-}
-
-/* Column toggle modal items */
-.column-toggle-item {
-    padding: 10px 14px;
-    border-bottom: 1px solid #e9ecef;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    transition: background-color 0.15s ease;
-    cursor: pointer;
-}
-
-.column-toggle-item:hover {
-    background-color: #f8f9fa;
-}
-
-.column-toggle-item:last-child {
-    border-bottom: none;
-}
-
-.column-toggle-item label {
-    cursor: pointer;
-    flex: 1;
-    margin: 0;
-    font-size: 0.95rem;
-    user-select: none;
-}
-
-.column-toggle-item input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
-    flex-shrink: 0;
-    accent-color: #0d6efd;
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .btn {
+        font-weight: 500;
+    }
+    .table thead th {
+        font-weight: 500;
+    }
 }
 
 /* ============================================
-   UNSAVED CHANGES WARNING BANNER
+   DARK MODE SUPPORT (Future Enhancement)
    ============================================ */
-
-#unsavedWarning {
-    position: sticky;
-    top: 0;
-    z-index: 1050;
-    border-radius: 0;
-    margin: 0;
-    padding: 12px 24px;
-    background-color: #fff3cd !important;
-    border-bottom: 3px solid #ffc107;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    display: none;
-    animation: slideDown 0.3s ease-out;
+@media (prefers-color-scheme: dark) {
+    /* This will be enabled when dark mode is implemented */
+    /* Currently uses light mode only */
 }
 
-#unsavedWarning .alert {
-    margin: 0;
+/* ============================================
+   ACCESSIBILITY
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+:focus-visible {
+    outline: 3px solid #0d6efd;
+    outline-offset: 2px;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
     padding: 0;
-    background: transparent;
-    border: none;
-    color: #856404;
-}
-
-#unsavedWarning .btn {
-    margin-left: 8px;
-    font-size: 0.85rem;
-    padding: 4px 14px;
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* ============================================
-   FILTER BUTTONS - IMPROVED LAYOUT
-   ============================================ */
-
-.filter-button-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-}
-
-.filter-button-group .btn {
-    white-space: nowrap;
-}
-
-/* ============================================
-   RESPONSIVE - COLUMN VISIBILITY MODAL
-   ============================================ */
-
-@media (max-width: 576px) {
-    .column-toggle-item {
-        padding: 8px 12px;
-        font-size: 0.9rem;
-    }
-    
-    .column-toggle-item input[type="checkbox"] {
-        width: 20px;
-        height: 20px;
-    }
-    
-    #unsavedWarning {
-        padding: 8px 12px;
-        font-size: 0.85rem;
-    }
-    
-    #unsavedWarning .btn {
-        font-size: 0.75rem;
-        padding: 3px 10px;
-    }
-    
-    .filter-button-group .btn {
-        font-size: 0.8rem;
-        padding: 6px 12px;
-    }
-}
-
-/* ============================================
-   TABLE HEADER STICKY WITH COLUMN TOGGLE
-   ============================================ */
-
-.table thead th {
-    background-color: #343a40;
-    color: white;
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    white-space: nowrap;
-    padding: 10px 14px;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-}
-
-/* When column is hidden, ensure header is also hidden */
-.table thead th.column-hidden,
-.table tbody td.column-hidden {
-    display: none !important;
-}
-
-/* ============================================
-   COUNT INPUT - UNSAVED CHANGE INDICATOR
-   ============================================ */
-
-.initial-count.has-changes {
-    border-color: #ffc107 !important;
-    background-color: #fff8e1 !important;
-    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.25);
-}
-
-.initial-count.saved {
-    border-color: #198754 !important;
-    background-color: #f0fff4 !important;
-}
-
-/* ============================================
-   PAGINATION WITH UNSAVED WARNING
-   ============================================ */
-
-#paginationControls .btn {
-    min-width: 80px;
-}
-
-#paginationControls .page-info {
-    padding: 8px 16px;
-    background: #f8f9fa;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 0.9rem;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
 }
