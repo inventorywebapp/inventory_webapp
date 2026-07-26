@@ -346,10 +346,14 @@ def get_skus():
         is_completed = False
         is_expired = False
         recount_completed = False
+        current_count = None
+        final_count_value = None
         
         if latest_record:
             has_count = True
-            recount_completed = latest_record.recount_completed  # ← GET THE FLAG
+            recount_completed = latest_record.recount_completed
+            current_count = latest_record.initial_count
+            
             if latest_record.count_time:
                 count_time_naive = latest_record.count_time.replace(tzinfo=None) if hasattr(latest_record.count_time, 'replace') else latest_record.count_time
                 count_time = latest_record.count_time.strftime('%Y-%m-%d %H:%M:%S')
@@ -357,15 +361,15 @@ def get_skus():
                 count_time_naive = None
             
             # ============================================================
-            # FIX: Properly handle recount count of 0
-            # ============================================================
+            # FIX: Properly handle recount count
             # If recount was completed, use recount_count as final (even if 0)
+            # ============================================================
             if latest_record.recount_completed:
-                final_count = latest_record.recount_count
+                final_count_value = latest_record.recount_count
             elif latest_record.final_count is not None and latest_record.final_count != '':
-                final_count = latest_record.final_count
+                final_count_value = latest_record.final_count
             else:
-                final_count = latest_record.initial_count
+                final_count_value = latest_record.initial_count
             
             session = CountingSession.query.get(latest_record.session_id)
             if session and session.is_completed:
@@ -390,12 +394,12 @@ def get_skus():
             'stock_status': sku.stock_status,
             'bypass_recount': sku.bypass_recount,
             'has_count': has_count,
-            'final_count': final_count if not is_expired else None,
+            'final_count': final_count_value if not is_expired else None,
             'count_time': count_time if not is_expired else None,
             'is_completed': is_completed and not is_expired,
             'is_expired': is_expired,
-            'recount_completed': recount_completed,  # ← ADD THIS
-            'current_count': latest_record.initial_count if latest_record else None  # ← ADD THIS FOR COMPARISON
+            'recount_completed': recount_completed,
+            'current_count': current_count
         })
     
     return jsonify(result)
