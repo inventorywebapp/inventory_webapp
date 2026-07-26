@@ -3,111 +3,11 @@
 {% block content %}
 <h2>Inventory Counting</h2>
 
+<!-- ============================================ -->
+<!-- FILTERS CARD -->
+<!-- ============================================ -->
 <div class="card mb-3">
     <div class="card-body">
-        <!-- Column Visibility Toggle Button -->
-        <div class="row mb-3">
-            <div class="col-12">
-                <button class="btn btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#columnToggle" aria-expanded="false">
-                    <i class="bi bi-eye-slash"></i> Toggle Columns
-                </button>
-                <button class="btn btn-outline-primary" type="button" onclick="resetColumnVisibility()">
-                    <i class="bi bi-arrow-counterclockwise"></i> Reset Columns
-                </button>
-                <span class="badge bg-secondary ms-2" id="visibleColumnCount">12 columns visible</span>
-            </div>
-        </div>
-        
-        <!-- Column Toggle Panel -->
-        <div class="collapse mb-3" id="columnToggle">
-            <div class="card card-body">
-                <div class="row g-3">
-                    <div class="col-12">
-                        <p class="text-muted small mb-2">Uncheck columns to hide them visually (export still includes all columns)</p>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-check">
-                            <input class="form-check-input column-toggle" type="checkbox" id="col-sku" checked data-col="0">
-                            <label class="form-check-label" for="col-sku">SKU</label>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-check">
-                            <input class="form-check-input column-toggle" type="checkbox" id="col-description" checked data-col="1">
-                            <label class="form-check-label" for="col-description">Description</label>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-check">
-                            <input class="form-check-input column-toggle" type="checkbox" id="col-day" checked data-col="2">
-                            <label class="form-check-label" for="col-day">Day Category</label>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-check">
-                            <input class="form-check-input column-toggle" type="checkbox" id="col-last-count-date" checked data-col="3">
-                            <label class="form-check-label" for="col-last-count-date">Last Count Date</label>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-check">
-                            <input class="form-check-input column-toggle" type="checkbox" id="col-last-count" checked data-col="4">
-                            <label class="form-check-label" for="col-last-count">Last Count</label>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-check">
-                            <input class="form-check-input column-toggle" type="checkbox" id="col-container-qty" checked data-col="5">
-                            <label class="form-check-label" for="col-container-qty">Container Qty</label>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-check">
-                            <input class="form-check-input column-toggle" type="checkbox" id="col-container-details" checked data-col="6">
-                            <label class="form-check-label" for="col-container-details">Container Details</label>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-check">
-                            <input class="form-check-input column-toggle" type="checkbox" id="col-final-expected" checked data-col="7">
-                            <label class="form-check-label" for="col-final-expected">Final Expected</label>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-check">
-                            <input class="form-check-input column-toggle" type="checkbox" id="col-kenneth" checked data-col="8">
-                            <label class="form-check-label" for="col-kenneth">Kenneth's Inv</label>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-check">
-                            <input class="form-check-input column-toggle" type="checkbox" id="col-current-count" checked data-col="9">
-                            <label class="form-check-label" for="col-current-count">Current Count</label>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-check">
-                            <input class="form-check-input column-toggle" type="checkbox" id="col-last-counted-date" checked data-col="10">
-                            <label class="form-check-label" for="col-last-counted-date">Last Counted Date</label>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-check">
-                            <input class="form-check-input column-toggle" type="checkbox" id="col-previous-count" checked data-col="11">
-                            <label class="form-check-label" for="col-previous-count">Previous Count</label>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-check">
-                            <input class="form-check-input column-toggle" type="checkbox" id="col-status" checked data-col="12">
-                            <label class="form-check-label" for="col-status">Status</label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Filters -->
         <div class="row">
             <div class="col-md-3">
                 <label>Select Warehouse</label>
@@ -139,9 +39,41 @@
                 <small class="text-muted">Smart search - type to see suggestions instantly</small>
             </div>
         </div>
+        
+        <!-- ============================================ -->
+        <!-- COLUMN VISIBILITY TOGGLE (NEW) -->
+        <!-- ============================================ -->
+        <div class="row mt-2">
+            <div class="col-md-12">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="fw-bold me-2">Show/Hide Columns:</span>
+                    <div class="btn-group btn-group-sm flex-wrap" role="group" id="columnToggleGroup">
+                        <button class="btn btn-outline-secondary active" data-column="sku">SKU</button>
+                        <button class="btn btn-outline-secondary active" data-column="description">Description</button>
+                        <button class="btn btn-outline-secondary active" data-column="day_category">Day Category</button>
+                        <button class="btn btn-outline-secondary active" data-column="last_count_date">Last Count Date</button>
+                        <button class="btn btn-outline-secondary active" data-column="last_count">Last Count</button>
+                        <button class="btn btn-outline-secondary active" data-column="container_qty">Container Qty</button>
+                        <button class="btn btn-outline-secondary active" data-column="container_details">Container Details</button>
+                        <button class="btn btn-outline-secondary active" data-column="final_expected">Final Expected</button>
+                        <button class="btn btn-outline-secondary active" data-column="kenneth_inv">Kenneth's Inv</button>
+                        <button class="btn btn-outline-secondary active" data-column="current_count">Current Count</button>
+                        <button class="btn btn-outline-secondary active" data-column="last_counted_date">Last Counted Date</button>
+                        <button class="btn btn-outline-secondary active" data-column="previous_count">Previous Count</button>
+                        <button class="btn btn-outline-secondary active" data-column="status">Status</button>
+                    </div>
+                </div>
+                <small class="text-muted">Click to toggle column visibility (visual only, exports unaffected)</small>
+            </div>
+        </div>
+        
+        <!-- ============================================ -->
+        <!-- ACTION BUTTONS (UPDATED) -->
+        <!-- ============================================ -->
         <div class="row mt-2">
             <div class="col-md-12">
                 <button id="applyFilters" class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
+                <button id="clearFilters" class="btn btn-warning" onclick="clearAllFilters()">Clear Filters</button>
                 <button id="saveCounts" class="btn btn-success" onclick="saveAllCounts()">Save All Counts</button>
                 <button id="completeCounting" class="btn btn-danger" onclick="completeCounting()">Complete Counting Session</button>
                 <button id="scanBarcodeBtn" class="btn btn-info" onclick="startBarcodeScanner()">
@@ -152,7 +84,7 @@
     </div>
 </div>
 
-<!-- Scanner Modal -->
+<!-- Scanner Modal (unchanged) -->
 <div class="modal fade" id="scannerModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -172,7 +104,7 @@
     </div>
 </div>
 
-<!-- Manual SKU Selection Modal -->
+<!-- Manual SKU Selection Modal (unchanged) -->
 <div class="modal fade" id="manualSkuModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -188,27 +120,7 @@
     </div>
 </div>
 
-<!-- Unsaved Changes Warning Modal -->
-<div class="modal fade" id="unsavedModal" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-warning">
-                <h5 class="modal-title">⚠️ Unsaved Changes Detected</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>You have <strong id="unsavedCount">0</strong> SKU(s) with counts that haven't been saved.</p>
-                <p>What would you like to do?</p>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="cancelNavigation()">Cancel Navigation</button>
-                <button class="btn btn-primary" onclick="saveAndNavigate()">Save & Continue</button>
-                <button class="btn btn-danger" onclick="discardAndNavigate()">Discard & Continue</button>
-            </div>
-        </div>
-    </div>
-</div>
-
+<!-- Loading Indicator (unchanged) -->
 <div id="loadingIndicator" style="display: none; text-align: center; padding: 20px;">
     <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Loading...</span>
@@ -216,6 +128,7 @@
     <p>Loading SKUs...</p>
 </div>
 
+<!-- SKUs List Container -->
 <div id="skusList" class="row">
     <div class="col-12">
         <div class="alert alert-info text-center">
@@ -224,6 +137,7 @@
     </div>
 </div>
 
+<!-- Pagination Controls (unchanged) -->
 <div id="paginationControls" class="row mt-3" style="display: none;">
     <div class="col-12 text-center">
         <button class="btn btn-secondary" onclick="previousPage()">Previous</button>
@@ -233,6 +147,51 @@
 </div>
 
 <style>
+/* ============================================ */
+/* NEW: Column visibility classes */
+/* ============================================ */
+.column-hidden {
+    display: none !important;
+}
+
+/* ============================================ */
+/* Column toggle button styles */
+/* ============================================ */
+#columnToggleGroup .btn {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    transition: all 0.2s ease;
+}
+
+#columnToggleGroup .btn.active {
+    background-color: #0d6efd;
+    color: white;
+    border-color: #0d6efd;
+}
+
+#columnToggleGroup .btn:not(.active) {
+    background-color: #f8f9fa;
+    color: #6c757d;
+    border-color: #dee2e6;
+    opacity: 0.6;
+}
+
+#columnToggleGroup .btn:not(.active):hover {
+    background-color: #e9ecef;
+    opacity: 0.8;
+}
+
+/* ============================================ */
+/* Column hide/show animation */
+/* ============================================ */
+.column-hidden td,
+.column-hidden th {
+    display: none !important;
+}
+
+/* ============================================ */
+/* Existing styles (keep all) */
+/* ============================================ */
 .suggestion-item:hover {
     background-color: #f0f0f0;
 }
@@ -320,13 +279,6 @@
     max-height: 150px;
     overflow-y: auto;
 }
-.column-hidden {
-    display: none !important;
-}
-.auto-filter-loading {
-    opacity: 0.6;
-    pointer-events: none;
-}
 </style>
 
 <!-- Load html5-qrcode library -->
@@ -334,19 +286,36 @@
 
 <script>
 // ============================================
-// CONFIGURATION & CONSTANTS
+// GLOBAL STATE
 // ============================================
-const COLUMN_CONFIG_KEY = 'inventory_column_visibility';
-const DAY_ORDER = {'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6};
+const DAY_ORDER = {
+    'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
+};
+
 const FIFTH_FLOOR_CATEGORIES = [
     'Console/Armrest', 'Deep Dish-3D', 'Deep Dish-5D', 'Deep Dish-5D-CF',
     'Deep Dish-DL', 'Deep Dish-DM', 'Deep Dish-ROHS', 'Deep Dish-TPE-CF',
     'Deep Dish-UN', 'Trunk Tray'
 ];
 
-// ============================================
-// STATE
-// ============================================
+// Column mapping for visibility toggle
+const COLUMN_MAP = {
+    'sku': 0,
+    'description': 1,
+    'day_category': 2,
+    'last_count_date': 3,
+    'last_count': 4,
+    'container_qty': 5,
+    'container_details': 6,
+    'final_expected': 7,
+    'kenneth_inv': 8,
+    'current_count': 9,
+    'last_counted_date': 10,
+    'previous_count': 11,
+    'status': 12
+};
+
+// Global variables
 let allItemCategories = {{ item_categories|tojson }};
 let allDayCategoriesRaw = {{ day_categories|tojson }};
 let allSkus = [];
@@ -357,9 +326,8 @@ let currentSessionId = null;
 let searchTimeout = null;
 let html5QrCode = null;
 let isScannerActive = false;
-let pendingNavigation = null;
-let isAutoFiltering = false;
-let columnVisibility = {};
+let hasUnsavedChanges = false;
+let isNavigatingAway = false;
 
 // Sort day categories
 let allDayCategories = [...allDayCategoriesRaw].sort((a, b) => {
@@ -369,131 +337,121 @@ let allDayCategories = [...allDayCategoriesRaw].sort((a, b) => {
 });
 
 // ============================================
-// UTILITY FUNCTIONS
+// COLUMN VISIBILITY TOGGLE (NEW)
 // ============================================
-function getUrlParameter(name) {
-    let urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get(name);
-}
-
-function escapeHtml(text) {
-    if (!text) return '';
-    return String(text).replace(/[&<>]/g, function(m) {
-        if (m === '&') return '&amp;';
-        if (m === '<') return '&lt;';
-        if (m === '>') return '&gt;';
-        return m;
-    });
-}
-
-function showToast(message, type = 'info') {
-    const toast = document.createElement('div');
-    toast.className = `alert alert-${type === 'success' ? 'success' : (type === 'error' ? 'danger' : 'info')} alert-dismissible fade show position-fixed`;
-    toast.style.bottom = '20px';
-    toast.style.right = '20px';
-    toast.style.zIndex = '9999';
-    toast.style.minWidth = '300px';
-    toast.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 4000);
-}
-
-// ============================================
-// COLUMN VISIBILITY MANAGEMENT
-// ============================================
-function loadColumnVisibility() {
+function getColumnVisibilityPreference() {
     try {
-        const saved = localStorage.getItem(COLUMN_CONFIG_KEY);
+        const saved = localStorage.getItem('columnVisibility');
         if (saved) {
-            columnVisibility = JSON.parse(saved);
-        } else {
-            // Default: all columns visible (index 0-12)
-            for (let i = 0; i <= 12; i++) {
-                columnVisibility[i] = true;
-            }
+            return JSON.parse(saved);
         }
     } catch (e) {
-        // Default all visible
-        for (let i = 0; i <= 12; i++) {
-            columnVisibility[i] = true;
-        }
+        console.warn('Could not load column visibility preferences:', e);
     }
-    applyColumnVisibility();
-    updateColumnCheckboxes();
-    updateVisibleColumnCount();
+    // Default: all columns visible
+    return Object.keys(COLUMN_MAP).reduce((acc, key) => {
+        acc[key] = true;
+        return acc;
+    }, {});
 }
 
-function saveColumnVisibility() {
+function saveColumnVisibilityPreference(prefs) {
     try {
-        localStorage.setItem(COLUMN_CONFIG_KEY, JSON.stringify(columnVisibility));
+        localStorage.setItem('columnVisibility', JSON.stringify(prefs));
     } catch (e) {
-        // Silently fail
+        console.warn('Could not save column visibility preferences:', e);
     }
+}
+
+function toggleColumn(columnKey) {
+    const prefs = getColumnVisibilityPreference();
+    prefs[columnKey] = !prefs[columnKey];
+    saveColumnVisibilityPreference(prefs);
+    applyColumnVisibility();
+    updateColumnToggleButtons();
 }
 
 function applyColumnVisibility() {
-    const rows = document.querySelectorAll('#skusList tbody tr');
-    const headerCells = document.querySelectorAll('#skusList thead tr th');
+    const prefs = getColumnVisibilityPreference();
+    const table = document.querySelector('#skusList table');
+    if (!table) return;
     
-    // Apply to header
-    headerCells.forEach((th, index) => {
-        if (columnVisibility[index] === false) {
+    const headers = table.querySelectorAll('thead th');
+    const rows = table.querySelectorAll('tbody tr');
+    
+    headers.forEach((th, index) => {
+        const columnKey = Object.keys(COLUMN_MAP).find(key => COLUMN_MAP[key] === index);
+        if (columnKey && prefs[columnKey] === false) {
             th.classList.add('column-hidden');
         } else {
             th.classList.remove('column-hidden');
         }
     });
     
-    // Apply to rows
     rows.forEach(row => {
         const cells = row.querySelectorAll('td');
         cells.forEach((td, index) => {
-            if (columnVisibility[index] === false) {
+            const columnKey = Object.keys(COLUMN_MAP).find(key => COLUMN_MAP[key] === index);
+            if (columnKey && prefs[columnKey] === false) {
                 td.classList.add('column-hidden');
             } else {
                 td.classList.remove('column-hidden');
             }
         });
     });
-    
-    updateVisibleColumnCount();
 }
 
-function updateColumnCheckboxes() {
-    document.querySelectorAll('.column-toggle').forEach(checkbox => {
-        const colIndex = parseInt(checkbox.dataset.col);
-        checkbox.checked = columnVisibility[colIndex] !== false;
+function updateColumnToggleButtons() {
+    const prefs = getColumnVisibilityPreference();
+    document.querySelectorAll('#columnToggleGroup .btn').forEach(btn => {
+        const column = btn.dataset.column;
+        if (column && prefs[column] !== undefined) {
+            if (prefs[column]) {
+                btn.classList.add('active');
+                btn.classList.remove('btn-outline-secondary');
+                btn.classList.add('btn-primary');
+            } else {
+                btn.classList.remove('active');
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-outline-secondary');
+            }
+        }
     });
 }
 
-function updateVisibleColumnCount() {
-    const visibleCount = Object.values(columnVisibility).filter(v => v === true).length;
-    const badge = document.getElementById('visibleColumnCount');
-    if (badge) {
-        badge.textContent = `${visibleCount} columns visible`;
-    }
-}
-
-function toggleColumn(index) {
-    columnVisibility[index] = !columnVisibility[index];
-    saveColumnVisibility();
+function initColumnToggles() {
+    document.querySelectorAll('#columnToggleGroup .btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const column = this.dataset.column;
+            if (column) {
+                toggleColumn(column);
+            }
+        });
+    });
     applyColumnVisibility();
-    updateColumnCheckboxes();
-}
-
-function resetColumnVisibility() {
-    for (let i = 0; i <= 12; i++) {
-        columnVisibility[i] = true;
-    }
-    saveColumnVisibility();
-    applyColumnVisibility();
-    updateColumnCheckboxes();
-    updateVisibleColumnCount();
-    showToast('Column visibility reset', 'success');
+    updateColumnToggleButtons();
 }
 
 // ============================================
-// FILTER FUNCTIONS
+// CLEAR FILTERS (NEW)
+// ============================================
+function clearAllFilters() {
+    document.getElementById('warehouse').value = 'All';
+    document.getElementById('dayCategory').value = 'All';
+    document.getElementById('itemCategory').value = 'All';
+    document.getElementById('searchSku').value = '';
+    document.getElementById('suggestions').style.display = 'none';
+    
+    // Reset day category filter based on item category
+    updateDayCategories();
+    applyFilters();
+    
+    showToast('Filters cleared', 'info');
+}
+
+// ============================================
+// BIDIRECTIONAL FILTERING (UPDATED)
 // ============================================
 function filterItemCategoriesByWarehouse() {
     let warehouse = document.getElementById('warehouse').value;
@@ -527,26 +485,25 @@ function filterItemCategoriesByWarehouse() {
         itemCategorySelect.value = currentValue;
     }
     
-    // Auto-update day categories based on selected item category
     updateDayCategories();
-    
-    // Auto-apply filters if not in auto-filter mode
-    if (!isAutoFiltering) {
-        debouncedApplyFilters();
-    }
 }
 
+// UPDATED: Bidirectional Day Category filtering
 function updateDayCategories() {
     let selectedItemCategory = document.getElementById('itemCategory').value;
     let selectedDayCategory = document.getElementById('dayCategory').value;
     let dayCategorySelect = document.getElementById('dayCategory');
     if (!dayCategorySelect) return;
     
-    let filteredDayCategories = [];
+    let currentValue = selectedDayCategory;
     
+    dayCategorySelect.innerHTML = '<option value="All">-- All Day Categories --</option>';
+    
+    let filteredDayCategories = [];
+    let daySet = new Set();
+    
+    // If Item Category is selected, filter Day Categories based on it
     if (selectedItemCategory !== 'All' && allSkus.length > 0) {
-        // Filter day categories based on selected item category
-        let daySet = new Set();
         for (let i = 0; i < allSkus.length; i++) {
             if (allSkus[i].description === selectedItemCategory && allSkus[i].category) {
                 daySet.add(allSkus[i].category);
@@ -563,11 +520,6 @@ function updateDayCategories() {
         return orderA - orderB;
     });
     
-    // Preserve selection if possible
-    let currentValue = selectedDayCategory;
-    
-    dayCategorySelect.innerHTML = '<option value="All">-- All Day Categories --</option>';
-    
     for (let i = 0; i < filteredDayCategories.length; i++) {
         if (filteredDayCategories[i]) {
             let option = document.createElement('option');
@@ -577,24 +529,27 @@ function updateDayCategories() {
         }
     }
     
+    // Try to restore previous selection if still valid
     if (currentValue !== 'All' && filteredDayCategories.includes(currentValue)) {
         dayCategorySelect.value = currentValue;
-    } else {
-        dayCategorySelect.value = 'All';
     }
 }
 
-function updateItemCategoriesFromDay() {
+// UPDATED: Filter Item Categories based on selected Day Category
+function filterItemCategoriesByDay() {
     let selectedDayCategory = document.getElementById('dayCategory').value;
     let itemCategorySelect = document.getElementById('itemCategory');
     if (!itemCategorySelect) return;
     
     let currentValue = itemCategorySelect.value;
     
-    let filteredCategories = [];
+    itemCategorySelect.innerHTML = '<option value="All">-- All Item Categories --</option>';
     
+    let filteredCategories = [];
+    let categorySet = new Set();
+    
+    // If Day Category is selected, filter Item Categories based on it
     if (selectedDayCategory !== 'All' && allSkus.length > 0) {
-        let categorySet = new Set();
         for (let i = 0; i < allSkus.length; i++) {
             if (allSkus[i].category === selectedDayCategory && allSkus[i].description) {
                 categorySet.add(allSkus[i].description);
@@ -602,20 +557,18 @@ function updateItemCategoriesFromDay() {
         }
         filteredCategories = Array.from(categorySet);
     } else {
-        filteredCategories = [...allItemCategories];
-    }
-    
-    // Apply warehouse filter
-    let warehouse = document.getElementById('warehouse').value;
-    if (warehouse === '5thFloor') {
-        filteredCategories = filteredCategories.filter(cat => FIFTH_FLOOR_CATEGORIES.includes(cat));
-    } else if (warehouse === 'Main') {
-        filteredCategories = filteredCategories.filter(cat => !FIFTH_FLOOR_CATEGORIES.includes(cat));
+        // Apply warehouse filter as well
+        let warehouse = document.getElementById('warehouse').value;
+        if (warehouse === '5thFloor') {
+            filteredCategories = allItemCategories.filter(cat => FIFTH_FLOOR_CATEGORIES.includes(cat));
+        } else if (warehouse === 'Main') {
+            filteredCategories = allItemCategories.filter(cat => !FIFTH_FLOOR_CATEGORIES.includes(cat));
+        } else {
+            filteredCategories = [...allItemCategories];
+        }
     }
     
     filteredCategories.sort();
-    
-    itemCategorySelect.innerHTML = '<option value="All">-- All Item Categories --</option>';
     
     for (let i = 0; i < filteredCategories.length; i++) {
         let option = document.createElement('option');
@@ -626,178 +579,100 @@ function updateItemCategoriesFromDay() {
     
     if (currentValue !== 'All' && filteredCategories.includes(currentValue)) {
         itemCategorySelect.value = currentValue;
-    } else {
-        itemCategorySelect.value = 'All';
     }
 }
 
 // ============================================
-// DEBOUNCED FILTERS
+// SAVE BEFORE NAVIGATION (NEW)
 // ============================================
-let filterTimeout = null;
-
-function debouncedApplyFilters() {
-    if (filterTimeout) clearTimeout(filterTimeout);
-    filterTimeout = setTimeout(() => {
-        applyFilters();
-        filterTimeout = null;
-    }, 300);
-}
-
-// ============================================
-// UNSAVED CHANGES DETECTION
-// ============================================
-function hasUnsavedChanges() {
+function trackUnsavedChanges() {
     const inputs = document.querySelectorAll('.initial-count');
+    let hasChanges = false;
     for (let input of inputs) {
         if (input.value && input.value.trim() !== '') {
-            return true;
+            hasChanges = true;
+            break;
         }
     }
-    return false;
+    hasUnsavedChanges = hasChanges;
 }
 
-function getUnsavedCount() {
-    const inputs = document.querySelectorAll('.initial-count');
-    let count = 0;
-    for (let input of inputs) {
-        if (input.value && input.value.trim() !== '') {
-            count++;
+function setupUnsavedChangesWarning() {
+    // Track changes on input
+    document.addEventListener('input', function(e) {
+        if (e.target.classList && e.target.classList.contains('initial-count')) {
+            trackUnsavedChanges();
         }
-    }
-    return count;
-}
-
-function showUnsavedModal(navigationTarget) {
-    pendingNavigation = navigationTarget;
-    document.getElementById('unsavedCount').textContent = getUnsavedCount();
-    const modal = new bootstrap.Modal(document.getElementById('unsavedModal'));
-    modal.show();
-}
-
-function cancelNavigation() {
-    pendingNavigation = null;
-    const modal = bootstrap.Modal.getInstance(document.getElementById('unsavedModal'));
-    if (modal) modal.hide();
-}
-
-function saveAndNavigate() {
-    const modal = bootstrap.Modal.getInstance(document.getElementById('unsavedModal'));
-    if (modal) modal.hide();
+    });
     
-    // Save first
-    saveAllCountsWithCallback(function() {
-        if (pendingNavigation) {
-            navigateTo(pendingNavigation);
+    // Before page unload
+    window.addEventListener('beforeunload', function(e) {
+        if (hasUnsavedChanges && !isNavigatingAway) {
+            const message = 'You have unsaved counts. Are you sure you want to leave?';
+            e.preventDefault();
+            e.returnValue = message;
+            return message;
+        }
+    });
+    
+    // Before any navigation within the app
+    document.addEventListener('click', function(e) {
+        const link = e.target.closest('a');
+        if (link && link.href && link.href.indexOf(window.location.origin) === 0) {
+            if (hasUnsavedChanges) {
+                const confirmLeave = confirm('⚠️ You have unsaved counts. If you leave, your counts will be lost.\n\nClick OK to leave without saving, or Cancel to stay.');
+                if (!confirmLeave) {
+                    e.preventDefault();
+                    return false;
+                } else {
+                    isNavigatingAway = true;
+                }
+            }
         }
     });
 }
 
-function discardAndNavigate() {
-    const modal = bootstrap.Modal.getInstance(document.getElementById('unsavedModal'));
-    if (modal) modal.hide();
-    
-    if (pendingNavigation) {
-        navigateTo(pendingNavigation);
-    }
-}
-
-function navigateTo(target) {
-    if (typeof target === 'string') {
-        window.location.href = target;
-    } else if (typeof target === 'function') {
-        target();
-    }
-    pendingNavigation = null;
-}
-
-function saveAllCountsWithCallback(callback) {
-    // Reuse the existing saveAllCounts logic but with callback
-    const originalSave = window.saveAllCounts;
-    window.saveAllCounts = function() {
-        // Call original save logic
-        originalSave.call(this);
-        // After save completes, call callback
-        if (callback) {
-            // Check if save was successful by observing
-            const checkSaveComplete = setInterval(() => {
-                const saveBtn = document.getElementById('saveCounts');
-                if (saveBtn && !saveBtn.disabled) {
-                    clearInterval(checkSaveComplete);
-                    callback();
-                }
-            }, 500);
-            // Timeout after 10 seconds
-            setTimeout(() => {
-                clearInterval(checkSaveComplete);
-                callback();
-            }, 10000);
-        }
-    };
-    // Trigger save
-    window.saveAllCounts();
-    // Restore original function
-    setTimeout(() => {
-        window.saveAllCounts = originalSave;
-    }, 100);
+function resetUnsavedChanges() {
+    hasUnsavedChanges = false;
 }
 
 // ============================================
-// PAGINATION WITH SAVE CHECK
+// SHOW TOAST (Utility)
 // ============================================
-function previousPage() {
-    if (currentPage > 1) {
-        if (hasUnsavedChanges()) {
-            showUnsavedModal(function() {
-                currentPage--;
-                displaySkusWithPagination();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            });
-        } else {
-            currentPage--;
-            displaySkusWithPagination();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-    }
-}
-
-function nextPage() {
-    let totalPages = Math.ceil(filteredSkus.length / itemsPerPage);
-    if (currentPage < totalPages) {
-        if (hasUnsavedChanges()) {
-            showUnsavedModal(function() {
-                currentPage++;
-                displaySkusWithPagination();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            });
-        } else {
-            currentPage++;
-            displaySkusWithPagination();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-    }
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type === 'success' ? 'success' : (type === 'error' ? 'danger' : type === 'warning' ? 'warning' : 'info')} alert-dismissible fade show position-fixed`;
+    toast.style.bottom = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '9999';
+    toast.style.minWidth = '300px';
+    toast.style.maxWidth = '500px';
+    toast.style.boxShadow = '0 4px 20px rgba(0,0,0,0.15)';
+    toast.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
 }
 
 // ============================================
-// CORE COUNTING FUNCTIONS
+// URL HELPERS
 // ============================================
-function applyFilters() {
-    let warehouse = document.getElementById('warehouse').value;
-    let dayCategory = document.getElementById('dayCategory').value;
-    let itemCategory = document.getElementById('itemCategory').value;
-    let search = document.getElementById('searchSku').value;
-    
-    if (hasUnsavedChanges()) {
-        showUnsavedModal(function() {
-            loadSkus(warehouse, dayCategory, itemCategory, search);
-        });
-    } else {
-        loadSkus(warehouse, dayCategory, itemCategory, search);
-    }
+function getUrlParameter(name) {
+    let urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(name);
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text).replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+    });
 }
 
 // ============================================
-// QR/BARCODE SCANNER
+// QR/BARCODE SCANNER (unchanged)
 // ============================================
 async function startBarcodeScanner() {
     if (isScannerActive) {
@@ -941,7 +816,6 @@ function intelligentSkuSearch(scannedText) {
     }
     
     let exactMatch = null;
-    
     for (let sku of allSkus) {
         if (sku.sku && sku.sku.toLowerCase() === cleanedScan.toLowerCase()) {
             exactMatch = sku;
@@ -999,8 +873,17 @@ function intelligentSkuSearch(scannedText) {
 }
 
 // ============================================
-// SKU DISPLAY FUNCTIONS
+// FILTER FUNCTIONS (UPDATED)
 // ============================================
+function applyFilters() {
+    let warehouse = document.getElementById('warehouse').value;
+    let dayCategory = document.getElementById('dayCategory').value;
+    let itemCategory = document.getElementById('itemCategory').value;
+    let search = document.getElementById('searchSku').value;
+    
+    loadSkus(warehouse, dayCategory, itemCategory, search);
+}
+
 function loadInProgressSkus() {
     let sessionIdFromUrl = getUrlParameter('session_id');
     if (!sessionIdFromUrl) {
@@ -1083,7 +966,10 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
             currentPage = 1;
             displaySkusWithPagination();
             if (loadingDiv) loadingDiv.style.display = 'none';
+            
+            // Update both filters for bidirectional support
             updateDayCategories();
+            filterItemCategoriesByDay();
         })
         .catch(error => {
             console.error('Error loading SKUs:', error);
@@ -1094,6 +980,9 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
         });
 }
 
+// ============================================
+// DISPLAY FUNCTIONS (UPDATED with column visibility)
+// ============================================
 function displaySkusWithPagination() {
     let startIndex = (currentPage - 1) * itemsPerPage;
     let endIndex = startIndex + itemsPerPage;
@@ -1120,7 +1009,7 @@ function displaySkusWithPagination() {
     }
     
     // Apply column visibility after rendering
-    applyColumnVisibility();
+    setTimeout(applyColumnVisibility, 50);
 }
 
 function loadExistingCountsForSkus() {
@@ -1153,6 +1042,7 @@ function loadExistingCountsForSkus() {
                 }
             }
             highlightSkusStatus();
+            trackUnsavedChanges();
         })
         .catch(error => console.error('Error loading existing counts:', error));
 }
@@ -1170,22 +1060,22 @@ function displaySkus(skus) {
         return;
     }
     
-    let html = '<div class="col-12"><div class="table-responsive"><table class="table table-bordered table-hover table-striped">';
+    let html = '<div class="col-12"><div class="table-responsive"><table class="table table-bordered table-hover table-striped" id="skuTable">';
     html += '<thead class="table-dark">';
     html += '<tr>';
-    html += '<th data-col="0">SKU</th>';
-    html += '<th data-col="1">Description (Item Category)</th>';
-    html += '<th data-col="2">Day Category</th>';
-    html += '<th data-col="3">Last Count Date</th>';
-    html += '<th data-col="4">Last Count</th>';
-    html += '<th data-col="5">Container Qty</th>';
-    html += '<th data-col="6">Container Details</th>';
-    html += '<th data-col="7">Final Expected</th>';
-    html += '<th data-col="8">Kenneth\'s Inv</th>';
-    html += '<th data-col="9">Current Count</th>';
-    html += '<th data-col="10">Last Counted Date</th>';
-    html += '<th data-col="11">Previous Count</th>';
-    html += '<th data-col="12">Status</th>';
+    html += '<th data-column="sku">SKU</th>';
+    html += '<th data-column="description">Description (Item Category)</th>';
+    html += '<th data-column="day_category">Day Category</th>';
+    html += '<th data-column="last_count_date">Last Count Date</th>';
+    html += '<th data-column="last_count">Last Count</th>';
+    html += '<th data-column="container_qty">Container Qty</th>';
+    html += '<th data-column="container_details">Container Details</th>';
+    html += '<th data-column="final_expected">Final Expected</th>';
+    html += '<th data-column="kenneth_inv">Kenneth\'s Inv</th>';
+    html += '<th data-column="current_count">Current Count</th>';
+    html += '<th data-column="last_counted_date">Last Counted Date</th>';
+    html += '<th data-column="previous_count">Previous Count</th>';
+    html += '<th data-column="status">Status</th>';
     html += '</tr>';
     html += '</thead><tbody>';
     
@@ -1245,37 +1135,37 @@ function displaySkus(skus) {
         let rowId = `sku-row-${sku.id}`;
         
         html += `<tr id="${rowId}" class="${rowClass}" data-in-progress="${isInProgress}" data-completed="${isCompleted}" data-expired="${isExpired}">`;
-        html += `<td data-col="0"><strong>${escapeHtml(sku.sku)}</strong></td>`;
-        html += `<td data-col="1">${escapeHtml(sku.description || '-')}</td>`;
-        html += `<td data-col="2">${escapeHtml(sku.category || '-')}</td>`;
-        html += `<td data-col="3" class="text-nowrap">${escapeHtml(lastCountDate)}</td>`;
-        html += `<td data-col="4" class="${lastCountClass}">${(sku.last_count || 0)}</td>`;
-        html += `<td data-col="5">${(sku.total_container_qty || 0)}</td>`;
-        html += `<td data-col="6"><small>${escapeHtml(containerDetails)}</small></td>`;
-        html += `<td data-col="7" class="${finalExpectedClass}">${(sku.final_expected_count || 0)}</td>`;
-        html += `<td data-col="8" class="${kennethClass}">${(sku.kenneth_inventory || 0)}</td>`;
-        html += `<td data-col="9">`;
+        html += '<td data-column="sku"><strong>' + escapeHtml(sku.sku) + '</strong></td>';
+        html += '<td data-column="description">' + escapeHtml(sku.description || '-') + '</td>';
+        html += '<td data-column="day_category">' + escapeHtml(sku.category || '-') + '</td>';
+        html += '<td data-column="last_count_date" class="text-nowrap">' + escapeHtml(lastCountDate) + '</td>';
+        html += '<td data-column="last_count" class="' + lastCountClass + '">' + (sku.last_count || 0) + '</td>';
+        html += '<td data-column="container_qty">' + (sku.total_container_qty || 0) + '</td>';
+        html += '<td data-column="container_details"><small>' + escapeHtml(containerDetails) + '</small></td>';
+        html += '<td data-column="final_expected" class="' + finalExpectedClass + '">' + (sku.final_expected_count || 0) + '</td>';
+        html += '<td data-column="kenneth_inv" class="' + kennethClass + '">' + (sku.kenneth_inventory || 0) + '</td>';
+        html += '<td data-column="current_count">';
         html += `<input type="text" class="form-control initial-count" data-sku-id="${sku.id}" style="min-width: 100px; width: 100px;" placeholder="${inputPlaceholder}" inputmode="numeric"`;
         if (inputValue) {
             html += ` value="${inputValue}"`;
         }
         html += '>';
         html += '</td>';
-        html += `<td data-col="10">`;
+        html += '<td data-column="last_counted_date">';
         if (existingCountTime && !isExpired) {
             html += `<span id="last-counted-${sku.id}" style="color: #0d6efd; font-weight: bold;">${existingCountTime}</span>`;
         } else {
             html += `<span id="last-counted-${sku.id}">-</span>`;
         }
         html += '</td>';
-        html += `<td data-col="11">`;
+        html += '<td data-column="previous_count">';
         if (finalCountValue && !isExpired) {
             html += `<span id="last-count-value-${sku.id}" style="color: #0d6efd; font-weight: bold;">${finalCountValue}</span>`;
         } else {
             html += `<span id="last-count-value-${sku.id}">-</span>`;
         }
         html += '</td>';
-        html += `<td data-col="12">${statusBadge}</td>`;
+        html += '<td data-column="status">' + statusBadge + '</td>';
         html += '</tr>';
     }
     
@@ -1304,6 +1194,7 @@ function displaySkus(skus) {
                         validateCountInput(this);
                     }
                     highlightSkusStatus();
+                    trackUnsavedChanges();
                 });
                 
                 input.addEventListener('keypress', function(e) {
@@ -1329,15 +1220,20 @@ function displaySkus(skus) {
                         row.classList.remove('sku-completed', 'sku-in-progress', 'sku-needs-count');
                     }
                     highlightSkusStatus();
+                    trackUnsavedChanges();
                 });
             }
         });
         
         highlightSkusStatus();
         applyColumnVisibility();
+        updateColumnToggleButtons();
     }, 100);
 }
 
+// ============================================
+// VALIDATION & HIGHLIGHTING
+// ============================================
 function highlightSkusStatus() {
     let countInputs = document.querySelectorAll('.initial-count');
     let uncountedCount = 0;
@@ -1508,7 +1404,27 @@ function setupSmartSearch() {
 }
 
 // ============================================
-// SAVE & COMPLETE FUNCTIONS
+// PAGINATION
+// ============================================
+function previousPage() {
+    if (currentPage > 1) {
+        currentPage--;
+        displaySkusWithPagination();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+}
+
+function nextPage() {
+    let totalPages = Math.ceil(filteredSkus.length / itemsPerPage);
+    if (currentPage < totalPages) {
+        currentPage++;
+        displaySkusWithPagination();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+}
+
+// ============================================
+// SAVE & COMPLETE (UPDATED with unsaved changes reset)
 // ============================================
 function saveAllCounts() {
     let warehouse = document.getElementById('warehouse').value;
@@ -1606,6 +1522,7 @@ function saveAllCounts() {
     .then(data => {
         if (data.success) {
             currentSessionId = data.session_id;
+            resetUnsavedChanges();
             
             if (data.recount_needed_count > 0) {
                 alert(`⚠️ ${data.recount_needed_count} SKU(s) need recount (discrepancy > 5)\n\nThe recount window will now open.`);
@@ -1864,6 +1781,7 @@ function completeCountingSession() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            resetUnsavedChanges();
             alert('✓ Counting session completed successfully!');
             window.location.href = '/dashboard';
         } else {
@@ -1896,7 +1814,7 @@ function completeCounting() {
 }
 
 // ============================================
-// EVENT LISTENERS
+// EVENT LISTENERS (UPDATED)
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
     const warehouseSelect = document.getElementById('warehouse');
@@ -1904,35 +1822,33 @@ document.addEventListener('DOMContentLoaded', function() {
     const dayCategorySelect = document.getElementById('dayCategory');
     const scannerModal = document.getElementById('scannerModal');
     
-    // Load column visibility from localStorage
-    loadColumnVisibility();
+    // Initialize column toggles
+    initColumnToggles();
     
-    // Column toggle listeners
-    document.querySelectorAll('.column-toggle').forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            const colIndex = parseInt(this.dataset.col);
-            toggleColumn(colIndex);
-        });
-    });
+    // Setup unsaved changes warning
+    setupUnsavedChangesWarning();
     
+    // Warehouse change
     if (warehouseSelect) {
         warehouseSelect.addEventListener('change', function() {
             filterItemCategoriesByWarehouse();
-            debouncedApplyFilters();
+            applyFilters();
         });
     }
     
+    // Item Category change - UPDATED with bidirectional filtering
     if (itemCategorySelect) {
         itemCategorySelect.addEventListener('change', function() {
-            updateDayCategories();
-            debouncedApplyFilters();
+            updateDayCategories();  // Filter Day Categories based on Item Category
+            applyFilters();
         });
     }
     
+    // Day Category change - NEW: bidirectional filtering
     if (dayCategorySelect) {
         dayCategorySelect.addEventListener('change', function() {
-            updateItemCategoriesFromDay();
-            debouncedApplyFilters();
+            filterItemCategoriesByDay();  // Filter Item Categories based on Day Category
+            applyFilters();
         });
     }
     
@@ -1944,21 +1860,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     filterItemCategoriesByWarehouse();
     setupSmartSearch();
-    
-    // Intercept navigation events
-    document.addEventListener('click', function(e) {
-        const link = e.target.closest('a[href]');
-        if (link && link.href && !link.target) {
-            const url = new URL(link.href);
-            // Only intercept internal links
-            if (url.origin === window.location.origin && !url.pathname.includes('/counting')) {
-                if (hasUnsavedChanges()) {
-                    e.preventDefault();
-                    showUnsavedModal(link.href);
-                }
-            }
-        }
-    });
     
     let sessionIdFromUrl = getUrlParameter('session_id');
     if (sessionIdFromUrl) {
