@@ -567,7 +567,7 @@ def get_recount_list():
         'final_expected_count': r.sku.final_expected_count,
         'kenneth_inventory': r.sku.kenneth_inventory, 
         'remarks': r.remarks,
-        'recount_count': r.recount_count  # Include recount_count
+        'recount_count': r.recount_count
     } for r in records]
     
     return jsonify(result)
@@ -981,6 +981,7 @@ def export_counts():
                     'Day Category': str(day_category),
                     'Count Status': 'COMPLETED',
                     'Initial Count': count_record.initial_count,
+                    # FIX: Show 0 in recount count column, not blank
                     'Recount Count': count_record.recount_count if count_record.recount_count is not None else '',
                     'Final Count': final_count,
                     'Remarks': str(count_record.remarks) if count_record.remarks else '',
