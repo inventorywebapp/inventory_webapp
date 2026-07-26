@@ -1169,14 +1169,11 @@ function displaySkus(skus) {
         let isExpired = false;
         let rowClass = '';
         let existingCountValue = '';
-        let recountCompleted = false;
-        
         if (sku.has_count === true && !sku.in_progress && sku.is_completed === true && !sku.is_expired) {
             existingCountTime = sku.count_time || '';
             finalCountValue = sku.final_count;
             isCompleted = true;
             rowClass = 'sku-completed';
-            recountCompleted = sku.recount_completed || false;
             statusBadge = '<span class="badge bg-success">Completed (ready for next count)</span>';
         }
         else if (sku.is_expired === true) {
@@ -1198,7 +1195,6 @@ function displaySkus(skus) {
             }
             isInProgress = true;
             rowClass = 'sku-in-progress';
-            recountCompleted = sku.recount_completed || false;
             statusBadge = '<span class="badge bg-primary">In Progress</span>';
         }
         if (sku.bypass_recount) {
@@ -1241,29 +1237,26 @@ function displaySkus(skus) {
         html += '</td>';
         html += `<td class="col-previous_count">`;
         // ============================================================
-        // FIX: Previous Count should show the FINAL count from the last completed session
-        // For in-progress: show final count from previous completed session
-        // For completed: show final count from this session
+        // FIX: Previous Count should show the count from the completed session
+        // If has_count is true and is_completed is true, show the count
         // ============================================================
-        let previousCountDisplay = '-';
-        if (!isExpired && finalCountValue !== null && finalCountValue !== undefined) {
-            // Show the final count if:
-            // 1. Session is completed (is_completed = true) -> show final count
-            // 2. Or recount was completed (recount_completed = true) -> show final count
-            // 3. Or this is in-progress but has a final count from previous session
-            if (isCompleted || recountCompleted) {
-                previousCountDisplay = finalCountValue;
-            } else if (sku.final_count !== undefined && sku.final_count !== null && sku.final_count !== '') {
-                // Check if final_count exists and is different from current_count (indicates a recount was done)
-                if (sku.current_count !== undefined && sku.current_count !== null && 
-                    sku.final_count !== sku.current_count) {
-                    previousCountDisplay = sku.final_count;
-                }
+        if (sku.has_count === true && sku.is_completed === true && !isExpired) {
+            // This SKU has a completed count - show it
+            const displayValue = (finalCountValue !== null && finalCountValue !== undefined) ? finalCountValue : sku.final_count;
+            if (displayValue !== null && displayValue !== undefined) {
+                html += `<span id="last-count-value-${sku.id}" style="color: #0d6efd; font-weight: bold;">${displayValue}</span>`;
+            } else {
+                html += `<span id="last-count-value-${sku.id}">-</span>`;
             }
-        }
-        
-        if (previousCountDisplay !== '-') {
-            html += `<span id="last-count-value-${sku.id}" style="color: #0d6efd; font-weight: bold;">${previousCountDisplay}</span>`;
+        } else if (sku.in_progress === true && sku.has_count === true && !isExpired) {
+            // In progress but not completed - show current count
+            const displayValue = (sku.current_count !== undefined && sku.current_count !== null) ? sku.current_count : 
+                                 (finalCountValue !== null && finalCountValue !== undefined) ? finalCountValue : null;
+            if (displayValue !== null && displayValue !== undefined) {
+                html += `<span id="last-count-value-${sku.id}" style="color: #ff8c00; font-weight: bold;">${displayValue}</span>`;
+            } else {
+                html += `<span id="last-count-value-${sku.id}">-</span>`;
+            }
         } else {
             html += `<span id="last-count-value-${sku.id}">-</span>`;
         }
@@ -1453,43 +1446,41 @@ function saveAllCounts() {
             counts: counts
         })
     })
-.then(response => response.json())
-.then(data => {
-    if (data.success) {
-        currentSessionId = data.session_id;
-        hasUnsavedChanges = false;
-        updateUnsavedStatus();
-        
-        // ============================================================
-        // FIX: Refresh SKU data to show updated Previous Count
-        // ============================================================
-        // Check if we're on the counting page and reload SKU data
-        if (filteredSkus.length > 0) {
-            // Reload current SKUs to get updated data
-            const warehouse = document.getElementById('warehouse').value;
-            const dayCategory = document.getElementById('dayCategory').value;
-            const itemCategory = document.getElementById('itemCategory').value;
-            const search = document.getElementById('searchSku').value;
-            loadSkus(warehouse, dayCategory, itemCategory, search);
-        }
-        
-        if (data.recount_needed_count > 0) {
-            alert(`⚠️ ${data.recount_needed_count} SKU(s) need recount (discrepancy > 5)\n\nThe recount window will now open.`);
-            checkForRecounts();
-        } else {
-            let completeMsg = `✓ Counts saved successfully!\n\n`;
-            completeMsg += `Saved ${Object.keys(counts).length} SKU counts\n`;
-            completeMsg += `✅ No discrepancies found.\n\n`;
-            completeMsg += `Do you want to complete the counting session now?`;
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            currentSessionId = data.session_id;
+            hasUnsavedChanges = false;
+            updateUnsavedStatus();
             
-            if (confirm(completeMsg)) {
-                completeCountingSession();
+            // ============================================================
+            // FIX: Refresh SKU data to show updated Previous Count
+            // ============================================================
+            if (filteredSkus.length > 0) {
+                const warehouse = document.getElementById('warehouse').value;
+                const dayCategory = document.getElementById('dayCategory').value;
+                const itemCategory = document.getElementById('itemCategory').value;
+                const search = document.getElementById('searchSku').value;
+                loadSkus(warehouse, dayCategory, itemCategory, search);
             }
+            
+            if (data.recount_needed_count > 0) {
+                alert(`⚠️ ${data.recount_needed_count} SKU(s) need recount (discrepancy > 5)\n\nThe recount window will now open.`);
+                checkForRecounts();
+            } else {
+                let completeMsg = `✓ Counts saved successfully!\n\n`;
+                completeMsg += `Saved ${Object.keys(counts).length} SKU counts\n`;
+                completeMsg += `✅ No discrepancies found.\n\n`;
+                completeMsg += `Do you want to complete the counting session now?`;
+                
+                if (confirm(completeMsg)) {
+                    completeCountingSession();
+                }
+            }
+        } else {
+            alert('Error saving counts');
         }
-    } else {
-        alert('Error saving counts');
-    }
-})
+    })
     .catch(error => {
         alert('Error: ' + error);
     })
@@ -1741,36 +1732,35 @@ function saveRecounts() {
         body: JSON.stringify({recounts: recounts})
     })
     .then(response => response.json())
-.then(data => {
-    if (data.success) {
-        let modal = document.getElementById('recountModal');
-        if (modal) {
-            let bsModal = bootstrap.Modal.getInstance(modal);
-            if (bsModal) bsModal.hide();
-            modal.remove();
+    .then(data => {
+        if (data.success) {
+            let modal = document.getElementById('recountModal');
+            if (modal) {
+                let bsModal = bootstrap.Modal.getInstance(modal);
+                if (bsModal) bsModal.hide();
+                modal.remove();
+            }
+            
+            // ============================================================
+            // FIX: Refresh SKU data to show updated Previous Count
+            // ============================================================
+            if (filteredSkus.length > 0) {
+                const warehouse = document.getElementById('warehouse').value;
+                const dayCategory = document.getElementById('dayCategory').value;
+                const itemCategory = document.getElementById('itemCategory').value;
+                const search = document.getElementById('searchSku').value;
+                loadSkus(warehouse, dayCategory, itemCategory, search);
+            }
+            
+            completeCountingSession();
+        } else {
+            alert('Error saving recounts');
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = originalText;
+            }
         }
-        
-        // ============================================================
-        // FIX: Refresh SKU data to show updated Previous Count
-        // ============================================================
-        // Reload current SKUs to get updated data
-        if (filteredSkus.length > 0) {
-            const warehouse = document.getElementById('warehouse').value;
-            const dayCategory = document.getElementById('dayCategory').value;
-            const itemCategory = document.getElementById('itemCategory').value;
-            const search = document.getElementById('searchSku').value;
-            loadSkus(warehouse, dayCategory, itemCategory, search);
-        }
-        
-        completeCountingSession();
-    } else {
-        alert('Error saving recounts');
-        if (saveBtn) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = originalText;
-        }
-    }
-})
+    })
     .catch(error => {
         alert('Error: ' + error);
         if (saveBtn) {
