@@ -1089,8 +1089,14 @@ function displaySkusWithPagination() {
 }
 
 function loadExistingCountsForSkus() {
+    // If no active session, don't load counts (keep inputs blank)
+    if (!currentSessionId) {
+        return;
+    }
+    
     let skuIds = filteredSkus.map(s => s.id).join(',');
     if (!skuIds) return;
+    
     fetch(`/get_latest_counts?sku_ids=${skuIds}&session_id=${currentSessionId}`)
         .then(response => response.json())
         .then(latestCounts => {
