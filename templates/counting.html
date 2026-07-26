@@ -336,6 +336,7 @@ let isScannerActive = false;
 // Track unsaved changes
 let hasUnsavedChanges = false;
 let pendingNavigationAction = null;
+let isNavigatingAway = false;
 
 // Sort day categories
 let allDayCategories = [...allDayCategoriesRaw].sort((a, b) => {
@@ -1229,7 +1230,6 @@ function displaySkus(skus) {
         }
         html += '</td>';
         html += `<td class="col-previous_count">`;
-        // FIX: Check for null/undefined explicitly so 0 is shown properly
         if (finalCountValue !== null && finalCountValue !== undefined && !isExpired) {
             html += `<span id="last-count-value-${sku.id}" style="color: #0d6efd; font-weight: bold;">${finalCountValue}</span>`;
         } else {
@@ -1690,6 +1690,11 @@ function completeCountingSession() {
         alert('Please save counts first');
         return;
     }
+    
+    // Set flag to prevent beforeunload prompt
+    isNavigatingAway = true;
+    hasUnsavedChanges = false;
+    
     fetch('/complete_counting', {
         method: 'POST',
         headers: {
@@ -1704,10 +1709,12 @@ function completeCountingSession() {
             window.location.href = '/dashboard';
         } else {
             alert(data.message || 'Error completing session');
+            isNavigatingAway = false;
         }
     })
     .catch(error => {
         alert('Error: ' + error);
+        isNavigatingAway = false;
     });
 }
 
@@ -1803,13 +1810,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
     setInterval(updateUnsavedStatus, 2000);
-    window.addEventListener('beforeunload', function(e) {
-        if (hasUnsavedChanges) {
-            e.preventDefault();
-            e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
-            return e.returnValue;
-        }
-    });
+    
+    // REMOVED: window.addEventListener('beforeunload', ...) 
+    // This was causing the "Leave site" prompt
 });
 </script>
 {% endblock %}
