@@ -567,91 +567,89 @@ body {
 }
 
 /* ============================================
-   COLUMN TOGGLE
+   COLUMN TOGGLE & UNSAVED CHANGES
    ============================================ */
-.column-toggle-btn {
-    border: 2px solid #dee2e6;
-    background: #f8f9fa;
-    padding: 8px 14px;
-    border-radius: 8px;
+
+/* Column visibility toggle menu */
+#columnToggleMenu {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+#columnToggleMenu .dropdown-item {
+    padding: 6px 12px;
     cursor: pointer;
-    font-size: 14px;
-    transition: all 0.2s ease;
-    min-width: 80px;
 }
 
-.column-toggle-btn:hover {
-    border-color: #0d6efd;
+#columnToggleMenu .dropdown-item:hover {
+    background-color: #f0f7ff;
 }
 
-.column-toggle-btn.active {
-    background: #0d6efd;
-    color: white;
-    border-color: #0d6efd;
+#columnToggleMenu .dropdown-item input[type="checkbox"] {
+    margin-right: 8px;
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
 }
 
-.column-toggle-btn.hidden {
-    opacity: 0.5;
-    text-decoration: line-through;
+#columnToggleMenu .dropdown-item .col-toggle-label {
+    font-size: 0.9rem;
+    user-select: none;
 }
 
-.column-toggle-btn .badge {
-    font-size: 10px;
-    margin-left: 4px;
-}
-
-.col-hidden {
+/* Hidden column class */
+.hidden-col {
     display: none !important;
 }
 
-/* ============================================
-   UNSAVED CHANGES WARNING
-   ============================================ */
-#unsavedModal .modal-content {
-    border-radius: 16px;
+/* Unsaved changes badge */
+#unsavedBadge {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    animation: pulse-warning 2s infinite;
 }
 
-#unsavedModal .btn {
+@keyframes pulse-warning {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* Unsaved changes modal */
+#unsavedChangesModal .modal-footer .btn {
     min-width: 120px;
 }
 
-/* ============================================
-   RESPONSIVE MOBILE FIXES
-   ============================================ */
-@media (max-width: 576px) {
-    .btn-sm {
-        font-size: 0.7rem;
-        padding: 4px 6px;
+/* Filter auto-apply indicator */
+.filter-auto-indicator {
+    font-size: 0.7rem;
+    color: #6c757d;
+    margin-left: 6px;
+}
+
+/* Mobile adjustments for column toggle */
+@media (max-width: 768px) {
+    #columnToggleMenu {
+        max-height: 250px !important;
+        min-width: 180px !important;
     }
-    .btn-sm i {
-        font-size: 0.85rem;
+    
+    #columnToggleMenu .dropdown-item {
+        font-size: 0.8rem;
+        padding: 4px 10px;
     }
-    .form-select-sm {
-        font-size: 0.75rem;
-        padding: 4px 6px;
+    
+    #unsavedBadge {
+        font-size: 0.6rem;
+        padding: 2px 8px;
     }
-    .form-control-sm {
-        font-size: 0.75rem;
-        padding: 4px 6px;
-    }
-    .gap-1 {
-        gap: 0.15rem !important;
-    }
-    #skusList .table td,
-    #skusList .table th {
-        padding: 3px 4px;
-        font-size: 0.7rem;
-    }
-    .initial-count {
-        min-width: 50px !important;
-        width: 50px !important;
-        font-size: 0.7rem;
-        padding: 2px 3px;
-    }
-    .modal-dialog {
-        margin: 5px;
-    }
-    .modal-body {
-        padding: 12px;
-    }
+}
+
+/* Toast notifications position */
+.position-fixed {
+    position: fixed !important;
+}
+
+/* Dropdown button with columns icon */
+.dropdown-toggle .bi-eye {
+    margin-right: 4px;
 }
