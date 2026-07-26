@@ -1727,23 +1727,36 @@ function saveRecounts() {
         body: JSON.stringify({recounts: recounts})
     })
     .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            let modal = document.getElementById('recountModal');
-            if (modal) {
-                let bsModal = bootstrap.Modal.getInstance(modal);
-                if (bsModal) bsModal.hide();
-                modal.remove();
-            }
-            completeCountingSession();
-        } else {
-            alert('Error saving recounts');
-            if (saveBtn) {
-                saveBtn.disabled = false;
-                saveBtn.textContent = originalText;
-            }
+.then(data => {
+    if (data.success) {
+        let modal = document.getElementById('recountModal');
+        if (modal) {
+            let bsModal = bootstrap.Modal.getInstance(modal);
+            if (bsModal) bsModal.hide();
+            modal.remove();
         }
-    })
+        
+        // ============================================================
+        // FIX: Refresh SKU data to show updated Previous Count
+        // ============================================================
+        // Reload current SKUs to get updated data
+        if (filteredSkus.length > 0) {
+            const warehouse = document.getElementById('warehouse').value;
+            const dayCategory = document.getElementById('dayCategory').value;
+            const itemCategory = document.getElementById('itemCategory').value;
+            const search = document.getElementById('searchSku').value;
+            loadSkus(warehouse, dayCategory, itemCategory, search);
+        }
+        
+        completeCountingSession();
+    } else {
+        alert('Error saving recounts');
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalText;
+        }
+    }
+})
     .catch(error => {
         alert('Error: ' + error);
         if (saveBtn) {
