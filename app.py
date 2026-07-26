@@ -354,9 +354,13 @@ def get_skus():
             else:
                 count_time_naive = None
             
-            if latest_record.recount_count and latest_record.recount_count > 0:
+            # ============================================================
+            # FIX: Properly handle recount count of 0
+            # ============================================================
+            # If recount was completed, use recount_count as final (even if 0)
+            if latest_record.recount_completed:
                 final_count = latest_record.recount_count
-            elif latest_record.final_count and latest_record.final_count > 0:
+            elif latest_record.final_count is not None and latest_record.final_count != '':
                 final_count = latest_record.final_count
             else:
                 final_count = latest_record.initial_count
@@ -562,7 +566,8 @@ def get_recount_list():
         'initial_count': r.initial_count, 
         'final_expected_count': r.sku.final_expected_count,
         'kenneth_inventory': r.sku.kenneth_inventory, 
-        'remarks': r.remarks
+        'remarks': r.remarks,
+        'recount_count': r.recount_count  # Include recount_count
     } for r in records]
     
     return jsonify(result)
@@ -959,7 +964,13 @@ def export_counts():
                 sheets_data[day_category] = []
             
             if count_record and session_obj:
-                if count_record.recount_count and count_record.recount_count > 0:
+                # ============================================================
+                # FIX: Properly handle recount count of 0 in export
+                # ============================================================
+                # If recount was completed, use recount_count as final (even if 0)
+                if count_record.recount_completed:
+                    final_count = count_record.recount_count
+                elif count_record.recount_count and count_record.recount_count > 0:
                     final_count = count_record.recount_count
                 else:
                     final_count = count_record.initial_count
