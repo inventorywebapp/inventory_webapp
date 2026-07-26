@@ -379,7 +379,6 @@ function showToast(message, type = 'info') {
 // ============================================
 
 function clearAllFilters() {
-    // Check for unsaved changes
     if (hasUnsavedChanges) {
         promptUnsavedChanges(() => {
             doClearFilters();
@@ -394,12 +393,8 @@ function doClearFilters() {
     document.getElementById('dayCategory').value = 'All';
     document.getElementById('itemCategory').value = 'All';
     document.getElementById('searchSku').value = '';
-    
-    // Update dependent dropdowns
     populateDayCategories();
     populateItemCategories();
-    
-    // Apply filters
     applyFilters();
     showToast('All filters cleared', 'info');
 }
@@ -1161,7 +1156,7 @@ function displaySkus(skus) {
         let sku = skus[i];
         let statusBadge = '';
         let existingCountTime = '';
-        let finalCountValue = '';
+        let finalCountValue = null;
         let isInProgress = false;
         let isCompleted = false;
         let isExpired = false;
@@ -1182,7 +1177,7 @@ function displaySkus(skus) {
         else if (sku.in_progress === true || (sku.has_count === true && sku.current_count !== undefined && sku.current_count !== null && sku.current_count !== '')) {
             existingCountValue = sku.current_count;
             existingCountTime = sku.count_time || '';
-            finalCountValue = sku.final_count || sku.current_count;
+            finalCountValue = sku.final_count !== undefined && sku.final_count !== null ? sku.final_count : sku.current_count;
             isInProgress = true;
             rowClass = 'sku-in-progress';
             statusBadge = '<span class="badge bg-primary">In Progress</span>';
@@ -1226,8 +1221,8 @@ function displaySkus(skus) {
         }
         html += '</td>';
         html += `<td class="col-previous_count">`;
-        // FIX: Show 0 properly - check if finalCountValue is not undefined/null
-        if (finalCountValue !== undefined && finalCountValue !== null && !isExpired) {
+        // FIX: Check for null/undefined explicitly so 0 is shown properly
+        if (finalCountValue !== null && finalCountValue !== undefined && !isExpired) {
             html += `<span id="last-count-value-${sku.id}" style="color: #0d6efd; font-weight: bold;">${finalCountValue}</span>`;
         } else {
             html += `<span id="last-count-value-${sku.id}">-</span>`;
@@ -1473,16 +1468,14 @@ function checkForRecounts() {
 }
 
 function showRecountModal(recountItems) {
-    // FIX: Filter out bypass recount SKUs
+    // Filter out bypass recount SKUs
     const filteredItems = recountItems.filter(item => {
-        // Check if the SKU has bypass_recount flag
         const sku = allSkus.find(s => s.sku === item.sku);
         return sku && !sku.bypass_recount;
     });
     
     if (filteredItems.length === 0) {
         alert('✅ All recount-needed SKUs are marked as "Bypass Recount". No action needed.');
-        // Check if all counts are valid
         fetch('/check_recount_status?session_id=' + currentSessionId)
             .then(res => res.json())
             .then(status => {
