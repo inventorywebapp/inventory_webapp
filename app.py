@@ -361,13 +361,16 @@ def get_skus():
                 count_time_naive = None
             
             # ============================================================
-            # FIX: Properly handle recount count
-            # If recount was completed, use recount_count as final (even if 0)
+            # FIX: PROPERLY HANDLE PREVIOUS COUNT
+            # The "Previous Count" should show the FINAL saved count from the LAST session
             # ============================================================
+            # If recount was completed, use recount_count as final
             if latest_record.recount_completed:
                 final_count_value = latest_record.recount_count
+            # If there's a final_count value (even 0), use it
             elif latest_record.final_count is not None and latest_record.final_count != '':
                 final_count_value = latest_record.final_count
+            # Otherwise, use the initial_count (the count the user entered)
             else:
                 final_count_value = latest_record.initial_count
             
