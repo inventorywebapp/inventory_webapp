@@ -1177,7 +1177,15 @@ function displaySkus(skus) {
         else if (sku.in_progress === true || (sku.has_count === true && sku.current_count !== undefined && sku.current_count !== null && sku.current_count !== '')) {
             existingCountValue = sku.current_count;
             existingCountTime = sku.count_time || '';
-            finalCountValue = sku.final_count !== undefined && sku.final_count !== null ? sku.final_count : sku.current_count;
+            // ============================================================
+            // FIX: Properly handle recount count of 0
+            // If final_count exists (even 0), use it instead of falling back
+            // ============================================================
+            if (sku.final_count !== undefined && sku.final_count !== null && sku.final_count !== '') {
+                finalCountValue = sku.final_count;
+            } else {
+                finalCountValue = sku.current_count;
+            }
             isInProgress = true;
             rowClass = 'sku-in-progress';
             statusBadge = '<span class="badge bg-primary">In Progress</span>';
