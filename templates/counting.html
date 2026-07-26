@@ -1794,7 +1794,34 @@ document.addEventListener('DOMContentLoaded', function() {
     let sessionIdFromUrl = getUrlParameter('session_id');
     if (sessionIdFromUrl) {
         currentSessionId = parseInt(sessionIdFromUrl);
-        loadInProgressSkus();
+        // ============================================================
+        // FIX: Check if session is already completed before loading
+        // ============================================================
+        fetch(`/api/check_session_completed?session_id=${currentSessionId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.is_completed) {
+                    // Session is already completed, clear everything
+                    currentSessionId = null;
+                    // Clear session ID from URL
+                    const url = new URL(window.location);
+                    url.searchParams.delete('session_id');
+                    window.history.replaceState({}, '', url);
+                    // Clear all inputs
+                    document.querySelectorAll('.initial-count').forEach(input => {
+                        input.value = '';
+                    });
+                    updateUnsavedStatus();
+                    // Load normal SKUs
+                    applyFilters();
+                } else {
+                    loadInProgressSkus();
+                }
+            })
+            .catch(() => {
+                // If API fails, fall back to normal behavior
+                loadInProgressSkus();
+            });
     } else {
         fetch('/api/active_session')
             .then(response => response.json())
@@ -1809,6 +1836,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 applyFilters();
             });
     }
+    
     setInterval(updateUnsavedStatus, 2000);
     
     // REMOVED: window.addEventListener('beforeunload', ...) 
