@@ -981,7 +981,7 @@ def export_counts():
                     'Day Category': str(day_category),
                     'Count Status': 'COMPLETED',
                     'Initial Count': count_record.initial_count,
-                    'Recount Count': count_record.recount_count if count_record.recount_count else '',
+                    'Recount Count': count_record.recount_count if count_record.recount_count is not None else '',  ,
                     'Final Count': final_count,
                     'Remarks': str(count_record.remarks) if count_record.remarks else '',
                     'Date/Time Counted': count_record.count_time.strftime('%Y-%m-%d %H:%M:%S') if count_record.count_time else '',
