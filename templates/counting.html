@@ -1178,10 +1178,6 @@ function displaySkus(skus) {
         else if (sku.in_progress === true || (sku.has_count === true && sku.current_count !== undefined && sku.current_count !== null && sku.current_count !== '')) {
             existingCountValue = sku.current_count;
             existingCountTime = sku.count_time || '';
-            // ============================================================
-            // FIX: Properly handle recount count of 0
-            // If final_count exists (even 0), use it instead of falling back
-            // ============================================================
             if (sku.final_count !== undefined && sku.final_count !== null && sku.final_count !== '') {
                 finalCountValue = sku.final_count;
             } else {
@@ -1475,6 +1471,9 @@ function checkForRecounts() {
         });
 }
 
+// ============================================================
+// FIX: Updated showRecountModal with auto-refresh for bypass
+// ============================================================
 function showRecountModal(recountItems) {
     // Filter out bypass recount SKUs
     const filteredItems = recountItems.filter(item => {
@@ -1484,15 +1483,8 @@ function showRecountModal(recountItems) {
     
     if (filteredItems.length === 0) {
         alert('✅ All recount-needed SKUs are marked as "Bypass Recount". No action needed.');
-        fetch('/check_recount_status?session_id=' + currentSessionId)
-            .then(res => res.json())
-            .then(status => {
-                if (!status.has_pending_recounts) {
-                    if (confirm('All counts are valid!\n\nDo you want to complete the counting session now?')) {
-                        completeCountingSession();
-                    }
-                }
-            });
+        // Auto-refresh the page to show updated status
+        location.reload();
         return;
     }
     
