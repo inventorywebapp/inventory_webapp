@@ -1089,14 +1089,8 @@ function displaySkusWithPagination() {
 }
 
 function loadExistingCountsForSkus() {
-    // If no active session, don't load counts (keep inputs blank)
-    if (!currentSessionId) {
-        return;
-    }
-    
     let skuIds = filteredSkus.map(s => s.id).join(',');
     if (!skuIds) return;
-    
     fetch(`/get_latest_counts?sku_ids=${skuIds}&session_id=${currentSessionId}`)
         .then(response => response.json())
         .then(latestCounts => {
@@ -1490,8 +1484,15 @@ function showRecountModal(recountItems) {
     
     if (filteredItems.length === 0) {
         alert('✅ All recount-needed SKUs are marked as "Bypass Recount". No action needed.');
-        // Refresh the page to show updated status
-        location.reload();
+        fetch('/check_recount_status?session_id=' + currentSessionId)
+            .then(res => res.json())
+            .then(status => {
+                if (!status.has_pending_recounts) {
+                    if (confirm('All counts are valid!\n\nDo you want to complete the counting session now?')) {
+                        completeCountingSession();
+                    }
+                }
+            });
         return;
     }
     
@@ -1707,11 +1708,7 @@ function completeCountingSession() {
             alert('✓ Counting session completed successfully!');
             // Reset session ID so a new session starts
             currentSessionId = null;
-            // Clear all count inputs
-            document.querySelectorAll('.initial-count').forEach(input => {
-                input.value = '';
-            });
-            // Refresh the page to start fresh
+            // Refresh the page to clear counted items and start fresh
             location.reload();
         } else {
             alert(data.message || 'Error completing session');
