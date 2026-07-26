@@ -1482,36 +1482,46 @@ function checkForRecounts() {
 }
 
 function showRecountModal(recountItems) {
-    // Filter out bypass recount SKUs
-    const filteredItems = recountItems.filter(item => {
+    // Separate bypass and non-bypass items
+    const bypassItems = recountItems.filter(item => {
+        const sku = allSkus.find(s => s.sku === item.sku);
+        return sku && sku.bypass_recount;
+    });
+    
+    const nonBypassItems = recountItems.filter(item => {
         const sku = allSkus.find(s => s.sku === item.sku);
         return sku && !sku.bypass_recount;
     });
     
-    if (filteredItems.length === 0) {
-        // All items are bypassed - auto-complete the session
-        alert('✅ All recount-needed SKUs are marked as "Bypass Recount". Auto-completing session...');
+    // If there are bypass items, auto-save them first
+    if (bypassItems.length > 0) {
+        // Auto-save bypass recounts with their initial count as recount count
+        const bypassRecounts = bypassItems.map(item => ({
+            record_id: item.id,
+            recount_count: item.initial_count,
+            remarks: 'Auto-completed (Bypass Recount)'
+        }));
         
-        // Complete the session automatically
-        fetch('/complete_counting', {
+        fetch('/save_recount', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({session_id: currentSessionId})
+            body: JSON.stringify({recounts: bypassRecounts})
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Reset session and reload
-                currentSessionId = null;
-                hasUnsavedChanges = false;
-                document.querySelectorAll('.initial-count').forEach(input => {
-                    input.value = '';
-                });
-                location.reload();
+                if (nonBypassItems.length === 0) {
+                    // All done - complete session
+                    alert('✅ All bypass recount SKUs auto-completed.');
+                    completeCountingSession();
+                } else {
+                    // Show recount modal for non-bypass items
+                    showRecountModalForItems(nonBypassItems);
+                }
             } else {
-                alert('Error completing session: ' + data.message);
+                alert('Error saving bypass recounts: ' + (data.message || 'Unknown error'));
             }
         })
         .catch(error => {
@@ -1520,7 +1530,14 @@ function showRecountModal(recountItems) {
         return;
     }
     
-    console.log("Recount Items (filtered):", filteredItems);
+    // If only non-bypass items, show the recount modal
+    if (nonBypassItems.length > 0) {
+        showRecountModalForItems(nonBypassItems);
+    }
+}
+
+function showRecountModalForItems(recountItems) {
+    console.log("Recount Items:", recountItems);
     
     let html = '<div class="table-responsive"><table class="table table-bordered">';
     html += '<thead class="table-dark">';
@@ -1534,8 +1551,8 @@ function showRecountModal(recountItems) {
     html += '<th>Remarks (Optional)</th>';
     html += '</tr></thead><tbody>';
     
-    for (let i = 0; i < filteredItems.length; i++) {
-        let item = filteredItems[i];
+    for (let i = 0; i < recountItems.length; i++) {
+        let item = recountItems[i];
         html += '<tr>';
         html += '<td><strong>' + escapeHtml(item.sku) + '</strong></td>';
         html += '<td>' + escapeHtml(item.description || '-') + '</td>';
