@@ -345,9 +345,11 @@ def get_skus():
         has_count = False
         is_completed = False
         is_expired = False
+        recount_completed = False
         
         if latest_record:
             has_count = True
+            recount_completed = latest_record.recount_completed  # ← GET THE FLAG
             if latest_record.count_time:
                 count_time_naive = latest_record.count_time.replace(tzinfo=None) if hasattr(latest_record.count_time, 'replace') else latest_record.count_time
                 count_time = latest_record.count_time.strftime('%Y-%m-%d %H:%M:%S')
@@ -391,7 +393,9 @@ def get_skus():
             'final_count': final_count if not is_expired else None,
             'count_time': count_time if not is_expired else None,
             'is_completed': is_completed and not is_expired,
-            'is_expired': is_expired
+            'is_expired': is_expired,
+            'recount_completed': recount_completed,  # ← ADD THIS
+            'current_count': latest_record.initial_count if latest_record else None  # ← ADD THIS FOR COMPARISON
         })
     
     return jsonify(result)
