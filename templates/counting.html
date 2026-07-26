@@ -1089,8 +1089,14 @@ function displaySkusWithPagination() {
 }
 
 function loadExistingCountsForSkus() {
+    // If no active session, don't load counts (keep inputs blank)
+    if (!currentSessionId) {
+        return;
+    }
+    
     let skuIds = filteredSkus.map(s => s.id).join(',');
     if (!skuIds) return;
+    
     fetch(`/get_latest_counts?sku_ids=${skuIds}&session_id=${currentSessionId}`)
         .then(response => response.json())
         .then(latestCounts => {
@@ -1483,16 +1489,34 @@ function showRecountModal(recountItems) {
     });
     
     if (filteredItems.length === 0) {
-        alert('✅ All recount-needed SKUs are marked as "Bypass Recount". No action needed.');
-        fetch('/check_recount_status?session_id=' + currentSessionId)
-            .then(res => res.json())
-            .then(status => {
-                if (!status.has_pending_recounts) {
-                    if (confirm('All counts are valid!\n\nDo you want to complete the counting session now?')) {
-                        completeCountingSession();
-                    }
-                }
-            });
+        // All items are bypassed - auto-complete the session
+        alert('✅ All recount-needed SKUs are marked as "Bypass Recount". Auto-completing session...');
+        
+        // Complete the session automatically
+        fetch('/complete_counting', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({session_id: currentSessionId})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Reset session and reload
+                currentSessionId = null;
+                hasUnsavedChanges = false;
+                document.querySelectorAll('.initial-count').forEach(input => {
+                    input.value = '';
+                });
+                location.reload();
+            } else {
+                alert('Error completing session: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Error: ' + error);
+        });
         return;
     }
     
@@ -1708,7 +1732,11 @@ function completeCountingSession() {
             alert('✓ Counting session completed successfully!');
             // Reset session ID so a new session starts
             currentSessionId = null;
-            // Refresh the page to clear counted items and start fresh
+            // Clear all count inputs
+            document.querySelectorAll('.initial-count').forEach(input => {
+                input.value = '';
+            });
+            // Refresh the page to start fresh
             location.reload();
         } else {
             alert(data.message || 'Error completing session');
