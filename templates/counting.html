@@ -38,33 +38,58 @@
         </div>
         <div class="row mt-2">
             <div class="col-md-12">
-                <!-- Column Visibility Toggle -->
-                <div class="btn-group me-2" id="columnToggleGroup">
-                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-eye"></i> Show/Hide Columns
-                    </button>
-                    <ul class="dropdown-menu" id="columnToggleMenu">
-                        <li><a class="dropdown-item" href="#"><input type="checkbox" checked data-col="description"> Description</a></li>
-                        <li><a class="dropdown-item" href="#"><input type="checkbox" checked data-col="day_category"> Day Category</a></li>
-                        <li><a class="dropdown-item" href="#"><input type="checkbox" checked data-col="last_count_date"> Last Count Date</a></li>
-                        <li><a class="dropdown-item" href="#"><input type="checkbox" checked data-col="last_count"> Last Count</a></li>
-                        <li><a class="dropdown-item" href="#"><input type="checkbox" checked data-col="container_qty"> Container Qty</a></li>
-                        <li><a class="dropdown-item" href="#"><input type="checkbox" checked data-col="container_details"> Container Details</a></li>
-                        <li><a class="dropdown-item" href="#"><input type="checkbox" checked data-col="final_expected"> Final Expected</a></li>
-                        <li><a class="dropdown-item" href="#"><input type="checkbox" checked data-col="kenneth_inv"> Kenneth's Inv</a></li>
-                        <li><a class="dropdown-item" href="#"><input type="checkbox" checked data-col="current_count"> Current Count</a></li>
-                        <li><a class="dropdown-item" href="#"><input type="checkbox" checked data-col="last_counted_date"> Last Counted Date</a></li>
-                        <li><a class="dropdown-item" href="#"><input type="checkbox" checked data-col="previous_count"> Previous Count</a></li>
-                        <li><a class="dropdown-item" href="#"><input type="checkbox" checked data-col="status"> Status</a></li>
-                    </ul>
-                </div>
                 <button id="applyFilters" class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
-                <button id="clearFilters" class="btn btn-secondary" onclick="clearFilters()">Clear Filters</button>
-                <button id="saveCounts" class="btn btn-success" onclick="saveAllCounts()">Save All Counts</button>
-                <button id="completeCounting" class="btn btn-danger" onclick="completeCounting()">Complete Counting Session</button>
-                <button id="scanBarcodeBtn" class="btn btn-info" onclick="startBarcodeScanner()">
-                    <i class="bi bi-upc-scan"></i> Scan Barcode/QR
+                <button id="clearFilters" class="btn btn-outline-secondary" onclick="clearAllFilters()">
+                    <i class="bi bi-x-circle"></i> Clear Filters
                 </button>
+                <button id="saveCounts" class="btn btn-success" onclick="saveAllCounts()">Save All Counts</button>
+                <button id="completeCounting" class="btn btn-danger" onclick="completeCounting()">Complete Session</button>
+                <button id="scanBarcodeBtn" class="btn btn-info" onclick="startBarcodeScanner()">
+                    <i class="bi bi-upc-scan"></i> Scan
+                </button>
+                <!-- Column Visibility Toggle -->
+                <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-eye"></i> Columns
+                </button>
+                <ul class="dropdown-menu p-2" id="columnToggleMenu" style="min-width: 200px; max-height: 400px; overflow-y: auto;">
+                    <li class="dropdown-item-text fw-bold">Toggle Columns</li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="sku" checked> SKU</label></li>
+                    <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="description" checked> Description</label></li>
+                    <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="category" checked> Day Category</label></li>
+                    <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="last_count_date" checked> Last Count Date</label></li>
+                    <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="last_count" checked> Last Count</label></li>
+                    <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="container_qty" checked> Container Qty</label></li>
+                    <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="container_details" checked> Container Details</label></li>
+                    <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="final_expected" checked> Final Expected</label></li>
+                    <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="kenneth" checked> Kenneth's Inv</label></li>
+                    <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="current_count" checked> Current Count</label></li>
+                    <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="last_counted_date" checked> Last Counted Date</label></li>
+                    <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="previous_count" checked> Previous Count</label></li>
+                    <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="status" checked> Status</label></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><button class="btn btn-sm btn-outline-secondary w-100" onclick="resetColumnVisibility()">Reset to Default</button></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Unsaved Changes Warning Modal -->
+<div class="modal fade" id="unsavedChangesModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Unsaved Changes</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>You have unsaved counts on this page.</p>
+                <p><strong>What would you like to do?</strong></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="discardChangesAndProceed()">Discard Changes</button>
+                <button class="btn btn-primary" onclick="saveChangesAndProceed()">Save & Continue</button>
             </div>
         </div>
     </div>
@@ -101,35 +126,6 @@
             <div class="modal-body">
                 <p>Multiple SKUs match the scanned code. Please select the correct one:</p>
                 <div id="manualSkuList" class="list-group"></div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Navigation Warning Modal -->
-<div class="modal fade" id="navWarningModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-warning">
-                <h5 class="modal-title">⚠️ Unsaved Counts</h5>
-                <button type="button" class="btn-close" onclick="closeNavWarning()"></button>
-            </div>
-            <div class="modal-body">
-                <p>You have unsaved counts on the current page.</p>
-                <p>Would you like to:</p>
-                <ul>
-                    <li><strong>Save & Continue</strong> - Save all counts then navigate</li>
-                    <li><strong>Discard & Continue</strong> - Lose unsaved counts</li>
-                    <li><strong>Cancel</strong> - Stay on current page</li>
-                </ul>
-                <div id="navWarningDetails" class="alert alert-info mt-2" style="display:none;">
-                    <small>You have entered counts for <span id="navWarningCount">0</span> SKU(s) on this page.</small>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeNavWarning()">Cancel</button>
-                <button class="btn btn-danger" onclick="discardAndNavigate()">Discard & Continue</button>
-                <button class="btn btn-success" onclick="saveAndNavigate()">Save & Continue</button>
             </div>
         </div>
     </div>
@@ -186,13 +182,6 @@
 .sku-typing {
     background-color: #ffe69e !important;
     border-left: 3px solid #ffc107;
-}
-.sku-recounted {
-    background-color: #d1e7dd !important;
-    border-left: 3px solid #28a745;
-}
-.sku-recounted:hover {
-    background-color: #b6dbc8 !important;
 }
 .uncounted-badge {
     display: inline-block;
@@ -253,18 +242,48 @@
     max-height: 150px;
     overflow-y: auto;
 }
-.column-hidden {
+
+/* Column Toggle Styles */
+.hidden-col {
     display: none !important;
 }
-/* Dropdown checkbox styling */
-#columnToggleMenu .dropdown-item {
-    padding: 4px 16px;
-    cursor: pointer;
+
+/* Filter Auto-Apply Indicator */
+.filter-auto-indicator {
+    font-size: 0.75rem;
+    color: #6c757d;
+    display: inline-block;
+    margin-left: 8px;
 }
-#columnToggleMenu .dropdown-item:hover {
-    background-color: #f0f0f0;
+
+.dropdown-item input[type="checkbox"] {
+    margin-right: 8px;
 }
-#columnToggleMenu .dropdown-item input[type="checkbox"] {
+
+/* Mobile Responsive for Column Toggle */
+@media (max-width: 768px) {
+    #columnToggleMenu {
+        max-height: 300px !important;
+    }
+    .dropdown-item {
+        font-size: 0.85rem;
+        padding: 6px 10px;
+    }
+}
+
+/* Column visibility badge */
+.col-toggle-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #e9ecef;
+    color: #495057;
+    margin-left: 5px;
+}
+
+/* Clear Filters button spacing */
+#clearFilters {
     margin-right: 8px;
 }
 </style>
@@ -285,49 +304,22 @@ const FIFTH_FLOOR_CATEGORIES = [
     'Deep Dish-UN', 'Trunk Tray'
 ];
 
-// ============================================
-// COLUMN VISIBILITY CONFIGURATION
-// ============================================
-const COLUMN_CONFIG = {
-    'sku': { label: 'SKU', visible: true, required: true },
-    'description': { label: 'Description (Item Category)', visible: true, required: false },
-    'day_category': { label: 'Day Category', visible: true, required: false },
-    'last_count_date': { label: 'Last Count Date', visible: true, required: false },
-    'last_count': { label: 'Last Count', visible: true, required: false },
-    'container_qty': { label: 'Container Qty', visible: true, required: false },
-    'container_details': { label: 'Container Details', visible: true, required: false },
-    'final_expected': { label: 'Final Expected', visible: true, required: false },
-    'kenneth_inv': { label: 'Kenneth\'s Inv', visible: true, required: false },
-    'current_count': { label: 'Current Count', visible: true, required: false },
-    'last_counted_date': { label: 'Last Counted Date', visible: true, required: false },
-    'previous_count': { label: 'Previous Count', visible: true, required: false },
-    'status': { label: 'Status', visible: true, required: false }
-};
-
-// Column mapping for display
-const COLUMN_MAP = {
-    'description': 'Description (Item Category)',
-    'day_category': 'Day Category',
-    'last_count_date': 'Last Count Date',
-    'last_count': 'Last Count',
-    'container_qty': 'Container Qty',
-    'container_details': 'Container Details',
-    'final_expected': 'Final Expected',
-    'kenneth_inv': 'Kenneth\'s Inv',
-    'current_count': 'Current Count',
-    'last_counted_date': 'Last Counted Date',
-    'previous_count': 'Previous Count',
-    'status': 'Status'
-};
-
-// Store column visibility state
-let columnVisibility = {};
-
-// ============================================
-// NAVIGATION WARNING STATE
-// ============================================
-let pendingNavigation = null; // { type: 'prev'|'next'|'apply' }
-let isNavigating = false;
+// Column definitions for visibility toggle
+const COLUMN_DEFINITIONS = [
+    { key: 'sku', label: 'SKU', default: true },
+    { key: 'description', label: 'Description', default: true },
+    { key: 'category', label: 'Day Category', default: true },
+    { key: 'last_count_date', label: 'Last Count Date', default: true },
+    { key: 'last_count', label: 'Last Count', default: true },
+    { key: 'container_qty', label: 'Container Qty', default: true },
+    { key: 'container_details', label: 'Container Details', default: true },
+    { key: 'final_expected', label: 'Final Expected', default: true },
+    { key: 'kenneth', label: "Kenneth's Inv", default: true },
+    { key: 'current_count', label: 'Current Count', default: true },
+    { key: 'last_counted_date', label: 'Last Counted Date', default: true },
+    { key: 'previous_count', label: 'Previous Count', default: true },
+    { key: 'status', label: 'Status', default: true }
+];
 
 // Store all data from server
 let allItemCategories = {{ item_categories|tojson }};
@@ -341,6 +333,11 @@ let searchTimeout = null;
 let html5QrCode = null;
 let isScannerActive = false;
 
+// Track unsaved changes
+let hasUnsavedChanges = false;
+let pendingNavigationAction = null;
+let isNavigatingAway = false;
+
 // Sort day categories
 let allDayCategories = [...allDayCategoriesRaw].sort((a, b) => {
     let orderA = DAY_ORDER[a] || 999;
@@ -348,399 +345,8 @@ let allDayCategories = [...allDayCategoriesRaw].sort((a, b) => {
     return orderA - orderB;
 });
 
-// ============================================
-// COLUMN VISIBILITY FUNCTIONS
-// ============================================
-
-function loadColumnVisibility() {
-    try {
-        const saved = localStorage.getItem('inventory_column_visibility');
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            // Merge with defaults to handle new columns
-            for (const key in COLUMN_CONFIG) {
-                if (parsed.hasOwnProperty(key)) {
-                    COLUMN_CONFIG[key].visible = parsed[key];
-                }
-            }
-        }
-    } catch (e) {
-        console.warn('Failed to load column visibility:', e);
-    }
-    
-    // Update checkbox states
-    document.querySelectorAll('#columnToggleMenu input[type="checkbox"]').forEach(cb => {
-        const col = cb.getAttribute('data-col');
-        if (col && COLUMN_CONFIG[col]) {
-            cb.checked = COLUMN_CONFIG[col].visible;
-            cb.addEventListener('change', function() {
-                toggleColumn(this.getAttribute('data-col'), this.checked);
-            });
-        }
-    });
-}
-
-function saveColumnVisibility() {
-    const state = {};
-    for (const key in COLUMN_CONFIG) {
-        state[key] = COLUMN_CONFIG[key].visible;
-    }
-    try {
-        localStorage.setItem('inventory_column_visibility', JSON.stringify(state));
-    } catch (e) {
-        console.warn('Failed to save column visibility:', e);
-    }
-}
-
-function toggleColumn(colKey, visible) {
-    if (COLUMN_CONFIG[colKey]) {
-        COLUMN_CONFIG[colKey].visible = visible;
-        saveColumnVisibility();
-        applyColumnVisibility();
-    }
-}
-
-function applyColumnVisibility() {
-    // Hide/show table columns
-    document.querySelectorAll('thead th, tbody td').forEach(cell => {
-        const col = cell.getAttribute('data-col');
-        if (col && COLUMN_CONFIG[col]) {
-            if (!COLUMN_CONFIG[col].visible) {
-                cell.classList.add('column-hidden');
-            } else {
-                cell.classList.remove('column-hidden');
-            }
-        }
-    });
-    
-    // Also hide/show header cells
-    document.querySelectorAll('thead th').forEach(th => {
-        const col = th.getAttribute('data-col');
-        if (col && COLUMN_CONFIG[col] && !COLUMN_CONFIG[col].visible) {
-            th.classList.add('column-hidden');
-        }
-    });
-}
-
-function setupColumnToggleDropdown() {
-    // The dropdown items already have checkboxes in HTML
-    // Just ensure they reflect saved state
-    document.querySelectorAll('#columnToggleMenu input[type="checkbox"]').forEach(cb => {
-        const col = cb.getAttribute('data-col');
-        if (col && COLUMN_CONFIG[col]) {
-            cb.checked = COLUMN_CONFIG[col].visible;
-        }
-    });
-}
-
-// ============================================
-// BI-DIRECTIONAL FILTER FUNCTIONS
-// ============================================
-
-function filterItemCategoriesByWarehouse() {
-    let warehouse = document.getElementById('warehouse').value;
-    let itemCategorySelect = document.getElementById('itemCategory');
-    if (!itemCategorySelect) return;
-    
-    let currentValue = itemCategorySelect.value;
-    
-    itemCategorySelect.innerHTML = '<option value="All">-- All Item Categories --</option>';
-    
-    let filteredCategories = [];
-    
-    if (warehouse === '5thFloor') {
-        filteredCategories = allItemCategories.filter(cat => FIFTH_FLOOR_CATEGORIES.includes(cat));
-    } else if (warehouse === 'Main') {
-        filteredCategories = allItemCategories.filter(cat => !FIFTH_FLOOR_CATEGORIES.includes(cat));
-    } else {
-        filteredCategories = [...allItemCategories];
-    }
-    
-    filteredCategories.sort();
-    
-    for (let i = 0; i < filteredCategories.length; i++) {
-        let option = document.createElement('option');
-        option.value = filteredCategories[i];
-        option.textContent = filteredCategories[i];
-        itemCategorySelect.appendChild(option);
-    }
-    
-    if (currentValue !== 'All' && filteredCategories.includes(currentValue)) {
-        itemCategorySelect.value = currentValue;
-    }
-    
-    updateDayCategories();
-}
-
-function updateDayCategories() {
-    let selectedItemCategory = document.getElementById('itemCategory').value;
-    let dayCategorySelect = document.getElementById('dayCategory');
-    if (!dayCategorySelect) return;
-    
-    let currentValue = dayCategorySelect.value;
-    
-    dayCategorySelect.innerHTML = '<option value="All">-- All Day Categories --</option>';
-    
-    let filteredDayCategories = [];
-    
-    // If an item category is selected, filter day categories by that category
-    if (selectedItemCategory !== 'All' && allSkus.length > 0) {
-        let daySet = new Set();
-        for (let i = 0; i < allSkus.length; i++) {
-            if (allSkus[i].description === selectedItemCategory && allSkus[i].category) {
-                daySet.add(allSkus[i].category);
-            }
-        }
-        filteredDayCategories = Array.from(daySet);
-    } else {
-        filteredDayCategories = [...allDayCategories];
-    }
-    
-    filteredDayCategories.sort((a, b) => {
-        let orderA = DAY_ORDER[a] || 999;
-        let orderB = DAY_ORDER[b] || 999;
-        return orderA - orderB;
-    });
-    
-    for (let i = 0; i < filteredDayCategories.length; i++) {
-        if (filteredDayCategories[i]) {
-            let option = document.createElement('option');
-            option.value = filteredDayCategories[i];
-            option.textContent = filteredDayCategories[i];
-            dayCategorySelect.appendChild(option);
-        }
-    }
-    
-    if (currentValue !== 'All' && filteredDayCategories.includes(currentValue)) {
-        dayCategorySelect.value = currentValue;
-    }
-}
-
-function updateItemCategoriesByDayCategory() {
-    let selectedDayCategory = document.getElementById('dayCategory').value;
-    let itemCategorySelect = document.getElementById('itemCategory');
-    if (!itemCategorySelect) return;
-    
-    let currentValue = itemCategorySelect.value;
-    let warehouse = document.getElementById('warehouse').value;
-    
-    itemCategorySelect.innerHTML = '<option value="All">-- All Item Categories --</option>';
-    
-    let filteredCategories = [];
-    
-    // Get all SKUs first
-    let allSkusForFilter = allSkus;
-    
-    // If a day category is selected, filter item categories by that day
-    if (selectedDayCategory !== 'All') {
-        let categorySet = new Set();
-        for (let i = 0; i < allSkusForFilter.length; i++) {
-            if (allSkusForFilter[i].category === selectedDayCategory) {
-                // Apply warehouse filter
-                let belongsTo5thFloor = FIFTH_FLOOR_CATEGORIES.includes(allSkusForFilter[i].description);
-                if (warehouse === '5thFloor' && belongsTo5thFloor) {
-                    categorySet.add(allSkusForFilter[i].description);
-                } else if (warehouse === 'Main' && !belongsTo5thFloor) {
-                    categorySet.add(allSkusForFilter[i].description);
-                } else if (warehouse === 'All') {
-                    categorySet.add(allSkusForFilter[i].description);
-                }
-            }
-        }
-        filteredCategories = Array.from(categorySet);
-    } else {
-        // No day filter, use all categories (respecting warehouse)
-        let categorySet = new Set();
-        for (let i = 0; i < allSkusForFilter.length; i++) {
-            let belongsTo5thFloor = FIFTH_FLOOR_CATEGORIES.includes(allSkusForFilter[i].description);
-            if (warehouse === '5thFloor' && belongsTo5thFloor) {
-                categorySet.add(allSkusForFilter[i].description);
-            } else if (warehouse === 'Main' && !belongsTo5thFloor) {
-                categorySet.add(allSkusForFilter[i].description);
-            } else if (warehouse === 'All') {
-                categorySet.add(allSkusForFilter[i].description);
-            }
-        }
-        filteredCategories = Array.from(categorySet);
-    }
-    
-    filteredCategories.sort();
-    
-    for (let i = 0; i < filteredCategories.length; i++) {
-        if (filteredCategories[i]) {
-            let option = document.createElement('option');
-            option.value = filteredCategories[i];
-            option.textContent = filteredCategories[i];
-            itemCategorySelect.appendChild(option);
-        }
-    }
-    
-    if (currentValue !== 'All' && filteredCategories.includes(currentValue)) {
-        itemCategorySelect.value = currentValue;
-    }
-}
-
-// ============================================
-// NAVIGATION WARNING FUNCTIONS
-// ============================================
-
-function hasUnsavedCounts() {
-    const inputs = document.querySelectorAll('.initial-count');
-    let count = 0;
-    for (let i = 0; i < inputs.length; i++) {
-        if (inputs[i].value && inputs[i].value.trim() !== '') {
-            count++;
-        }
-    }
-    return count;
-}
-
-function getUnsavedCount() {
-    const inputs = document.querySelectorAll('.initial-count');
-    let count = 0;
-    for (let i = 0; i < inputs.length; i++) {
-        if (inputs[i].value && inputs[i].value.trim() !== '') {
-            count++;
-        }
-    }
-    return count;
-}
-
-function checkUnsavedBeforeNavigation(navType) {
-    const unsavedCount = getUnsavedCount();
-    if (unsavedCount === 0) {
-        // No unsaved counts, proceed
-        executeNavigation(navType);
-        return;
-    }
-    
-    // Show warning modal
-    pendingNavigation = navType;
-    document.getElementById('navWarningCount').textContent = unsavedCount;
-    document.getElementById('navWarningDetails').style.display = 'block';
-    
-    const modal = new bootstrap.Modal(document.getElementById('navWarningModal'));
-    modal.show();
-}
-
-function closeNavWarning() {
-    pendingNavigation = null;
-    const modal = bootstrap.Modal.getInstance(document.getElementById('navWarningModal'));
-    if (modal) modal.hide();
-}
-
-function saveAndNavigate() {
-    // Save counts then navigate
-    const modal = bootstrap.Modal.getInstance(document.getElementById('navWarningModal'));
-    if (modal) modal.hide();
-    
-    if (pendingNavigation) {
-        // Save all counts
-        saveAllCountsSilent(function(success) {
-            if (success) {
-                executeNavigation(pendingNavigation);
-            } else {
-                showToast('Failed to save counts. Please try again.', 'error');
-                pendingNavigation = null;
-            }
-        });
-    }
-}
-
-function discardAndNavigate() {
-    const modal = bootstrap.Modal.getInstance(document.getElementById('navWarningModal'));
-    if (modal) modal.hide();
-    
-    if (pendingNavigation) {
-        executeNavigation(pendingNavigation);
-    }
-}
-
-function saveAllCountsSilent(callback) {
-    const countInputs = document.querySelectorAll('.initial-count');
-    let counts = {};
-    
-    for (let i = 0; i < countInputs.length; i++) {
-        let input = countInputs[i];
-        let skuId = input.getAttribute('data-sku-id');
-        let count = input.value;
-        
-        // Validate count
-        if (count && count.trim() !== '') {
-            const num = parseInt(count, 10);
-            if (!isNaN(num) && num >= 0) {
-                counts[skuId] = {initial_count: num};
-            }
-        }
-    }
-    
-    if (Object.keys(counts).length === 0) {
-        callback(true);
-        return;
-    }
-    
-    let warehouse = document.getElementById('warehouse').value;
-    let warehouseDisplay = warehouse === '5thFloor' ? '5th Floor Warehouse' : (warehouse === 'Main' ? 'Main Warehouse' : 'All Warehouses');
-    
-    fetch('/counting', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            session_id: currentSessionId,
-            warehouse: warehouseDisplay,
-            counts: counts
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            currentSessionId = data.session_id;
-            callback(true);
-        } else {
-            callback(false);
-        }
-    })
-    .catch(error => {
-        console.error('Silent save error:', error);
-        callback(false);
-    });
-}
-
-function executeNavigation(navType) {
-    pendingNavigation = null;
-    isNavigating = true;
-    
-    switch(navType) {
-        case 'prev':
-            if (currentPage > 1) {
-                currentPage--;
-                displaySkusWithPagination();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-            break;
-        case 'next':
-            let totalPages = Math.ceil(filteredSkus.length / itemsPerPage);
-            if (currentPage < totalPages) {
-                currentPage++;
-                displaySkusWithPagination();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-            break;
-        case 'apply':
-            applyFiltersInternal();
-            break;
-        default:
-            break;
-    }
-    
-    isNavigating = false;
-}
-
-// ============================================
-// MAIN APPLICATION FUNCTIONS
-// ============================================
+// Column visibility state
+let columnVisibility = {};
 
 function getUrlParameter(name) {
     let urlParams = new URLSearchParams(window.location.search);
@@ -764,10 +370,256 @@ function showToast(message, type = 'info') {
     toast.style.right = '20px';
     toast.style.zIndex = '9999';
     toast.style.minWidth = '300px';
-    toast.style.maxWidth = '500px';
     toast.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 4000);
+}
+
+// ============================================
+// CLEAR FILTERS
+// ============================================
+
+function clearAllFilters() {
+    if (hasUnsavedChanges) {
+        promptUnsavedChanges(() => {
+            doClearFilters();
+        });
+    } else {
+        doClearFilters();
+    }
+}
+
+function doClearFilters() {
+    document.getElementById('warehouse').value = 'All';
+    document.getElementById('dayCategory').value = 'All';
+    document.getElementById('itemCategory').value = 'All';
+    document.getElementById('searchSku').value = '';
+    populateDayCategories();
+    populateItemCategories();
+    applyFilters();
+    showToast('All filters cleared', 'info');
+}
+
+// ============================================
+// COLUMN VISIBILITY TOGGLE
+// ============================================
+
+function loadColumnVisibility() {
+    try {
+        const saved = localStorage.getItem('inventory_column_visibility');
+        if (saved) {
+            columnVisibility = JSON.parse(saved);
+        } else {
+            COLUMN_DEFINITIONS.forEach(col => {
+                columnVisibility[col.key] = col.default;
+            });
+        }
+        COLUMN_DEFINITIONS.forEach(col => {
+            if (columnVisibility[col.key] === undefined) {
+                columnVisibility[col.key] = col.default;
+            }
+        });
+        updateColumnToggleUI();
+    } catch (e) {
+        COLUMN_DEFINITIONS.forEach(col => {
+            columnVisibility[col.key] = col.default;
+        });
+    }
+}
+
+function updateColumnToggleUI() {
+    document.querySelectorAll('.col-toggle').forEach(checkbox => {
+        const colKey = checkbox.getAttribute('data-col');
+        if (colKey && columnVisibility[colKey] !== undefined) {
+            checkbox.checked = columnVisibility[colKey];
+        }
+    });
+}
+
+function saveColumnVisibility() {
+    try {
+        localStorage.setItem('inventory_column_visibility', JSON.stringify(columnVisibility));
+    } catch (e) {}
+}
+
+function toggleColumn(colKey, checked) {
+    columnVisibility[colKey] = checked;
+    saveColumnVisibility();
+    applyColumnVisibilityToTable();
+}
+
+function applyColumnVisibilityToTable() {
+    COLUMN_DEFINITIONS.forEach(col => {
+        const isVisible = columnVisibility[col.key] !== false;
+        const cells = document.querySelectorAll(`.col-${col.key}`);
+        cells.forEach(cell => {
+            if (isVisible) {
+                cell.classList.remove('hidden-col');
+            } else {
+                cell.classList.add('hidden-col');
+            }
+        });
+    });
+}
+
+function resetColumnVisibility() {
+    COLUMN_DEFINITIONS.forEach(col => {
+        columnVisibility[col.key] = col.default;
+    });
+    saveColumnVisibility();
+    updateColumnToggleUI();
+    applyColumnVisibilityToTable();
+    showToast('Columns reset to default', 'info');
+}
+
+// ============================================
+// UNSAVED CHANGES HANDLING
+// ============================================
+
+function checkUnsavedChanges() {
+    const inputs = document.querySelectorAll('.initial-count');
+    let hasChanges = false;
+    for (let input of inputs) {
+        if (input.value && input.value.trim() !== '') {
+            hasChanges = true;
+            break;
+        }
+    }
+    return hasChanges;
+}
+
+function updateUnsavedStatus() {
+    hasUnsavedChanges = checkUnsavedChanges();
+    const badge = document.getElementById('unsavedBadge');
+    if (badge) {
+        if (hasUnsavedChanges) {
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+}
+
+function promptUnsavedChanges(action) {
+    if (!hasUnsavedChanges) {
+        action();
+        return;
+    }
+    pendingNavigationAction = action;
+    const modal = new bootstrap.Modal(document.getElementById('unsavedChangesModal'));
+    modal.show();
+}
+
+function saveChangesAndProceed() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('unsavedChangesModal'));
+    if (modal) modal.hide();
+    saveAllCounts();
+    setTimeout(() => {
+        if (pendingNavigationAction) {
+            pendingNavigationAction();
+            pendingNavigationAction = null;
+        }
+    }, 500);
+}
+
+function discardChangesAndProceed() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('unsavedChangesModal'));
+    if (modal) modal.hide();
+    hasUnsavedChanges = false;
+    if (pendingNavigationAction) {
+        pendingNavigationAction();
+        pendingNavigationAction = null;
+    }
+}
+
+// ============================================
+// AUTO-FILTER FUNCTIONS
+// ============================================
+
+function populateDayCategories() {
+    const daySelect = document.getElementById('dayCategory');
+    if (!daySelect) return;
+    const currentValue = daySelect.value;
+    daySelect.innerHTML = '<option value="All">-- All Day Categories --</option>';
+    const selectedItemCategory = document.getElementById('itemCategory').value;
+    let filteredDays = [...allDayCategories];
+    if (selectedItemCategory !== 'All' && allSkus.length > 0) {
+        const daySet = new Set();
+        for (const sku of allSkus) {
+            if (sku.description === selectedItemCategory && sku.category) {
+                daySet.add(sku.category);
+            }
+        }
+        filteredDays = Array.from(daySet);
+        filteredDays.sort((a, b) => (DAY_ORDER[a] || 999) - (DAY_ORDER[b] || 999));
+    }
+    for (const day of filteredDays) {
+        if (day) {
+            const option = document.createElement('option');
+            option.value = day;
+            option.textContent = day;
+            daySelect.appendChild(option);
+        }
+    }
+    if (currentValue !== 'All' && filteredDays.includes(currentValue)) {
+        daySelect.value = currentValue;
+    }
+}
+
+function populateItemCategories() {
+    const itemSelect = document.getElementById('itemCategory');
+    if (!itemSelect) return;
+    const currentValue = itemSelect.value;
+    itemSelect.innerHTML = '<option value="All">-- All Item Categories --</option>';
+    const selectedDayCategory = document.getElementById('dayCategory').value;
+    let filteredItems = [...allItemCategories];
+    if (selectedDayCategory !== 'All' && allSkus.length > 0) {
+        const itemSet = new Set();
+        for (const sku of allSkus) {
+            if (sku.category === selectedDayCategory && sku.description) {
+                itemSet.add(sku.description);
+            }
+        }
+        filteredItems = Array.from(itemSet);
+        filteredItems.sort();
+    }
+    const warehouse = document.getElementById('warehouse').value;
+    if (warehouse === '5thFloor') {
+        filteredItems = filteredItems.filter(cat => FIFTH_FLOOR_CATEGORIES.includes(cat));
+    } else if (warehouse === 'Main') {
+        filteredItems = filteredItems.filter(cat => !FIFTH_FLOOR_CATEGORIES.includes(cat));
+    }
+    for (const item of filteredItems) {
+        if (item) {
+            const option = document.createElement('option');
+            option.value = item;
+            option.textContent = item;
+            itemSelect.appendChild(option);
+        }
+    }
+    if (currentValue !== 'All' && filteredItems.includes(currentValue)) {
+        itemSelect.value = currentValue;
+    }
+}
+
+function onFilterChange() {
+    if (hasUnsavedChanges) {
+        promptUnsavedChanges(() => {
+            doAutoApplyFilters();
+        });
+    } else {
+        doAutoApplyFilters();
+    }
+}
+
+function doAutoApplyFilters() {
+    const warehouse = document.getElementById('warehouse').value;
+    const dayCategory = document.getElementById('dayCategory').value;
+    const itemCategory = document.getElementById('itemCategory').value;
+    const search = document.getElementById('searchSku').value;
+    populateDayCategories();
+    populateItemCategories();
+    loadSkus(warehouse, dayCategory, itemCategory, search);
 }
 
 // ============================================
@@ -779,19 +631,22 @@ async function startBarcodeScanner() {
         showToast("Scanner is already running", "warning");
         return;
     }
-    
+    if (hasUnsavedChanges) {
+        const shouldContinue = confirm('You have unsaved changes. Continue scanning anyway?');
+        if (!shouldContinue) return;
+    }
     showToast("Loading all SKUs from database...", "info");
     const resultContainer = document.getElementById('qr-reader-results');
     if (resultContainer) {
         resultContainer.innerHTML = '<div class="alert alert-warning">📦 Loading ALL SKUs from database... Please wait.</div>';
     }
-    
     try {
         const response = await fetch('/api/get_all_skus');
         const data = await response.json();
         allSkus = data;
         console.log(`✅ Loaded ${allSkus.length} SKUs into memory`);
-        
+        let visorSkus = allSkus.filter(s => s.sku && s.sku.toLowerCase().includes("visor"));
+        console.log(`Found ${visorSkus.length} Visor SKUs:`, visorSkus.map(s => s.sku));
         if (resultContainer) {
             resultContainer.innerHTML = `<div class="alert alert-success">✓ Loaded ${allSkus.length} SKUs. Ready to scan!</div>`;
         }
@@ -801,31 +656,22 @@ async function startBarcodeScanner() {
         alert('Failed to load SKU data. Please refresh the page.');
         return;
     }
-    
     const scannerModal = new bootstrap.Modal(document.getElementById('scannerModal'));
     scannerModal.show();
-    
     if (resultContainer) {
         resultContainer.innerHTML = '<div class="alert alert-info">📷 Initializing camera... Please allow camera access.</div>';
     }
-    
     if (html5QrCode) {
-        try {
-            await html5QrCode.stop();
-        } catch(e) {}
+        try { await html5QrCode.stop(); } catch(e) {}
         html5QrCode = null;
     }
-    
     const readerElement = document.getElementById('qr-reader');
     if (readerElement) {
         readerElement.innerHTML = '';
     }
-    
     await new Promise(resolve => setTimeout(resolve, 300));
-    
     html5QrCode = new Html5Qrcode("qr-reader");
     isScannerActive = true;
-    
     const config = {
         fps: 15,
         qrbox: { width: 280, height: 280 },
@@ -840,7 +686,6 @@ async function startBarcodeScanner() {
             Html5QrcodeSupportedFormats.CODE_93
         ]
     };
-    
     try {
         await html5QrCode.start(
             { facingMode: "environment" },
@@ -848,12 +693,10 @@ async function startBarcodeScanner() {
             (decodedText, decodedResult) => {
                 let cleanedText = decodedText.trim().replace(/[\n\r]/g, '');
                 console.log(`📸 SCANNED: "${cleanedText}"`);
-                
                 if (resultContainer) {
                     resultContainer.innerHTML = `<div class="alert alert-success">✓ Scanned: ${cleanedText}</div>`;
                 }
                 showToast(`Scanned: ${cleanedText.substring(0, 50)}`, "success");
-                
                 stopBarcodeScanner();
                 intelligentSkuSearch(cleanedText);
             },
@@ -873,19 +716,14 @@ async function startBarcodeScanner() {
 
 async function stopBarcodeScanner() {
     isScannerActive = false;
-    
     if (html5QrCode) {
-        try {
-            await html5QrCode.stop();
-        } catch(err) {}
+        try { await html5QrCode.stop(); } catch(err) {}
         html5QrCode = null;
     }
-    
     const readerElement = document.getElementById('qr-reader');
     if (readerElement) {
         readerElement.innerHTML = '';
     }
-    
     const scannerModal = bootstrap.Modal.getInstance(document.getElementById('scannerModal'));
     if (scannerModal) {
         scannerModal.hide();
@@ -906,17 +744,13 @@ function manualBarcodeEntry() {
 
 function intelligentSkuSearch(scannedText) {
     let cleanedScan = scannedText.trim().replace(/[\n\r]/g, '');
-    
     console.log("=== SEARCHING FOR:", cleanedScan);
     console.log("Total SKUs in memory:", allSkus.length);
-    
     if (allSkus.length === 0) {
         alert("SKU data not loaded. Please click 'Apply Filters' first, then try scanning.");
         return;
     }
-    
     let exactMatch = null;
-    
     for (let sku of allSkus) {
         if (sku.sku && sku.sku.toLowerCase() === cleanedScan.toLowerCase()) {
             exactMatch = sku;
@@ -924,16 +758,13 @@ function intelligentSkuSearch(scannedText) {
             break;
         }
     }
-    
     if (exactMatch) {
         document.getElementById('searchSku').value = exactMatch.sku;
         document.getElementById('warehouse').value = 'All';
         document.getElementById('dayCategory').value = 'All';
         document.getElementById('itemCategory').value = 'All';
-        
         applyFilters();
         showToast(`✓ Found: ${exactMatch.sku}`, "success");
-        
         setTimeout(() => {
             let row = document.getElementById(`sku-row-${exactMatch.id}`);
             if (row) {
@@ -957,14 +788,12 @@ function intelligentSkuSearch(scannedText) {
         }, 800);
         return;
     }
-    
     let similar = [];
     for (let sku of allSkus) {
         if (sku.sku && sku.sku.toLowerCase().includes(cleanedScan.toLowerCase().substring(0, 8))) {
             similar.push(sku.sku);
         }
     }
-    
     if (similar.length > 0) {
         alert(`❌ "${cleanedScan}" not found.\n\nDid you mean?\n• ${similar.slice(0, 5).join('\n• ')}`);
     } else {
@@ -973,63 +802,59 @@ function intelligentSkuSearch(scannedText) {
     }
 }
 
-// ============================================
-// FILTER AND DISPLAY FUNCTIONS
-// ============================================
+// ============ END OF QR SCANNER ============
+
+function filterItemCategoriesByWarehouse() {
+    const warehouse = document.getElementById('warehouse').value;
+    populateDayCategories();
+    populateItemCategories();
+    onFilterChange();
+}
+
+function updateDayCategories() {
+    populateDayCategories();
+}
 
 function highlightSkusStatus() {
     let countInputs = document.querySelectorAll('.initial-count');
     let uncountedCount = 0;
     let completedCount = 0;
     let inProgressCount = 0;
-    
     for (let i = 0; i < countInputs.length; i++) {
         let input = countInputs[i];
         let row = input ? input.closest('tr') : null;
         if (!row) continue;
-        
         let count = input.value;
-        
         let isCompleted = row.getAttribute('data-completed') === 'true';
         let isInProgress = row.getAttribute('data-in-progress') === 'true';
         let isExpired = row.getAttribute('data-expired') === 'true';
-        let isRecounted = row.getAttribute('data-recounted') === 'true';
-        
         if (!count || count === '') {
             if (isCompleted && !isExpired) {
                 row.classList.add('sku-completed');
-                row.classList.remove('sku-in-progress', 'sku-needs-count', 'sku-typing', 'sku-recounted');
+                row.classList.remove('sku-in-progress', 'sku-needs-count', 'sku-typing');
                 completedCount++;
             } else if (isInProgress) {
                 row.classList.add('sku-in-progress');
-                row.classList.remove('sku-completed', 'sku-needs-count', 'sku-typing', 'sku-recounted');
+                row.classList.remove('sku-completed', 'sku-needs-count', 'sku-typing');
                 inProgressCount++;
-            } else if (isRecounted) {
-                row.classList.add('sku-recounted');
-                row.classList.remove('sku-completed', 'sku-in-progress', 'sku-needs-count', 'sku-typing');
-                completedCount++;
             } else {
                 row.classList.add('sku-needs-count');
-                row.classList.remove('sku-completed', 'sku-in-progress', 'sku-typing', 'sku-recounted');
+                row.classList.remove('sku-completed', 'sku-in-progress', 'sku-typing');
                 uncountedCount++;
             }
         } else {
             row.classList.add('sku-typing');
-            row.classList.remove('sku-completed', 'sku-in-progress', 'sku-needs-count', 'sku-recounted');
+            row.classList.remove('sku-completed', 'sku-in-progress', 'sku-needs-count');
         }
     }
-    
     let existingUncountedBadge = document.getElementById('uncountedBadge');
     let existingCompletedBadge = document.getElementById('completedBadge');
     let existingInProgressBadge = document.getElementById('inProgressBadge');
-    
     if (existingCompletedBadge) existingCompletedBadge.remove();
     if (existingInProgressBadge) existingInProgressBadge.remove();
     if (existingUncountedBadge) existingUncountedBadge.remove();
-    
     let title = document.querySelector('h2');
     if (!title) return;
-    
     if (completedCount > 0) {
         let badge = document.createElement('span');
         badge.id = 'completedBadge';
@@ -1037,7 +862,6 @@ function highlightSkusStatus() {
         badge.innerHTML = `${completedCount} SKU(s) Completed`;
         title.appendChild(badge);
     }
-    
     if (inProgressCount > 0) {
         let badge = document.createElement('span');
         badge.id = 'inProgressBadge';
@@ -1045,7 +869,6 @@ function highlightSkusStatus() {
         badge.innerHTML = `${inProgressCount} SKU(s) In Progress`;
         title.appendChild(badge);
     }
-    
     if (uncountedCount > 0) {
         let badge = document.createElement('span');
         badge.id = 'uncountedBadge';
@@ -1057,13 +880,10 @@ function highlightSkusStatus() {
 
 function validateCountInput(input) {
     if (!input) return true;
-    
     let value = input.value;
-    
     if (value === '' || value === null) {
         return true;
     }
-    
     if (isNaN(value) || value.includes('.') || parseFloat(value) < 0 || !Number.isInteger(parseFloat(value))) {
         alert('Please enter a valid whole number (no decimals, no negatives)');
         input.value = '';
@@ -1076,23 +896,17 @@ function validateCountInput(input) {
 function setupSmartSearch() {
     let searchInput = document.getElementById('searchSku');
     let suggestionsDiv = document.getElementById('suggestions');
-    
     if (!searchInput || !suggestionsDiv) return;
-    
     searchInput.addEventListener('input', function() {
         let term = this.value.trim();
-        
         if (term.length < 2) {
             suggestionsDiv.style.display = 'none';
             return;
         }
-        
         if (searchTimeout) clearTimeout(searchTimeout);
-        
         searchTimeout = setTimeout(function() {
             let suggestions = [];
             let seen = new Set();
-            
             for (let i = 0; i < allSkus.length && suggestions.length < 15; i++) {
                 let sku = allSkus[i];
                 if (sku.sku && sku.sku.toLowerCase().includes(term.toLowerCase())) {
@@ -1106,7 +920,6 @@ function setupSmartSearch() {
                     }
                 }
             }
-            
             if (suggestions.length > 0) {
                 suggestionsDiv.innerHTML = '';
                 for (let i = 0; i < suggestions.length; i++) {
@@ -1133,13 +946,11 @@ function setupSmartSearch() {
             }
         }, 300);
     });
-    
     document.addEventListener('click', function(e) {
         if (e.target !== searchInput && suggestionsDiv && !suggestionsDiv.contains(e.target)) {
             suggestionsDiv.style.display = 'none';
         }
     });
-    
     searchInput.addEventListener('keypress', function(e) {
         if (e.which === 13) {
             if (suggestionsDiv) suggestionsDiv.style.display = 'none';
@@ -1149,36 +960,21 @@ function setupSmartSearch() {
 }
 
 function applyFilters() {
-    // Check for unsaved counts before applying filters (which may change page)
-    if (isNavigating) return;
-    
-    const unsavedCount = getUnsavedCount();
-    if (unsavedCount > 0) {
-        checkUnsavedBeforeNavigation('apply');
-        return;
+    if (hasUnsavedChanges) {
+        promptUnsavedChanges(() => {
+            doApplyFilters();
+        });
+    } else {
+        doApplyFilters();
     }
-    
-    applyFiltersInternal();
 }
 
-function applyFiltersInternal() {
+function doApplyFilters() {
     let warehouse = document.getElementById('warehouse').value;
     let dayCategory = document.getElementById('dayCategory').value;
     let itemCategory = document.getElementById('itemCategory').value;
     let search = document.getElementById('searchSku').value;
-    
     loadSkus(warehouse, dayCategory, itemCategory, search);
-}
-
-function clearFilters() {
-    document.getElementById('warehouse').value = 'All';
-    document.getElementById('dayCategory').value = 'All';
-    document.getElementById('itemCategory').value = 'All';
-    document.getElementById('searchSku').value = '';
-    
-    // Update day and item categories based on "All" selection
-    filterItemCategoriesByWarehouse();
-    applyFilters();
 }
 
 function loadInProgressSkus() {
@@ -1187,15 +983,11 @@ function loadInProgressSkus() {
         applyFilters();
         return;
     }
-    
     currentSessionId = parseInt(sessionIdFromUrl);
-    
     let loadingDiv = document.getElementById('loadingIndicator');
     let skusListDiv = document.getElementById('skusList');
-    
     if (loadingDiv) loadingDiv.style.display = 'block';
     if (skusListDiv) skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-info text-center">Loading in-progress SKUs...</div></div>';
-    
     fetch(`/get_in_progress_skus/${currentSessionId}`)
         .then(response => response.json())
         .then(data => {
@@ -1205,7 +997,6 @@ function loadInProgressSkus() {
                     data.skus[i].has_count = true;
                     data.skus[i].current_count = data.skus[i].current_count;
                     data.skus[i].count_time = data.skus[i].count_time;
-                    data.skus[i].recount_count = data.skus[i].recount_count || null;
                 }
                 allSkus = data.skus;
                 filteredSkus = data.skus;
@@ -1228,14 +1019,11 @@ function loadInProgressSkus() {
 function loadSkus(warehouse, dayCategory, itemCategory, search) {
     let loadingDiv = document.getElementById('loadingIndicator');
     let skusListDiv = document.getElementById('skusList');
-    
     if (loadingDiv) loadingDiv.style.display = 'block';
     if (skusListDiv) skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-info text-center">Loading SKUs...</div></div>';
-    
     let url = '/get_skus?day_category=' + encodeURIComponent(dayCategory) + 
               '&item_category=' + encodeURIComponent(itemCategory) + 
               '&search=' + encodeURIComponent(search);
-    
     fetch(url)
         .then(response => {
             if (!response.ok) {
@@ -1245,12 +1033,10 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
         })
         .then(data => {
             allSkus = data;
-            
             let warehouseFiltered = [];
             for (let i = 0; i < data.length; i++) {
                 let sku = data[i];
                 let belongsTo5thFloor = FIFTH_FLOOR_CATEGORIES.includes(sku.description);
-                
                 if (warehouse === '5thFloor' && belongsTo5thFloor) {
                     warehouseFiltered.push(sku);
                 } else if (warehouse === 'Main' && !belongsTo5thFloor) {
@@ -1259,12 +1045,12 @@ function loadSkus(warehouse, dayCategory, itemCategory, search) {
                     warehouseFiltered.push(sku);
                 }
             }
-            
             filteredSkus = warehouseFiltered;
             currentPage = 1;
             displaySkusWithPagination();
             if (loadingDiv) loadingDiv.style.display = 'none';
-            updateDayCategories();
+            populateDayCategories();
+            populateItemCategories();
         })
         .catch(error => {
             console.error('Error loading SKUs:', error);
@@ -1279,9 +1065,7 @@ function displaySkusWithPagination() {
     let startIndex = (currentPage - 1) * itemsPerPage;
     let endIndex = startIndex + itemsPerPage;
     let pageSkus = filteredSkus.slice(startIndex, endIndex);
-    
     displaySkus(pageSkus);
-    
     let paginationDiv = document.getElementById('paginationControls');
     if (paginationDiv) {
         if (filteredSkus.length > itemsPerPage) {
@@ -1295,16 +1079,21 @@ function displaySkusWithPagination() {
             paginationDiv.style.display = 'none';
         }
     }
-    
     if (currentSessionId && filteredSkus.length > 0) {
         loadExistingCountsForSkus();
     }
-    
-    // Apply column visibility after rendering
-    setTimeout(applyColumnVisibility, 50);
+    setTimeout(() => {
+        applyColumnVisibilityToTable();
+        setTimeout(updateUnsavedStatus, 100);
+    }, 50);
 }
 
 function loadExistingCountsForSkus() {
+    // If no active session, don't load counts (keep inputs blank)
+    if (!currentSessionId) {
+        return;
+    }
+    
     let skuIds = filteredSkus.map(s => s.id).join(',');
     if (!skuIds) return;
     
@@ -1315,36 +1104,14 @@ function loadExistingCountsForSkus() {
                 let countInput = document.querySelector(`.initial-count[data-sku-id="${skuId}"]`);
                 let lastCountedSpan = document.getElementById(`last-counted-${skuId}`);
                 let lastCountValueSpan = document.getElementById(`last-count-value-${skuId}`);
-                
                 if (countInput && latestCounts[skuId]) {
-                    // Check if this SKU has been recounted
-                    // The recount_count is stored in the session data
-                    let isRecounted = latestCounts[skuId].recount_completed || false;
-                    
                     countInput.value = latestCounts[skuId].initial_count;
-                    
                     if (lastCountedSpan) {
                         lastCountedSpan.innerHTML = latestCounts[skuId].count_time;
                     }
                     if (lastCountValueSpan) {
-                        // Show the correct previous count (should be initial_count if not recounted, or recount_count if recounted)
-                        let displayCount = latestCounts[skuId].initial_count;
-                        if (latestCounts[skuId].recount_count && latestCounts[skuId].recount_count > 0) {
-                            displayCount = latestCounts[skuId].recount_count;
-                        } else if (latestCounts[skuId].final_count && latestCounts[skuId].final_count > 0) {
-                            displayCount = latestCounts[skuId].final_count;
-                        }
-                        lastCountValueSpan.innerHTML = displayCount;
-                        
-                        // Mark as recounted if recount exists
-                        if (latestCounts[skuId].recount_count && latestCounts[skuId].recount_count > 0) {
-                            let row = countInput.closest('tr');
-                            if (row) {
-                                row.setAttribute('data-recounted', 'true');
-                            }
-                        }
+                        lastCountValueSpan.innerHTML = latestCounts[skuId].initial_count;
                     }
-                    
                     let row = countInput.closest('tr');
                     if (row) {
                         row.setAttribute('data-in-progress', 'true');
@@ -1353,57 +1120,55 @@ function loadExistingCountsForSkus() {
                 }
             }
             highlightSkusStatus();
+            updateUnsavedStatus();
         })
         .catch(error => console.error('Error loading existing counts:', error));
 }
 
 function displaySkus(skus) {
     let skusListDiv = document.getElementById('skusList');
-    
     if (!skusListDiv) {
         console.error("skusList element not found!");
         return;
     }
-    
     if (!skus || skus.length === 0) {
         skusListDiv.innerHTML = '<div class="col-12"><div class="alert alert-warning text-center">No SKUs found. Try different filters.</div></div>';
         return;
     }
-    
-    // Build column headers based on visibility
-    let headers = [];
-    let headerCols = ['sku', 'description', 'day_category', 'last_count_date', 'last_count', 
-                      'container_qty', 'container_details', 'final_expected', 'kenneth_inv',
-                      'current_count', 'last_counted_date', 'previous_count', 'status'];
-    
-    // Build header HTML
     let html = '<div class="col-12"><div class="table-responsive"><table class="table table-bordered table-hover table-striped">';
-    html += '<thead class="table-dark"><tr>';
-    
-    for (let col of headerCols) {
-        if (COLUMN_CONFIG[col] && (COLUMN_CONFIG[col].visible || col === 'sku')) {
-            let colKey = col;
-            let label = COLUMN_CONFIG[col] ? COLUMN_CONFIG[col].label : col;
-            if (col === 'sku') label = 'SKU';
-            html += `<th data-col="${colKey}">${label}</th>`;
-            headers.push(colKey);
-        }
-    }
-    html += '</tr></thead><tbody>';
-    
+    html += '<thead class="table-dark">';
+    html += '<tr>';
+    const columns = [
+        { key: 'sku', label: 'SKU' },
+        { key: 'description', label: 'Description (Item Category)' },
+        { key: 'category', label: 'Day Category' },
+        { key: 'last_count_date', label: 'Last Count Date' },
+        { key: 'last_count', label: 'Last Count' },
+        { key: 'container_qty', label: 'Container Qty' },
+        { key: 'container_details', label: 'Container Details' },
+        { key: 'final_expected', label: 'Final Expected' },
+        { key: 'kenneth', label: "Kenneth's Inv" },
+        { key: 'current_count', label: 'Current Count' },
+        { key: 'last_counted_date', label: 'Last Counted Date' },
+        { key: 'previous_count', label: 'Previous Count' },
+        { key: 'status', label: 'Status' }
+    ];
+    columns.forEach(col => {
+        const isVisible = columnVisibility[col.key] !== false;
+        html += `<th class="col-${col.key} ${isVisible ? '' : 'hidden-col'}">${col.label}</th>`;
+    });
+    html += '</tr>';
+    html += '</thead><tbody>';
     for (let i = 0; i < skus.length; i++) {
         let sku = skus[i];
         let statusBadge = '';
         let existingCountTime = '';
-        let finalCountValue = '';
+        let finalCountValue = null;
         let isInProgress = false;
         let isCompleted = false;
         let isExpired = false;
-        let isRecounted = false;
         let rowClass = '';
         let existingCountValue = '';
-        let recountDisplayValue = '';
-        
         if (sku.has_count === true && !sku.in_progress && sku.is_completed === true && !sku.is_expired) {
             existingCountTime = sku.count_time || '';
             finalCountValue = sku.final_count;
@@ -1419,114 +1184,90 @@ function displaySkus(skus) {
         else if (sku.in_progress === true || (sku.has_count === true && sku.current_count !== undefined && sku.current_count !== null && sku.current_count !== '')) {
             existingCountValue = sku.current_count;
             existingCountTime = sku.count_time || '';
-            finalCountValue = sku.final_count || sku.current_count;
+            // ============================================================
+            // FIX: Properly handle recount count of 0
+            // If final_count exists (even 0), use it instead of falling back
+            // ============================================================
+            if (sku.final_count !== undefined && sku.final_count !== null && sku.final_count !== '') {
+                finalCountValue = sku.final_count;
+            } else {
+                finalCountValue = sku.current_count;
+            }
             isInProgress = true;
             rowClass = 'sku-in-progress';
             statusBadge = '<span class="badge bg-primary">In Progress</span>';
-            
-            // Check if this SKU has a recount
-            if (sku.recount_count && sku.recount_count > 0) {
-                isRecounted = true;
-                recountDisplayValue = sku.recount_count;
-                statusBadge = '<span class="badge bg-success">Recounted</span>';
-                rowClass = 'sku-recounted';
-            }
         }
-        
-        // Bypass Recount - always show bypass status
         if (sku.bypass_recount) {
             statusBadge = '<span class="badge bg-warning">Bypass Recount</span>';
         }
-        
         let containerDetails = sku.container_details || '-';
         if (containerDetails.length > 50) {
             containerDetails = containerDetails.substring(0, 50) + '...';
         }
-        
         let lastCountDate = sku.last_count_date || '-';
         if (lastCountDate !== '-' && lastCountDate.length > 10) {
             lastCountDate = lastCountDate.split(' ')[0];
         }
-        
         let inputValue = (isInProgress && existingCountValue) ? existingCountValue : '';
         let inputPlaceholder = 'Enter count';
-        
-        // If recounted, show the recount value as previous count
-        let previousDisplayValue = finalCountValue;
-        if (isRecounted && recountDisplayValue) {
-            previousDisplayValue = recountDisplayValue;
-        }
-        
         let rowId = `sku-row-${sku.id}`;
-        let dataRecounted = isRecounted ? 'true' : 'false';
-        
-        html += `<tr id="${rowId}" class="${rowClass}" data-in-progress="${isInProgress}" data-completed="${isCompleted}" data-expired="${isExpired}" data-recounted="${dataRecounted}">`;
-        
-        // Build cells based on headers
-        for (let col of headers) {
-            html += `<td data-col="${col}">`;
-            switch(col) {
-                case 'sku':
-                    html += `<strong>${escapeHtml(sku.sku)}</strong>`;
-                    break;
-                case 'description':
-                    html += escapeHtml(sku.description || '-');
-                    break;
-                case 'day_category':
-                    html += escapeHtml(sku.category || '-');
-                    break;
-                case 'last_count_date':
-                    html += escapeHtml(lastCountDate);
-                    break;
-                case 'last_count':
-                    html += `<span class="last-count-col">${sku.last_count || 0}</span>`;
-                    break;
-                case 'container_qty':
-                    html += sku.total_container_qty || 0;
-                    break;
-                case 'container_details':
-                    html += `<small>${escapeHtml(containerDetails)}</small>`;
-                    break;
-                case 'final_expected':
-                    html += `<span class="final-expected-col">${sku.final_expected_count || 0}</span>`;
-                    break;
-                case 'kenneth_inv':
-                    html += `<span class="kenneth-col">${sku.kenneth_inventory || 0}</span>`;
-                    break;
-                case 'current_count':
-                    html += `<input type="text" class="form-control initial-count" data-sku-id="${sku.id}" style="min-width: 100px; width: 100px;" placeholder="${inputPlaceholder}" inputmode="numeric"`;
-                    if (inputValue) {
-                        html += ` value="${inputValue}"`;
-                    }
-                    html += '>';
-                    break;
-                case 'last_counted_date':
-                    if (existingCountTime && !isExpired) {
-                        html += `<span id="last-counted-${sku.id}" style="color: #0d6efd; font-weight: bold;">${existingCountTime}</span>`;
-                    } else {
-                        html += `<span id="last-counted-${sku.id}">-</span>`;
-                    }
-                    break;
-                case 'previous_count':
-                    if (previousDisplayValue && !isExpired) {
-                        html += `<span id="last-count-value-${sku.id}" style="color: #0d6efd; font-weight: bold;">${previousDisplayValue}</span>`;
-                    } else {
-                        html += `<span id="last-count-value-${sku.id}">-</span>`;
-                    }
-                    break;
-                case 'status':
-                    html += statusBadge;
-                    break;
-                default:
-                    html += '-';
-            }
-            html += '</td>';
+        html += `<tr id="${rowId}" class="${rowClass}" data-in-progress="${isInProgress}" data-completed="${isCompleted}" data-expired="${isExpired}">`;
+        html += `<td class="col-sku"><strong>${escapeHtml(sku.sku)}</strong></td>`;
+        html += `<td class="col-description">${escapeHtml(sku.description || '-')}</td>`;
+        html += `<td class="col-category">${escapeHtml(sku.category || '-')}</td>`;
+        html += `<td class="col-last_count_date text-nowrap">${escapeHtml(lastCountDate)}</td>`;
+        html += `<td class="col-last_count fw-bold text-dark">${sku.last_count || 0}</td>`;
+        html += `<td class="col-container_qty">${sku.total_container_qty || 0}</td>`;
+        html += `<td class="col-container_details"><small>${escapeHtml(containerDetails)}</small></td>`;
+        html += `<td class="col-final_expected fw-bold text-dark">${sku.final_expected_count || 0}</td>`;
+        html += `<td class="col-kenneth fw-bold text-dark">${sku.kenneth_inventory || 0}</td>`;
+        html += `<td class="col-current_count">`;
+        html += `<input type="text" class="form-control initial-count" data-sku-id="${sku.id}" style="min-width: 80px; width: 100px;" placeholder="${inputPlaceholder}" inputmode="numeric"`;
+        if (inputValue) {
+            html += ` value="${inputValue}"`;
         }
+        html += '>';
+        html += '</td>';
+        html += `<td class="col-last_counted_date">`;
+        if (existingCountTime && !isExpired) {
+            html += `<span id="last-counted-${sku.id}" style="color: #0d6efd; font-weight: bold;">${existingCountTime}</span>`;
+        } else {
+            html += `<span id="last-counted-${sku.id}">-</span>`;
+        }
+        html += '</td>';
+        html += `<td class="col-previous_count">`;
+        // ============================================================
+        // FIX: Only show previous count if recount was actually performed
+        // ============================================================
+        if (finalCountValue !== null && finalCountValue !== undefined && !isExpired) {
+            // Check if this is a recount (recount_completed is true OR final count differs from initial)
+            const isRecount = (sku.recount_completed === true) || 
+                              (sku.final_count !== undefined && sku.final_count !== null && 
+                               sku.current_count !== undefined && sku.current_count !== null &&
+                               sku.final_count !== sku.current_count);
+            if (isRecount) {
+                html += `<span id="last-count-value-${sku.id}" style="color: #0d6efd; font-weight: bold;">${finalCountValue}</span>`;
+            } else {
+                html += `<span id="last-count-value-${sku.id}">-</span>`;
+            }
+        } else {
+            html += `<span id="last-count-value-${sku.id}">-</span>`;
+        }
+        html += '</td>';
+        html += `<td class="col-status">${statusBadge}</td>`;
         html += '</tr>';
     }
-    
     html += '</tbody></table></div></div>';
-    
+    let unsavedBadge = `<span id="unsavedBadge" class="badge bg-warning text-dark ms-2" style="display:none;">
+        <i class="bi bi-exclamation-circle"></i> Unsaved Changes
+    </span>`;
+    let title = document.querySelector('h2');
+    if (title) {
+        let existingBadge = document.getElementById('unsavedBadge');
+        if (!existingBadge) {
+            title.insertAdjacentHTML('beforeend', unsavedBadge);
+        }
+    }
     let sessionIdFromUrl = getUrlParameter('session_id');
     if (sessionIdFromUrl && currentSessionId == sessionIdFromUrl && filteredSkus.length > 0) {
         let banner = `<div class="col-12 mb-3">
@@ -1540,8 +1281,6 @@ function displaySkus(skus) {
     } else {
         skusListDiv.innerHTML = html;
     }
-    
-    // Bind events after DOM is updated
     setTimeout(function() {
         document.querySelectorAll('.initial-count').forEach(function(input) {
             if (input) {
@@ -1550,8 +1289,8 @@ function displaySkus(skus) {
                         validateCountInput(this);
                     }
                     highlightSkusStatus();
+                    updateUnsavedStatus();
                 });
-                
                 input.addEventListener('keypress', function(e) {
                     if (e.key === 'Enter') {
                         this.blur();
@@ -1567,60 +1306,75 @@ function displaySkus(skus) {
                         alert('Only numbers are allowed. Please enter a whole number.');
                     }
                 });
-                
                 input.addEventListener('input', function() {
                     let row = this.closest('tr');
                     if (row) {
                         row.classList.add('sku-typing');
-                        row.classList.remove('sku-completed', 'sku-in-progress', 'sku-needs-count', 'sku-recounted');
+                        row.classList.remove('sku-completed', 'sku-in-progress', 'sku-needs-count');
                     }
                     highlightSkusStatus();
+                    updateUnsavedStatus();
                 });
             }
         });
-        
         highlightSkusStatus();
-        applyColumnVisibility();
+        applyColumnVisibilityToTable();
+        updateUnsavedStatus();
     }, 100);
 }
 
 function previousPage() {
-    if (isNavigating) return;
-    if (currentPage > 1) {
-        checkUnsavedBeforeNavigation('prev');
+    if (hasUnsavedChanges) {
+        promptUnsavedChanges(() => {
+            if (currentPage > 1) {
+                currentPage--;
+                displaySkusWithPagination();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+    } else {
+        if (currentPage > 1) {
+            currentPage--;
+            displaySkusWithPagination();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     }
 }
 
 function nextPage() {
-    if (isNavigating) return;
     let totalPages = Math.ceil(filteredSkus.length / itemsPerPage);
-    if (currentPage < totalPages) {
-        checkUnsavedBeforeNavigation('next');
+    if (hasUnsavedChanges) {
+        promptUnsavedChanges(() => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                displaySkusWithPagination();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+    } else {
+        if (currentPage < totalPages) {
+            currentPage++;
+            displaySkusWithPagination();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     }
 }
-
-// ============================================
-// SAVE AND COMPLETE FUNCTIONS
-// ============================================
 
 function saveAllCounts() {
     let warehouse = document.getElementById('warehouse').value;
     let warehouseDisplay = warehouse === '5thFloor' ? '5th Floor Warehouse' : (warehouse === 'Main' ? 'Main Warehouse' : 'All Warehouses');
-    
     let countInputs = document.querySelectorAll('.initial-count');
     let totalSkus = countInputs.length;
     let countedSkus = 0;
     let blankSkus = 0;
     let invalidSkus = [];
     let blankSkuNames = [];
-    
     let hasInvalid = false;
     for (let i = 0; i < countInputs.length; i++) {
         let input = countInputs[i];
         let value = input.value;
         let row = input.closest('tr');
         let skuName = row ? row.cells[0].innerText : 'Unknown SKU';
-        
         if (value !== '' && value !== null) {
             if (isNaN(value) || value.includes('.') || parseFloat(value) < 0 || !Number.isInteger(parseFloat(value))) {
                 hasInvalid = true;
@@ -1636,54 +1390,44 @@ function saveAllCounts() {
             input.style.border = '';
         }
     }
-    
     if (hasInvalid) {
         alert(`Cannot save. The following SKU(s) have invalid counts (decimals or negatives):\n\n${invalidSkus.map(s => `  • ${s}`).join('\n')}\n\nPlease correct these entries.`);
         return;
     }
-    
     if (blankSkus > 0) {
         let warningMsg = `⚠️ You have ${blankSkus} SKU(s) with NO count entered.\n\n`;
         warningMsg += `Total SKUs: ${totalSkus}\n`;
         warningMsg += `Counted: ${countedSkus}\n`;
         warningMsg += `Blank: ${blankSkus}\n\n`;
-        
         if (blankSkus <= 5) {
             warningMsg += `Uncounted SKUs:\n${blankSkuNames.map(s => `  • ${s}`).join('\n')}\n\n`;
         } else {
             warningMsg += `First 5 uncounted: ${blankSkuNames.slice(0, 5).join(', ')}\n`;
             warningMsg += `... and ${blankSkus - 5} more\n\n`;
         }
-        
         warningMsg += `Are you sure you want to save with missing counts?`;
-        
         if (!confirm(warningMsg)) {
             return;
         }
     }
-    
     let counts = {};
     for (let i = 0; i < countInputs.length; i++) {
         let input = countInputs[i];
         let skuId = input.getAttribute('data-sku-id');
         let count = input.value;
-        
         if (count && count !== '') {
             counts[skuId] = {initial_count: parseInt(count, 10)};
         }
     }
-    
     if (Object.keys(counts).length === 0) {
         alert('No counts entered. Please enter at least one count before saving.');
         return;
     }
-    
     let saveBtn = document.getElementById('saveCounts');
     if (saveBtn) {
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving...';
     }
-    
     fetch('/counting', {
         method: 'POST',
         headers: {
@@ -1695,24 +1439,43 @@ function saveAllCounts() {
             counts: counts
         })
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            currentSessionId = data.session_id;
-            
-            if (data.recount_needed_count > 0) {
-                // Show recount modal but stay on page
-                showToast(`⚠️ ${data.recount_needed_count} SKU(s) need recount (discrepancy > 5)`, 'warning');
-                setTimeout(() => {
-                    checkForRecounts();
-                }, 500);
-            } else {
-                showToast(`✓ Counts saved successfully! (${Object.keys(counts).length} SKUs)`, 'success');
-            }
-        } else {
-            alert('Error saving counts');
+.then(response => response.json())
+.then(data => {
+    if (data.success) {
+        currentSessionId = data.session_id;
+        hasUnsavedChanges = false;
+        updateUnsavedStatus();
+        
+        // ============================================================
+        // FIX: Refresh SKU data to show updated Previous Count
+        // ============================================================
+        // Check if we're on the counting page and reload SKU data
+        if (filteredSkus.length > 0) {
+            // Reload current SKUs to get updated data
+            const warehouse = document.getElementById('warehouse').value;
+            const dayCategory = document.getElementById('dayCategory').value;
+            const itemCategory = document.getElementById('itemCategory').value;
+            const search = document.getElementById('searchSku').value;
+            loadSkus(warehouse, dayCategory, itemCategory, search);
         }
-    })
+        
+        if (data.recount_needed_count > 0) {
+            alert(`⚠️ ${data.recount_needed_count} SKU(s) need recount (discrepancy > 5)\n\nThe recount window will now open.`);
+            checkForRecounts();
+        } else {
+            let completeMsg = `✓ Counts saved successfully!\n\n`;
+            completeMsg += `Saved ${Object.keys(counts).length} SKU counts\n`;
+            completeMsg += `✅ No discrepancies found.\n\n`;
+            completeMsg += `Do you want to complete the counting session now?`;
+            
+            if (confirm(completeMsg)) {
+                completeCountingSession();
+            }
+        }
+    } else {
+        alert('Error saving counts');
+    }
+})
     .catch(error => {
         alert('Error: ' + error);
     })
@@ -1726,27 +1489,19 @@ function saveAllCounts() {
 
 function checkForRecounts() {
     if (!currentSessionId) return;
-    
     fetch('/get_recount_list?session_id=' + currentSessionId)
         .then(response => response.json())
         .then(data => {
             if (data.length > 0) {
-                // Filter out SKUs with bypass_recount
-                let filteredData = data.filter(item => !item.bypass_recount);
-                if (filteredData.length > 0) {
-                    showRecountModal(filteredData);
-                } else {
-                    // All recount SKUs are bypassed
-                    showToast('All recount SKUs are bypassed. Session completed.', 'success');
-                    // Auto-complete the session
-                    completeCountingSession();
-                }
+                showRecountModal(data);
             } else {
                 fetch('/check_recount_status?session_id=' + currentSessionId)
                     .then(res => res.json())
                     .then(status => {
                         if (!status.has_pending_recounts) {
-                            showToast('All counts are valid!', 'success');
+                            if (confirm('All counts are valid!\n\nDo you want to complete the counting session now?')) {
+                                completeCountingSession();
+                            }
                         }
                     });
             }
@@ -1754,6 +1509,61 @@ function checkForRecounts() {
 }
 
 function showRecountModal(recountItems) {
+    // Separate bypass and non-bypass items
+    const bypassItems = recountItems.filter(item => {
+        const sku = allSkus.find(s => s.sku === item.sku);
+        return sku && sku.bypass_recount;
+    });
+    
+    const nonBypassItems = recountItems.filter(item => {
+        const sku = allSkus.find(s => s.sku === item.sku);
+        return sku && !sku.bypass_recount;
+    });
+    
+    // If there are bypass items, auto-save them first
+    if (bypassItems.length > 0) {
+        // Auto-save bypass recounts with their initial count as recount count
+        const bypassRecounts = bypassItems.map(item => ({
+            record_id: item.id,
+            recount_count: item.initial_count,
+            remarks: 'Auto-completed (Bypass Recount)'
+        }));
+        
+        fetch('/save_recount', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({recounts: bypassRecounts})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (nonBypassItems.length === 0) {
+                    // All done - complete session
+                    alert('✅ All bypass recount SKUs auto-completed.');
+                    completeCountingSession();
+                } else {
+                    // Show recount modal for non-bypass items
+                    showRecountModalForItems(nonBypassItems);
+                }
+            } else {
+                alert('Error saving bypass recounts: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            alert('Error: ' + error);
+        });
+        return;
+    }
+    
+    // If only non-bypass items, show the recount modal
+    if (nonBypassItems.length > 0) {
+        showRecountModalForItems(nonBypassItems);
+    }
+}
+
+function showRecountModalForItems(recountItems) {
     console.log("Recount Items:", recountItems);
     
     let html = '<div class="table-responsive"><table class="table table-bordered">';
@@ -1770,9 +1580,6 @@ function showRecountModal(recountItems) {
     
     for (let i = 0; i < recountItems.length; i++) {
         let item = recountItems[i];
-        // Skip if bypass_recount is true
-        if (item.bypass_recount) continue;
-        
         html += '<tr>';
         html += '<td><strong>' + escapeHtml(item.sku) + '</strong></td>';
         html += '<td>' + escapeHtml(item.description || '-') + '</td>';
@@ -1780,7 +1587,7 @@ function showRecountModal(recountItems) {
         html += '<td class="bg-info">' + (item.final_expected_count || 0) + '</td>';
         html += '<td class="bg-info">' + (item.kenneth_inventory || 0) + '</td>';
         html += '<td><input type="text" class="form-control recount-count" data-record-id="' + item.id + '" style="width: 120px;" placeholder="Enter whole number" inputmode="numeric"></td>';
-        html += '<td><textarea class="form-control recount-remarks" data-record-id="' + item.id + '" rows="2" placeholder="Optional: Reason for discrepancy" style="width: 250px;"></textarea></td>';
+        html += '<td><textarea class="form-control recount-remarks" data-record-id="' + item.id + '" rows="2" placeholder="Optional: Reason for discrepancy (e.g., 9 were damaged)" style="width: 250px;"></textarea></td>';
         html += '</tr>';
     }
     
@@ -1800,7 +1607,7 @@ function showRecountModal(recountItems) {
                     </div>
                     <div class="modal-body">
                         <div class="alert alert-danger">
-                            <strong>Important:</strong> The following SKUs have discrepancies greater than 5 units.
+                            <strong>Important:</strong> The following SKUs have discrepancies greater than 3 units.
                             Please recount and enter the correct quantity.
                         </div>
                         ${html}
@@ -1830,7 +1637,6 @@ function showRecountModal(recountItems) {
                 }
             }
         });
-        
         input.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 this.blur();
@@ -1921,26 +1727,36 @@ function saveRecounts() {
         body: JSON.stringify({recounts: recounts})
     })
     .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            let modal = document.getElementById('recountModal');
-            if (modal) {
-                let bsModal = bootstrap.Modal.getInstance(modal);
-                if (bsModal) bsModal.hide();
-                modal.remove();
-            }
-            showToast('✓ Recounts saved successfully!', 'success');
-            // Stay on counting page - do NOT redirect to dashboard
-            // Just refresh the view
-            applyFilters();
-        } else {
-            alert('Error saving recounts');
-            if (saveBtn) {
-                saveBtn.disabled = false;
-                saveBtn.textContent = originalText;
-            }
+.then(data => {
+    if (data.success) {
+        let modal = document.getElementById('recountModal');
+        if (modal) {
+            let bsModal = bootstrap.Modal.getInstance(modal);
+            if (bsModal) bsModal.hide();
+            modal.remove();
         }
-    })
+        
+        // ============================================================
+        // FIX: Refresh SKU data to show updated Previous Count
+        // ============================================================
+        // Reload current SKUs to get updated data
+        if (filteredSkus.length > 0) {
+            const warehouse = document.getElementById('warehouse').value;
+            const dayCategory = document.getElementById('dayCategory').value;
+            const itemCategory = document.getElementById('itemCategory').value;
+            const search = document.getElementById('searchSku').value;
+            loadSkus(warehouse, dayCategory, itemCategory, search);
+        }
+        
+        completeCountingSession();
+    } else {
+        alert('Error saving recounts');
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalText;
+        }
+    }
+})
     .catch(error => {
         alert('Error: ' + error);
         if (saveBtn) {
@@ -1956,6 +1772,10 @@ function completeCountingSession() {
         return;
     }
     
+    // Set flag to prevent beforeunload prompt
+    isNavigatingAway = true;
+    hasUnsavedChanges = false;
+    
     fetch('/complete_counting', {
         method: 'POST',
         headers: {
@@ -1966,20 +1786,23 @@ function completeCountingSession() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showToast('✓ Counting session completed successfully!', 'success');
-            // Stay on counting page instead of redirecting to dashboard
+            alert('✓ Counting session completed successfully!');
+            // Reset session ID so a new session starts
             currentSessionId = null;
-            // Reset the session parameter in URL
-            const url = new URL(window.location);
-            url.searchParams.delete('session_id');
-            window.history.replaceState({}, '', url);
-            applyFilters();
+            // Clear all count inputs
+            document.querySelectorAll('.initial-count').forEach(input => {
+                input.value = '';
+            });
+            // Refresh the page to start fresh
+            location.reload();
         } else {
             alert(data.message || 'Error completing session');
+            isNavigatingAway = false;
         }
     })
     .catch(error => {
         alert('Error: ' + error);
+        isNavigatingAway = false;
     });
 }
 
@@ -1988,7 +1811,6 @@ function completeCounting() {
         alert('Please save counts first');
         return;
     }
-    
     fetch('/check_recount_status?session_id=' + currentSessionId)
         .then(response => response.json())
         .then(data => {
@@ -1996,7 +1818,6 @@ function completeCounting() {
                 alert(`Cannot complete session. You have ${data.count} pending recount(s) that need to be completed first.`);
                 return;
             }
-            
             if (confirm('Complete this counting session? This will mark all counts as final.')) {
                 completeCountingSession();
             }
@@ -2004,13 +1825,26 @@ function completeCounting() {
 }
 
 // ============================================
-// EVENT LISTENERS AND INITIALIZATION
+// COLUMN TOGGLE EVENT LISTENERS
+// ============================================
+
+function setupColumnToggle() {
+    document.querySelectorAll('.col-toggle').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const colKey = this.getAttribute('data-col');
+            const checked = this.checked;
+            toggleColumn(colKey, checked);
+        });
+    });
+}
+
+// ============================================
+// DOMContentLoaded EVENT
 // ============================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Load column visibility
     loadColumnVisibility();
-    setupColumnToggleDropdown();
+    setupColumnToggle();
     
     const warehouseSelect = document.getElementById('warehouse');
     const itemCategorySelect = document.getElementById('itemCategory');
@@ -2020,61 +1854,29 @@ document.addEventListener('DOMContentLoaded', function() {
     if (warehouseSelect) {
         warehouseSelect.addEventListener('change', function() {
             filterItemCategoriesByWarehouse();
-            // Apply filters immediately (auto-filter)
-            applyFilters();
+            onFilterChange();
         });
     }
-    
     if (itemCategorySelect) {
         itemCategorySelect.addEventListener('change', function() {
-            // When item category changes, update day categories
-            updateDayCategories();
-            // Auto-apply filters
-            applyFilters();
+            populateDayCategories();
+            onFilterChange();
         });
     }
-    
     if (dayCategorySelect) {
         dayCategorySelect.addEventListener('change', function() {
-            // When day category changes, update item categories (bi-directional)
-            updateItemCategoriesByDayCategory();
-            // Auto-apply filters
-            applyFilters();
+            populateItemCategories();
+            onFilterChange();
         });
     }
-    
     if (scannerModal) {
         scannerModal.addEventListener('hidden.bs.modal', function () {
             stopBarcodeScanner();
         });
     }
     
-    // Column toggle dropdown - handle checkbox clicks
-    document.querySelectorAll('#columnToggleMenu input[type="checkbox"]').forEach(cb => {
-        cb.addEventListener('change', function(e) {
-            e.stopPropagation();
-            const col = this.getAttribute('data-col');
-            if (col && COLUMN_CONFIG[col]) {
-                COLUMN_CONFIG[col].visible = this.checked;
-                saveColumnVisibility();
-                applyColumnVisibility();
-            }
-        });
-    });
-    
-    // Prevent dropdown from closing when clicking checkbox
-    document.querySelectorAll('#columnToggleMenu .dropdown-item').forEach(item => {
-        item.addEventListener('click', function(e) {
-            e.preventDefault();
-            const cb = this.querySelector('input[type="checkbox"]');
-            if (cb) {
-                cb.checked = !cb.checked;
-                cb.dispatchEvent(new Event('change'));
-            }
-        });
-    });
-    
-    filterItemCategoriesByWarehouse();
+    populateDayCategories();
+    populateItemCategories();
     setupSmartSearch();
     
     let sessionIdFromUrl = getUrlParameter('session_id');
@@ -2095,6 +1897,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 applyFilters();
             });
     }
+    setInterval(updateUnsavedStatus, 2000);
+    
+    // REMOVED: window.addEventListener('beforeunload', ...) 
+    // This was causing the "Leave site" prompt
 });
 </script>
 {% endblock %}
