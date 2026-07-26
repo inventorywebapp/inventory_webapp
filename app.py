@@ -1824,20 +1824,6 @@ def restore_database():
     
     return render_template('admin_restore.html')
 
-@app.route('/api/check_session_completed')
-@login_required
-def check_session_completed():
-    """Check if a session is completed"""
-    session_id = request.args.get('session_id')
-    if not session_id:
-        return jsonify({'is_completed': False})
-    
-    session = CountingSession.query.get(int(session_id))
-    if not session:
-        return jsonify({'is_completed': False})
-    
-    return jsonify({'is_completed': session.is_completed})
-
 # ============================================
 # MAIN ENTRY POINT
 # ============================================
