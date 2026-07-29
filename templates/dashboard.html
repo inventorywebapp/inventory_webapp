@@ -1,163 +1,169 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2 class="mb-4">Executive Dashboard</h2>
+<div class="container-fluid px-0 px-md-2">
+    <h2 class="mb-4 fw-bold">Executive Dashboard</h2>
 
-<!-- 1. KPI Cards -->
-<div class="row g-4 mb-4">
-    <div class="col-xl-3 col-md-6">
-        <div class="card h-100 shadow-sm border-0">
-            <div class="card-body d-flex align-items-center">
-                <div class="flex-shrink-0 bg-primary bg-opacity-10 rounded-circle p-3 me-3">
-                    <i class="bi bi-box-seam fs-3 text-primary"></i>
+    <!-- 1. KPI Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card h-100 shadow-sm border-0 rounded-4">
+                <div class="card-body d-flex align-items-center p-3">
+                    <div class="flex-shrink-0 bg-primary bg-opacity-10 rounded-circle p-3 me-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
+                        <i class="bi bi-box-seam fs-4 text-primary"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-0 small text-uppercase fw-semibold">Total Active SKUs</h6>
+                        <h3 class="mb-0 fw-bold fs-2">{{ total_skus }}</h3>
+                    </div>
                 </div>
-                <div>
-                    <h6 class="text-muted mb-1">Total Active SKUs</h6>
-                    <h3 class="mb-0 fw-bold">{{ total_skus }}</h3>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card h-100 shadow-sm border-0 rounded-4">
+                <div class="card-body d-flex align-items-center p-3">
+                    <div class="flex-shrink-0 bg-success bg-opacity-10 rounded-circle p-3 me-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
+                        <i class="bi bi-arrow-repeat fs-4 text-success"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-0 small text-uppercase fw-semibold">Active Sessions</h6>
+                        <h3 class="mb-0 fw-bold fs-2">{{ active_sessions_count }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card h-100 shadow-sm border-0 rounded-4">
+                <div class="card-body d-flex align-items-center p-3">
+                    <div class="flex-shrink-0 bg-warning bg-opacity-10 rounded-circle p-3 me-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
+                        <i class="bi bi-clock-history fs-4 text-warning"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-0 small text-uppercase fw-semibold">Latest Session</h6>
+                        {% if active_session_info %}
+                            <h6 class="mb-0 fw-bold text-truncate" style="max-width: 180px;">{{ active_session_info.session_date }}</h6>
+                        {% else %}
+                            <span class="badge bg-light text-muted fw-normal">None Active</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card h-100 shadow-sm border-0 rounded-4">
+                <div class="card-body p-3">
+                    <h6 class="text-muted mb-2 small text-uppercase fw-semibold">Quick Action</h6>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('counting') }}" class="btn btn-primary btn-sm rounded-3"><i class="bi bi-plus-circle me-1"></i> New Count</a>
+                        {% if active_session_info %}
+                            <a href="{{ url_for('continue_session', session_id=active_session_info.id) }}" class="btn btn-outline-warning btn-sm rounded-3"><i class="bi bi-play-circle me-1"></i> Continue</a>
+                        {% else %}
+                            <button class="btn btn-outline-secondary btn-sm rounded-3" disabled>No Active Session</button>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-xl-3 col-md-6">
-        <div class="card h-100 shadow-sm border-0">
-            <div class="card-body d-flex align-items-center">
-                <div class="flex-shrink-0 bg-success bg-opacity-10 rounded-circle p-3 me-3">
-                    <i class="bi bi-arrow-repeat fs-3 text-success"></i>
-                </div>
-                <div>
-                    <h6 class="text-muted mb-1">Active Sessions</h6>
-                    <h3 class="mb-0 fw-bold">{{ active_sessions_count }}</h3>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-xl-3 col-md-6">
-        <div class="card h-100 shadow-sm border-0">
-            <div class="card-body d-flex align-items-center">
-                <div class="flex-shrink-0 bg-warning bg-opacity-10 rounded-circle p-3 me-3">
-                    <i class="bi bi-clock-history fs-3 text-warning"></i>
-                </div>
-                <div>
-                    <h6 class="text-muted mb-1">Latest Session</h6>
-                    {% if active_session_info %}
-                        <h6 class="mb-0 fw-bold text-truncate" style="max-width: 150px;">{{ active_session_info.session_date }}</h6>
-                    {% else %}
-                        <span class="badge bg-light text-muted">None Active</span>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-xl-3 col-md-6">
-        <div class="card h-100 shadow-sm border-0">
-            <div class="card-body">
-                <h6 class="text-muted mb-2">Quick Action</h6>
-                <div class="d-grid gap-2">
-                    <a href="{{ url_for('counting') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle"></i> New Count</a>
-                    {% if active_session_info %}
-                        <a href="{{ url_for('continue_session', session_id=active_session_info.id) }}" class="btn btn-outline-warning btn-sm"><i class="bi bi-play-circle"></i> Continue</a>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
-<!-- 2. Week Progress Section -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-white border-0 py-3">
-                <div class="d-flex justify-content-between align-items-center">
+    <!-- 2. Week Progress Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-0 rounded-4">
+                <div class="card-header bg-white border-0 py-3 px-4 rounded-top-4">
                     <h5 class="fw-bold mb-0"><i class="bi bi-calendar-week text-primary me-2"></i>Weekly Count Progress</h5>
                 </div>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th class="ps-4">Day</th>
-                                <th>Total SKUs</th>
-                                <th>Completed</th>
-                                <th style="width: 35%;">Progress</th>
-                                <th class="pe-4 text-end">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for progress in day_category_progress %}
-                            <tr>
-                                <td class="ps-4 fw-bold">{{ progress.name }}</td>
-                                <td>{{ progress.total_skus }}</td>
-                                <td>{{ progress.completed_skus }}</td>
-                                <td>
-                                    <div class="progress" style="height: 8px; background-color: #e9ecef;">
-                                        <div class="progress-bar {% if progress.percentage == 100 %}bg-success{% elif progress.percentage >= 50 %}bg-info{% else %}bg-warning{% endif %}" 
-                                             role="progressbar" 
-                                             style="width: {{ progress.percentage }}%;" 
-                                             aria-valuenow="{{ progress.percentage }}" 
-                                             aria-valuemin="0" 
-                                             aria-valuemax="100">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4 py-3">Day</th>
+                                    <th class="py-3">Total SKUs</th>
+                                    <th class="py-3">Completed</th>
+                                    <th class="py-3" style="width: 40%;">Progress</th>
+                                    <th class="pe-4 py-3 text-end">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for progress in day_category_progress %}
+                                <tr>
+                                    <td class="ps-4 fw-bold py-3">{{ progress.name }}</td>
+                                    <td class="py-3">{{ progress.total_skus }}</td>
+                                    <td class="py-3">{{ progress.completed_skus }}</td>
+                                    <td class="py-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="progress flex-grow-1" style="height: 6px; background-color: #e9ecef;">
+                                                <div class="progress-bar {% if progress.percentage == 100 %}bg-success{% elif progress.percentage >= 50 %}bg-info{% else %}bg-warning{% endif %}" 
+                                                     role="progressbar" 
+                                                     style="width: {{ progress.percentage }}%;" 
+                                                     aria-valuenow="{{ progress.percentage }}" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="100">
+                                                </div>
+                                            </div>
+                                            <small class="text-muted ms-3 fw-semibold" style="min-width: 45px;">{{ "%.1f"|format(progress.percentage) }}%</small>
                                         </div>
+                                    </td>
+                                    <td class="pe-4 py-3 text-end">
+                                        {% if progress.percentage == 100 %}
+                                            <span class="badge bg-success rounded-pill px-3">Complete</span>
+                                        {% elif progress.completed_skus > 0 %}
+                                            <span class="badge bg-info rounded-pill px-3 text-white">Active</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary rounded-pill px-3">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. REMARKS BUBBLE MAP -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-0 rounded-4">
+                <div class="card-header bg-white border-0 py-3 px-4 rounded-top-4">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div>
+                            <h5 class="fw-bold mb-0"><i class="bi bi-chat-dots text-danger me-2"></i>Inventory Issue Hotspots</h5>
+                            <small class="text-muted d-block">Hover to analyze. <strong>Click</strong> a bubble to pin the breakdown.</small>
+                        </div>
+                        <div>
+                            <button id="exportRemarksBtn" class="btn btn-outline-danger btn-sm rounded-3">
+                                <i class="bi bi-download me-1"></i> Export Report
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-3 p-md-4">
+                    <div id="bubbleMapLoader" class="text-center py-5">
+                        <div class="spinner-border text-danger" role="status"></div>
+                        <p class="text-muted mt-2 mb-0">Analyzing inventory remarks...</p>
+                    </div>
+                    
+                    <div id="bubbleMapContainer" style="display: none;">
+                        <div class="row g-4">
+                            <!-- Left: Bubble Chart -->
+                            <div class="col-xl-8 col-lg-12">
+                                <div style="height: 450px; position: relative; min-height: 300px;">
+                                    <canvas id="remarksBubbleChart"></canvas>
+                                </div>
+                            </div>
+                            
+                            <!-- Right: Top 5 Breakdown Sidebar -->
+                            <div class="col-xl-4 col-lg-12">
+                                <div class="bg-light bg-opacity-50 p-3 rounded-4 border h-100">
+                                    <h6 class="fw-bold text-muted mb-3 border-bottom pb-2"><i class="bi bi-bar-chart-fill me-1"></i> Category Breakdown</h6>
+                                    <div id="issueBreakdownSidebar">
+                                        <p class="text-muted small mb-0">Hover over a bubble to preview.<br><strong>Click</strong> to pin the details here.</p>
                                     </div>
-                                    <small class="text-muted ms-2">{{ "%.1f"|format(progress.percentage) }}%</small>
-                                </td>
-                                <td class="pe-4 text-end">
-                                    {% if progress.percentage == 100 %}
-                                        <span class="badge bg-success rounded-pill">Complete</span>
-                                    {% elif progress.completed_skus > 0 %}
-                                        <span class="badge bg-info rounded-pill text-white">Active</span>
-                                    {% else %}
-                                        <span class="badge bg-secondary rounded-pill">Pending</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 3. REMARKS BUBBLE MAP (Grid Layout - 2 Columns on Desktop) -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-white border-0 py-3">
-                <div class="d-flex justify-content-between align-items-center flex-wrap">
-                    <div>
-                        <h5 class="fw-bold mb-0"><i class="bi bi-chat-dots text-danger me-2"></i>Inventory Issue Hotspots</h5>
-                        <small class="text-muted">Hover to analyze. <strong>Click</strong> a bubble to pin the breakdown.</small>
-                    </div>
-                    <div class="mt-2 mt-sm-0">
-                        <button id="exportRemarksBtn" class="btn btn-outline-danger btn-sm">
-                            <i class="bi bi-download"></i> Export Detailed Report
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <div class="card-body">
-                <div id="bubbleMapLoader" class="text-center py-5">
-                    <div class="spinner-border text-danger" role="status"></div>
-                    <p class="text-muted mt-2">Analyzing inventory remarks...</p>
-                </div>
-                
-                <div id="bubbleMapContainer" style="display: none;">
-                    <div class="row g-3">
-                        <!-- Left: Bubble Chart -->
-                        <div class="col-lg-8 col-md-12">
-                            <div style="height: 450px; position: relative;">
-                                <canvas id="remarksBubbleChart"></canvas>
-                            </div>
-                        </div>
-                        
-                        <!-- Right: Top 5 Breakdown Sidebar -->
-                        <div class="col-lg-4 col-md-12 border-start-lg">
-                            <h6 class="fw-bold text-muted mb-3"><i class="bi bi-bar-chart-fill me-1"></i> Category Breakdown</h6>
-                            <div id="issueBreakdownSidebar">
-                                <p class="text-muted small">Hover over a bubble to preview.<br><strong>Click</strong> to pin the details here.</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -165,42 +171,42 @@
             </div>
         </div>
     </div>
-</div>
 
-<!-- 4. Sidebar Info -->
-<div class="row g-4">
-    <div class="col-lg-6">
-        <div class="card shadow-sm border-0 h-100">
-            <div class="card-header bg-white border-0 py-3">
-                <h6 class="fw-bold mb-0"><i class="bi bi-house-door me-2"></i>Warehouses</h6>
-            </div>
-            <div class="card-body">
-                <ul class="list-group list-group-flush">
-                    {% for warehouse in warehouses %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        {{ warehouse }}
-                        <span class="badge bg-light text-dark rounded-pill">Active</span>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-6">
-        <div class="card shadow-sm border-0 h-100">
-            <div class="card-header bg-white border-0 py-3">
-                <div class="d-flex justify-content-between">
-                    <h6 class="fw-bold mb-0"><i class="bi bi-tags me-2"></i>Categories</h6>
-                    <small class="text-muted">{{ item_categories|length }} Items</small>
+    <!-- 4. Sidebar Info -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0 h-100 rounded-4">
+                <div class="card-header bg-white border-0 py-3 px-4 rounded-top-4">
+                    <h6 class="fw-bold mb-0"><i class="bi bi-house-door me-2"></i>Warehouses</h6>
+                </div>
+                <div class="card-body p-3">
+                    <ul class="list-group list-group-flush rounded-3">
+                        {% for warehouse in warehouses %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-3 py-2">
+                            {{ warehouse }}
+                            <span class="badge bg-light text-dark rounded-pill fw-normal">Active</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
                 </div>
             </div>
-            <div class="card-body" style="max-height: 300px; overflow-y: auto;">
-                <div class="row g-2">
-                    {% for cat in item_categories %}
-                    <div class="col-md-6 col-xl-4">
-                        <span class="badge bg-light text-dark border w-100 text-start py-2 px-3">{{ cat }}</span>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0 h-100 rounded-4">
+                <div class="card-header bg-white border-0 py-3 px-4 rounded-top-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="fw-bold mb-0"><i class="bi bi-tags me-2"></i>Categories</h6>
+                        <small class="text-muted fw-semibold">{{ item_categories|length }} Items</small>
                     </div>
-                    {% endfor %}
+                </div>
+                <div class="card-body p-3" style="max-height: 250px; overflow-y: auto;">
+                    <div class="row g-2">
+                        {% for cat in item_categories %}
+                        <div class="col-md-6 col-xl-4">
+                            <span class="badge bg-light text-dark border w-100 text-start py-2 px-3 fw-normal rounded-3">{{ cat }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
         </div>
@@ -227,9 +233,9 @@ function fetchBubbleData() {
             
             if(!data.success || data.data.length === 0) {
                 document.getElementById('bubbleMapContainer').innerHTML = `
-                    <div class="alert alert-light text-center py-5 border">
+                    <div class="alert alert-light text-center py-5 border rounded-4">
                         <i class="bi bi-check-circle text-success fs-1"></i>
-                        <p class="mt-3 text-muted">No inventory issues reported yet! Everything is running smoothly.</p>
+                        <p class="mt-3 text-muted mb-0">No inventory issues reported yet! Everything is running smoothly.</p>
                     </div>
                 `;
                 document.getElementById('exportRemarksBtn').style.display = 'none';
@@ -238,15 +244,14 @@ function fetchBubbleData() {
             
             renderBubbleChart(data.data);
             
-            // Setup Export Button
             document.getElementById('exportRemarksBtn').onclick = function() {
                 exportDetailedIssues(data.data);
             };
         })
         .catch(error => {
             document.getElementById('bubbleMapLoader').innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="bi bi-exclamation-triangle"></i> Error loading analytics: ${error.message}
+                <div class="alert alert-danger rounded-4">
+                    <i class="bi bi-exclamation-triangle me-2"></i> Error loading analytics: ${error.message}
                 </div>
             `;
         });
@@ -255,7 +260,6 @@ function fetchBubbleData() {
 function renderBubbleChart(issuesData) {
     const ctx = document.getElementById('remarksBubbleChart').getContext('2d');
     
-    // Destroy previous chart if exists
     if (bubbleChartInstance) {
         bubbleChartInstance.destroy();
     }
@@ -279,7 +283,7 @@ function renderBubbleChart(issuesData) {
         hoverBackgroundColor: issuesData.map(item => item.color)
     }];
 
-    // 2. Custom Plugin to Draw Labels INSIDE the Bubbles (Responsive)
+    // 2. Custom Plugin: Smart Contrast Text Renderer
     const bubbleLabelPlugin = {
         id: 'bubbleLabelPlugin',
         afterDraw: (chart) => {
@@ -289,17 +293,25 @@ function renderBubbleChart(issuesData) {
                 meta.data.forEach((element, index) => {
                     const data = dataset.data[index];
                     const radius = element.options.radius;
-                    // Responsive font size: 10% of radius, but not less than 8px and not more than 20px
                     const fontSize = Math.max(8, Math.min(20, radius * 0.35));
                     
-                    ctx.font = `${fontSize}px 'Inter', sans-serif`;
-                    ctx.fillStyle = '#ffffff';
-                    ctx.shadowColor = 'rgba(0,0,0,0.7)';
-                    ctx.shadowBlur = 6;
+                    // Smart Contrast Logic
+                    const hex = data.color.replace('#', '');
+                    const r = parseInt(hex.substring(0, 2), 16);
+                    const g = parseInt(hex.substring(2, 4), 16);
+                    const b = parseInt(hex.substring(4, 6), 16);
+                    const brightness = (r * 0.299) + (g * 0.587) + (b * 0.114);
+                    
+                    const textColor = brightness > 160 ? '#1a1a2e' : '#ffffff';
+                    const shadowColor = brightness > 160 ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)';
+                    
+                    ctx.font = `${fontSize}px 'Inter', -apple-system, sans-serif`;
+                    ctx.fillStyle = textColor;
+                    ctx.shadowColor = shadowColor;
+                    ctx.shadowBlur = 4;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     
-                    // Wrap text if bubble is large enough
                     const text = data.label;
                     if (text.length > 6 && radius > 25) {
                         const mid = Math.ceil(text.length / 2);
@@ -308,7 +320,7 @@ function renderBubbleChart(issuesData) {
                     } else {
                         ctx.fillText(text, element.x, element.y);
                     }
-                    ctx.shadowBlur = 0; // Reset shadow
+                    ctx.shadowBlur = 0;
                 });
             });
         }
@@ -320,15 +332,14 @@ function renderBubbleChart(issuesData) {
     function updateSidebar(data, isPinned = false) {
         const sidebar = document.getElementById('issueBreakdownSidebar');
         if(!data) {
-            sidebar.innerHTML = `<p class="text-muted small">Hover over a bubble to preview.<br><strong>Click</strong> to pin the details here.</p>`;
+            sidebar.innerHTML = `<p class="text-muted small mb-0">Hover over a bubble to preview.<br><strong>Click</strong> to pin the details here.</p>`;
             return;
         }
 
-        let html = `<div class="alert alert-danger py-2 mb-2 d-flex justify-content-between align-items-center">
-            <strong>${data.label}</strong> <span class="badge bg-light text-dark">${data.count} Total</span>
+        let html = `<div class="alert alert-danger py-2 mb-3 d-flex justify-content-between align-items-center rounded-3">
+            <strong>${data.label}</strong> <span class="badge bg-light text-dark rounded-pill">${data.count} Total</span>
         </div>`;
         
-        // Calculate percentages and break down
         const sorted = Object.entries(data.breakdown).sort((a,b) => b[1]-a[1]);
         const total = data.count;
         let top5 = sorted.slice(0, 5);
@@ -341,36 +352,33 @@ function renderBubbleChart(issuesData) {
             remainingPercent = ((remainingCount / total) * 100).toFixed(1);
         }
 
-        html += `<ul class="list-group list-group-flush mt-2">`;
-        // Render Top 5
+        html += `<ul class="list-group list-group-flush mt-2 mb-2">`;
         top5.forEach(([cat, count]) => {
             const percent = ((count / total) * 100).toFixed(1);
             html += `
-                <li class="list-group-item d-flex justify-content-between align-items-center px-0 border-0 py-1">
-                    <span class="small text-truncate" style="max-width: 140px;">${cat}</span>
-                    <span class="badge bg-primary rounded-pill">${percent}%</span>
+                <li class="list-group-item d-flex justify-content-between align-items-center px-0 border-0 py-1 bg-transparent">
+                    <span class="small text-truncate me-2" style="max-width: 140px;">${cat}</span>
+                    <span class="badge bg-primary rounded-pill fw-normal">${percent}%</span>
                 </li>
             `;
         });
 
-        // Render "Others" if applicable
         if (sorted.length > 5) {
             html += `
-                <li class="list-group-item d-flex justify-content-between align-items-center px-0 border-0 py-1 text-muted">
-                    <span class="small text-truncate" style="max-width: 140px;">Others</span>
-                    <span class="badge bg-secondary rounded-pill">${remainingPercent}%</span>
+                <li class="list-group-item d-flex justify-content-between align-items-center px-0 border-0 py-1 text-muted bg-transparent">
+                    <span class="small text-truncate me-2" style="max-width: 140px;">Others</span>
+                    <span class="badge bg-secondary rounded-pill fw-normal">${remainingPercent}%</span>
                 </li>
             `;
         }
         html += `</ul>`;
         
         if(isPinned) {
-            html += `<div class="text-end mt-1"><button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="unpinSidebar()">Unpin</button></div>`;
+            html += `<div class="text-end mt-1"><button class="btn btn-sm btn-outline-secondary py-0 px-3 rounded-pill transition-opacity" onclick="unpinSidebar()">Unpin</button></div>`;
         }
         sidebar.innerHTML = html;
     }
 
-    // Expose unpin function globally so HTML button can call it
     window.unpinSidebar = function() {
         pinnedIssue = null;
         updateSidebar(null);
@@ -397,16 +405,11 @@ function renderBubbleChart(issuesData) {
                     titleFont: { size: 14, weight: 'bold' },
                     bodyFont: { size: 12 },
                     callbacks: {
-                        title: function(items) {
-                            return items[0].raw.label;
-                        },
-                        label: function(context) {
-                            const raw = context.raw;
-                            return `Occurrences: ${raw.count}`;
-                        },
+                        title: function(items) { return items[0].raw.label; },
+                        label: function(context) { return `Occurrences: ${context.raw.count}`; },
                         afterBody: function(items) {
                             const raw = items[0].raw;
-                            let text = "Top 5 Categories:";
+                            let text = "Top Categories:";
                             if(raw.top_5 && raw.top_5.length > 0) {
                                 raw.top_5.forEach(cat => {
                                     const percent = ((cat[1] / raw.count) * 100).toFixed(1);
@@ -431,7 +434,6 @@ function renderBubbleChart(issuesData) {
                     ticks: { stepSize: 2 }
                 }
             },
-            // Handle Hover & Click
             onClick: function(event, elements) {
                 if(elements.length > 0) {
                     const data = elements[0].element.$context.raw;
@@ -448,36 +450,26 @@ function renderBubbleChart(issuesData) {
                 }
             }
         },
-        plugins: [bubbleLabelPlugin] // Add the label renderer
+        plugins: [bubbleLabelPlugin]
     });
 }
 
 function exportDetailedIssues(issuesData) {
-    // Build 3 Sections: Summary, Item Breakdown, SKU Details
-    let csvContent = "=== ISSUE SUMMARY ===\n";
-    csvContent += "Issue,Total Occurrences\n";
+    let csvContent = "=== ISSUE SUMMARY ===\nIssue,Total Occurrences\n";
+    issuesData.forEach(item => { csvContent += `"${item.label}",${item.count}\n`; });
     
-    issuesData.forEach(item => {
-        csvContent += `"${item.label}",${item.count}\n`;
-    });
-    
-    csvContent += "\n\n=== CATEGORY BREAKDOWN (Top 5) ===\n";
-    csvContent += "Issue,Item Category,Count,Percentage\n";
-    
+    csvContent += "\n\n=== CATEGORY BREAKDOWN (Top 5) ===\nIssue,Item Category,Count,Percentage\n";
     issuesData.forEach(item => {
         const total = item.count;
         const sortedCats = Object.entries(item.breakdown).sort((a,b) => b[1]-a[1]);
         const top5 = sortedCats.slice(0, 5);
-        
         top5.forEach(([cat, count]) => {
             const percent = ((count / total) * 100).toFixed(1);
             csvContent += `"${item.label}","${cat}",${count},${percent}%\n`;
         });
     });
     
-    csvContent += "\n\n=== DETAILED SKU REPORT ===\n";
-    csvContent += "SKU,Item Category,Issue Type,Original Remark\n";
-    
+    csvContent += "\n\n=== DETAILED SKU REPORT ===\nSKU,Item Category,Issue Type,Original Remark\n";
     issuesData.forEach(item => {
         if(item.sku_details && item.sku_details.length > 0) {
             item.sku_details.forEach(detail => {
