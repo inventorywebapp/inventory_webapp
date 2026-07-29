@@ -274,11 +274,14 @@ function renderBubbleChart(issuesData) {
         })),
         backgroundColor: issuesData.map(item => item.color + '80'),
         borderColor: issuesData.map(item => item.color),
-        borderWidth: 2
+        borderWidth: 2,
+        // FIX: Prevent Chart.js from changing size on hover
+        hoverRadius: (context) => context.raw.r,
+        hoverBorderWidth: 4 
     }];
 
     // =========================================================
-    // ULTIMATE BULLETPROOF TOOLTIP (Forces rendering on top)
+    // FIX: BULLETPROOF TOOLTIP (No flicker, always on top)
     // =========================================================
     const customTooltip = {
         id: 'customTooltip',
@@ -298,21 +301,16 @@ function renderBubbleChart(issuesData) {
                 breakdownHtml += `<div class="d-flex justify-content-between"><span>${cat}</span><span class="fw-bold">${count} (${percent}%)</span></div>`;
             });
 
-            // Find chart position on screen to guarantee exact location
-            const rect = chart.canvas.getBoundingClientRect();
-            const x = rect.left + tooltipModel.caretX;
-            const y = rect.top + tooltipModel.caretY;
-
             const tooltip = document.createElement('div');
             tooltip.id = 'bubble-tooltip';
-            // Inject directly into the BODY, not the chart container, to bypass z-index restrictions
+            // USING position: fixed PREVENTS IT FROM BEING CLIPPED BY THE CARD
             tooltip.style.cssText = `
                 position: fixed; 
                 background: #1a1a2e; color: white; padding: 15px; 
                 border-radius: 12px; pointer-events: none; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-                max-width: 280px; font-size: 0.9rem; z-index: 999999 !important;
-                left: ${x + 15}px; 
-                top: ${y + 15}px;
+                max-width: 280px; font-size: 0.9rem; z-index: 10000;
+                left: ${tooltipModel.caretX + 15}px; 
+                top: ${tooltipModel.caretY + 15}px;
                 transform: none;
             `;
             
@@ -322,7 +320,7 @@ function renderBubbleChart(issuesData) {
                 <div class="small">Breakdown by Category:</div>
                 ${breakdownHtml}
             `;
-            document.body.appendChild(tooltip);
+            chart.canvas.parentNode.appendChild(tooltip);
         }
     };
 
@@ -332,6 +330,11 @@ function renderBubbleChart(issuesData) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: {
+                // FIX: Explicitly disable Chart.js hover animations
+                mode: null,
+                intersect: false
+            },
             plugins: {
                 legend: { display: false },
                 tooltip: { enabled: false }
@@ -343,6 +346,12 @@ function renderBubbleChart(issuesData) {
                     title: { display: true, text: 'Frequency Count', color: '#6c757d' }, 
                     grid: { color: '#f0f0f0' },
                     ticks: { stepSize: 2 }
+                }
+            },
+            elements: {
+                point: {
+                    // FIX: Keep the radius hard-coded to prevent zoom effect
+                    radius: (context) => context.raw.r
                 }
             }
         },
