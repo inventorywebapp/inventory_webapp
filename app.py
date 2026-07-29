@@ -307,63 +307,57 @@ def dashboard():
 def api_dashboard_remarks_analytics():
     """Returns analytics for the remark bubbles (Hardcoded only)"""
     try:
-        # 1. Fetch ALL count records that have remarks (In-Progress OR Completed)
+        # 1. Fetch ALL count records that have remarks
         records = db.session.query(CountRecord).filter(
             CountRecord.remarks != None,
             CountRecord.remarks != ''
         ).all()
 
         issue_counts = {}
-        issue_items = {}  # Store SKU breakdown per issue
-        issue_sku_details = {} # Store exact details for export
+        issue_items = {}  
+        issue_sku_details = {} 
         
-        # 2. Loop through remarks and parse
+        # 2. DEFINE PARSER OUTSIDE THE LOOP (This was the bug!)
+        def parse_remarks(text):
+            if not text or not isinstance(text, str):
+                return []
+            text_lower = text.lower()
+            found_issues = set()
+            
+            mapping = {
+                'damage': ['damage', 'damaged'],
+                'scratches': ['scratches', 'scratch', 'scratched'],
+                'no screw': ['no screw', 'missing screw', 'screw missing', 'no scews'],
+                'wrong embroidery': ['wrong embroidery', 'embroidery wrong', 'embroid wrong'],
+                'wrong design': ['wrong design', 'different design', 'design wrong'],
+                'detached logo': ['detached logo', 'logo detached'],
+                'no adhesive': ['no adhesive', 'adhesive missing', 'missing adhesive'],
+                'no logo': ['no logo', 'logo missing', 'missing logo'],
+                'cracked': ['cracked', 'crack'],
+                'rusty': ['rusty', 'rust', 'corroded'],
+                'wobbly': ['wobbly', 'loose', 'unstable'],
+                'hold': ['hold', 'holding', 'on hold'],
+                'BTI': ['bti', 'b.t.i'],
+                'transfer stock': ['transfer stock', 'stock transfer', 'transfer'],
+                'fading': ['fading', 'fade', 'color fade'],
+                'loose/wrong fittings': ['loose fittings', 'wrong fittings', 'fitting loose', 'loose/wrong'],
+                'dented': ['dented', 'dent', 'dents']
+            }
+            
+            for standard_issue, synonyms in mapping.items():
+                for synonym in synonyms:
+                    if synonym in text_lower:
+                        found_issues.add(standard_issue)
+                        break
+            return list(found_issues)
+
+        # 3. Process records safely
         for record in records:
             if not record.remarks or not record.sku:
                 continue
             
-            # ============================================================
-            # FIX: Manually create the parser function inline if needed
-            # ============================================================
-            def parse_local_remarks(text):
-                if not text or not isinstance(text, str):
-                    return []
-                text_lower = text.lower()
-                found_issues = set()
-                
-                mapping = {
-                    'damage': ['damage', 'damaged'],
-                    'scratches': ['scratches', 'scratch', 'scratched'],
-                    'no screw': ['no screw', 'missing screw', 'screw missing', 'no scews'],
-                    'wrong embroidery': ['wrong embroidery', 'embroidery wrong', 'embroid wrong'],
-                    'wrong design': ['wrong design', 'different design', 'design wrong'],
-                    'detached logo': ['detached logo', 'logo detached'],
-                    'no adhesive': ['no adhesive', 'adhesive missing', 'missing adhesive'],
-                    'no logo': ['no logo', 'logo missing', 'missing logo'],
-                    'cracked': ['cracked', 'crack'],
-                    'rusty': ['rusty', 'rust', 'corroded'],
-                    'wobbly': ['wobbly', 'loose', 'unstable'],
-                    'hold': ['hold', 'holding', 'on hold'],
-                    'BTI': ['bti', 'b.t.i'],
-                    'transfer stock': ['transfer stock', 'stock transfer', 'transfer'],
-                    'fading': ['fading', 'fade', 'color fade'],
-                    'loose/wrong fittings': ['loose fittings', 'wrong fittings', 'fitting loose', 'loose/wrong'],
-                    'dented': ['dented', 'dent', 'dents']
-                }
-                
-                # Check for hardcoded matches
-                for standard_issue, synonyms in mapping.items():
-                    for synonym in synonyms:
-                        if synonym in text_lower:
-                            found_issues.add(standard_issue)
-                            break
-                
-                return list(found_issues)
-
-            # Run the inline function (No external dependency needed)
-            issues = parse_local_remarks(record.remarks)
+            issues = parse_remarks(record.remarks)
             
-            # CRITICAL: Hardcoded Whitelist
             ALLOWED_ISSUES = {
                 'damage', 'scratches', 'no screw', 'wrong embroidery', 
                 'wrong design', 'detached logo', 'no adhesive', 'no logo', 
@@ -372,11 +366,10 @@ def api_dashboard_remarks_analytics():
                 'loose/wrong fittings', 'dented'
             }
             
-            # Filter out dynamic words that aren't in the hardcoded list
             filtered_issues = [issue for issue in issues if issue in ALLOWED_ISSUES]
             
             if not filtered_issues:
-                continue # Skip if it matches nothing in our hardcoded list
+                continue
 
             sku_desc = record.sku.description or 'Uncategorized'
             sku_name = record.sku.sku
@@ -389,19 +382,17 @@ def api_dashboard_remarks_analytics():
                 
                 issue_counts[issue] += 1
                 
-                # Track category breakdown
                 if sku_desc not in issue_items[issue]:
                     issue_items[issue][sku_desc] = 0
                 issue_items[issue][sku_desc] += 1
                 
-                # Track exact SKU and Remark for Export
                 issue_sku_details[issue].append({
                     'sku': sku_name,
                     'category': sku_desc,
                     'remark': record.remarks
                 })
 
-        # 3. Format data for the frontend Chart.js Bubble chart
+        # 4. Format data for Chart.js
         bubble_data = []
         for issue, count in issue_counts.items():
             radius = min(10 + (count * 2), 60)
@@ -410,7 +401,6 @@ def api_dashboard_remarks_analytics():
             hash_val = int(hashlib.md5(issue.encode()).hexdigest()[:6], 16) % 0xFFFFFF
             color = f"#{hash_val:06x}"
             
-            # Sort breakdown for top 5 calculation
             sorted_breakdown = sorted(issue_items[issue].items(), key=lambda x: x[1], reverse=True)
             
             bubble_data.append({
@@ -419,11 +409,10 @@ def api_dashboard_remarks_analytics():
                 'radius': radius,
                 'color': color,
                 'breakdown': issue_items[issue],
-                'sorted_breakdown': sorted_breakdown, # Pre-sorted for frontend
-                'sku_details': issue_sku_details[issue] # For Detailed Export
+                'sorted_breakdown': sorted_breakdown,
+                'sku_details': issue_sku_details[issue]
             })
         
-        # Sort by count descending (biggest problem first)
         bubble_data.sort(key=lambda x: x['count'], reverse=True)
         
         return jsonify({
@@ -434,8 +423,6 @@ def api_dashboard_remarks_analytics():
         
     except Exception as e:
         print(f"Dashboard API Error: {str(e)}", file=sys.stderr)
-        import traceback
-        traceback.print_exc(file=sys.stderr)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
