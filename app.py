@@ -300,12 +300,12 @@ def dashboard():
 
 
 # ============================================
-# NEW: DASHBOARD API FOR REMARKS BUBBLE MAP (UPDATED)
+# DASHBOARD API FOR REMARKS BUBBLE MAP (HARDCODED ONLY, NO DYNAMIC)
 # ============================================
 @app.route('/api/dashboard_remarks_analytics')
 @login_required
 def api_dashboard_remarks_analytics():
-    """Returns analytics for the remark bubbles (Hardcoded + Dynamic)"""
+    """Returns analytics for the remark bubbles (Hardcoded only)"""
     try:
         # 1. Fetch ALL count records that have remarks (In-Progress OR Completed)
         records = db.session.query(CountRecord).filter(
@@ -315,21 +315,38 @@ def api_dashboard_remarks_analytics():
 
         issue_counts = {}
         issue_items = {}  # Store SKU breakdown per issue
+        issue_sku_details = {} # Store exact details for export
         
         # 2. Loop through remarks and parse
         for record in records:
             if not record.remarks or not record.sku:
                 continue
             
-            # Use the hybrid parser from utils
+            # Use the hybrid parser from utils - BUT we will filter them below
             issues = parse_hybrid_remarks(record.remarks)
             
-            sku_desc = record.sku.description or 'Uncategorized'
+            # CRITICAL: Hardcoded Whitelist
+            # ONLY keep these specific issues. If a user types something else, ignore it.
+            ALLOWED_ISSUES = {
+                'damage', 'scratches', 'no screw', 'wrong embroidery', 
+                'wrong design', 'detached logo', 'no adhesive', 'no logo', 
+                'cracked', 'rusty', 'wobbly'
+            }
             
-            for issue in issues:
+            # Filter out dynamic words that aren't in the hardcoded list
+            filtered_issues = [issue for issue in issues if issue in ALLOWED_ISSUES]
+            
+            if not filtered_issues:
+                continue # Skip if it matches nothing in our hardcoded list
+
+            sku_desc = record.sku.description or 'Uncategorized'
+            sku_name = record.sku.sku
+            
+            for issue in filtered_issues:
                 if issue not in issue_counts:
                     issue_counts[issue] = 0
                     issue_items[issue] = {}
+                    issue_sku_details[issue] = []
                 
                 issue_counts[issue] += 1
                 
@@ -337,24 +354,34 @@ def api_dashboard_remarks_analytics():
                 if sku_desc not in issue_items[issue]:
                     issue_items[issue][sku_desc] = 0
                 issue_items[issue][sku_desc] += 1
+                
+                # Track exact SKU and Remark for Export
+                issue_sku_details[issue].append({
+                    'sku': sku_name,
+                    'category': sku_desc,
+                    'remark': record.remarks
+                })
 
         # 3. Format data for the frontend Chart.js Bubble chart
         bubble_data = []
         for issue, count in issue_counts.items():
-            # Determine bubble size (cap at 80 to prevent huge bubbles)
             radius = min(10 + (count * 2), 60)
             
-            # Generate random but visually appealing color based on issue name
             import hashlib
             hash_val = int(hashlib.md5(issue.encode()).hexdigest()[:6], 16) % 0xFFFFFF
             color = f"#{hash_val:06x}"
+            
+            # Sort breakdown for top 5 calculation
+            sorted_breakdown = sorted(issue_items[issue].items(), key=lambda x: x[1], reverse=True)
             
             bubble_data.append({
                 'label': issue,
                 'count': count,
                 'radius': radius,
                 'color': color,
-                'breakdown': issue_items[issue]
+                'breakdown': issue_items[issue],
+                'sorted_breakdown': sorted_breakdown, # Pre-sorted for frontend
+                'sku_details': issue_sku_details[issue] # For Detailed Export
             })
         
         # Sort by count descending (biggest problem first)
@@ -433,16 +460,9 @@ def get_skus():
             else:
                 count_time_naive = None
             
-            # ============================================================
-            # FIX: Properly handle count values (including 0)
-            # If recount was completed, use recount_count as final.
-            # Otherwise, use initial_count (even if it's 0).
-            # ============================================================
             if latest_record.recount_completed:
-                # Use recount_count (could be 0)
                 final_count_value = latest_record.recount_count
             else:
-                # Use initial_count (could be 0) - this is the "Previous Count"
                 final_count_value = latest_record.initial_count
             
             session = CountingSession.query.get(latest_record.session_id)
@@ -1047,10 +1067,6 @@ def export_counts():
                 sheets_data[day_category] = []
             
             if count_record and session_obj:
-                # ============================================================
-                # FIX: Properly handle recount count of 0 in export
-                # ============================================================
-                # If recount was completed, use recount_count as final (even if 0)
                 if count_record.recount_completed:
                     final_count = count_record.recount_count
                 elif count_record.recount_count and count_record.recount_count > 0:
@@ -1064,7 +1080,6 @@ def export_counts():
                     'Day Category': str(day_category),
                     'Count Status': 'COMPLETED',
                     'Initial Count': count_record.initial_count,
-                    # FIX: Only show recount count if recount was actually performed
                     'Recount Count': count_record.recount_count if (count_record.recount_completed and count_record.recount_count is not None) else '',
                     'Final Count': final_count,
                     'Remarks': str(count_record.remarks) if count_record.remarks else '',
@@ -1378,13 +1393,9 @@ def get_in_progress_skus(session_id):
         ).order_by(CountRecord.version.desc()).first()
         
         if sku and latest_record:
-            # ============================================================
-            # FIX: Correctly handle final count = 0
-            # ============================================================
             if latest_record.recount_completed:
                 final_count = latest_record.recount_count
             else:
-                # Use initial_count even if it's 0
                 final_count = latest_record.initial_count
             
             skus_data.append({
