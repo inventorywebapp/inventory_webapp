@@ -414,12 +414,11 @@ def get_skus():
 def api_dashboard_remarks_analytics():
     """Returns analytics for the remark bubbles (Hardcoded + Dynamic)"""
     try:
-        # 1. Fetch ALL completed count records that have remarks
-        # Joining tables to ensure we only get SKUs belonging to completed sessions
-        records = db.session.query(CountRecord).join(
-            CountingSession
-        ).filter(
-            CountingSession.is_completed == True,
+        # ================================================================
+        # FIX: Removed the 'CountingSession.is_completed == True' filter.
+        # It now analyzes ALL count records that have remarks.
+        # ================================================================
+        records = db.session.query(CountRecord).filter(
             CountRecord.remarks != None,
             CountRecord.remarks != ''
         ).all()
@@ -432,8 +431,14 @@ def api_dashboard_remarks_analytics():
             if not record.remarks or not record.sku:
                 continue
             
-            # Use the hybrid parser from utils
-            issues = parse_hybrid_remarks(record.remarks)
+            # ================================================================
+            # FIX: Strip ALL numbers from the remark string BEFORE parsing.
+            # This ensures "7 damaged" becomes just "damaged", and "scratch 3" becomes "scratch".
+            # ================================================================
+            cleaned_remark = re.sub(r'\d+', '', record.remarks)
+            
+            # Use the hybrid parser from utils (on the cleaned remark)
+            issues = parse_hybrid_remarks(cleaned_remark)
             
             sku_desc = record.sku.description or 'Uncategorized'
             
