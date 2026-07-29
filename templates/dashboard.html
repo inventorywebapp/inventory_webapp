@@ -213,6 +213,11 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 
 <script>
+// ============================================
+// REGISTER DATALABELS PLUGIN GLOBALLY
+// ============================================
+Chart.register(ChartDataLabels);
+
 document.addEventListener('DOMContentLoaded', function() {
     fetchBubbleData();
 });
@@ -274,22 +279,19 @@ function renderBubbleChart(issuesData) {
         })),
         backgroundColor: issuesData.map(item => item.color + '80'),
         borderColor: issuesData.map(item => item.color),
-        borderWidth: 2,
-        // FIX: Prevent Chart.js from changing size on hover
-        hoverRadius: (context) => context.raw.r,
-        hoverBorderWidth: 4 
+        borderWidth: 2
     }];
 
     // =========================================================
-    // FIX: BULLETPROOF TOOLTIP (No flicker, always on top)
+    // NEW: EXTERNAL TOOLTIP (Standard Chart.js Approach)
     // =========================================================
-    const customTooltip = {
-        id: 'customTooltip',
+    const externalTooltip = {
+        id: 'externalTooltip',
         beforeDraw: (chart) => {
             const tooltipEl = document.getElementById('bubble-tooltip');
             if (tooltipEl) tooltipEl.remove();
         },
-        afterDraw: (chart) => {
+        afterExternalDraw: (chart) => {
             const tooltipModel = chart.tooltip;
             if (!tooltipModel || tooltipModel.opacity === 0) return;
             
@@ -303,7 +305,6 @@ function renderBubbleChart(issuesData) {
 
             const tooltip = document.createElement('div');
             tooltip.id = 'bubble-tooltip';
-            // USING position: fixed PREVENTS IT FROM BEING CLIPPED BY THE CARD
             tooltip.style.cssText = `
                 position: fixed; 
                 background: #1a1a2e; color: white; padding: 15px; 
@@ -330,14 +331,29 @@ function renderBubbleChart(issuesData) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            interaction: {
-                // FIX: Explicitly disable Chart.js hover animations
-                mode: null,
-                intersect: false
-            },
             plugins: {
                 legend: { display: false },
-                tooltip: { enabled: false }
+                // ENABLE CHART.JS NATIVE TOOLTIP ENGINE
+                tooltip: { 
+                    enabled: false,
+                    external: externalTooltip.afterExternalDraw
+                },
+                // ADD LABELS TO THE BUBBLES
+                datalabels: {
+                    color: '#ffffff',
+                    font: {
+                        weight: 'bold',
+                        size: 12
+                    },
+                    textShadowColor: 'rgba(0,0,0,0.7)',
+                    textShadowBlur: 4,
+                    display: function(context) {
+                        return context.dataset.data[context.dataIndex].r > 15;
+                    },
+                    formatter: function(value) {
+                        return value.label.length > 12 ? value.label.substring(0, 12) + '..' : value.label;
+                    }
+                }
             },
             scales: {
                 x: { display: false, min: -2, max: 25 },
@@ -347,15 +363,9 @@ function renderBubbleChart(issuesData) {
                     grid: { color: '#f0f0f0' },
                     ticks: { stepSize: 2 }
                 }
-            },
-            elements: {
-                point: {
-                    // FIX: Keep the radius hard-coded to prevent zoom effect
-                    radius: (context) => context.raw.r
-                }
             }
         },
-        plugins: [customTooltip]
+        plugins: [externalTooltip]
     });
 }
 
