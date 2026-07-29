@@ -277,7 +277,9 @@ function renderBubbleChart(issuesData) {
         borderWidth: 2
     }];
 
-    // Stable Tooltip using 'external' mode (FIXES FLICKERING)
+    // =========================================================
+    // FIX: BULLETPROOF TOOLTIP (No flicker, always on top)
+    // =========================================================
     const customTooltip = {
         id: 'customTooltip',
         beforeDraw: (chart) => {
@@ -298,12 +300,15 @@ function renderBubbleChart(issuesData) {
 
             const tooltip = document.createElement('div');
             tooltip.id = 'bubble-tooltip';
+            // USING position: fixed PREVENTS IT FROM BEING CLIPPED BY THE CARD
             tooltip.style.cssText = `
-                position: absolute; background: #1a1a2e; color: white; padding: 15px; 
+                position: fixed; 
+                background: #1a1a2e; color: white; padding: 15px; 
                 border-radius: 12px; pointer-events: none; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-                max-width: 280px; font-size: 0.9rem; z-index: 1000;
-                left: ${tooltipModel.caretX + 10}px; top: ${tooltipModel.caretY - 10}px;
-                transform: translateY(-100%);
+                max-width: 280px; font-size: 0.9rem; z-index: 10000;
+                left: ${tooltipModel.caretX + 15}px; 
+                top: ${tooltipModel.caretY + 15}px;
+                transform: none;
             `;
             
             tooltip.innerHTML = `
