@@ -154,7 +154,7 @@
     <div class="col-lg-3">
         <div class="card shadow-sm border-0 h-100">
             <div class="card-header bg-white border-0 py-3">
-                <h6 class="fw-bold mb-0"><i class="bi bi-bar-chart-fill text-danger me-2"></i>Top 5 Categories with Issues</h6>
+                <h6 class="fw-bold mb-0"><i class="bi bi-bar-chart-fill text-danger me-2"></i>Top 5 Issue Categories</h6>
             </div>
             <div class="card-body">
                 <div id="top5Loader" class="text-center text-muted small py-3">
@@ -213,11 +213,6 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 
 <script>
-// ============================================
-// REGISTER DATALABELS PLUGIN GLOBALLY
-// ============================================
-//Chart.register(ChartDataLabels);
-
 document.addEventListener('DOMContentLoaded', function() {
     fetchBubbleData();
 });
@@ -283,7 +278,7 @@ function renderBubbleChart(issuesData) {
     }];
 
     // =========================================================
-    // NON-JITTERY TOOLTIP (Proven Logic)
+    // FIX: BULLETPROOF TOOLTIP (No flicker, always on top)
     // =========================================================
     const customTooltip = {
         id: 'customTooltip',
@@ -293,10 +288,8 @@ function renderBubbleChart(issuesData) {
         },
         afterDraw: (chart) => {
             const tooltipModel = chart.tooltip;
-            // ONLY draw if hover is active and valid
             if (!tooltipModel || tooltipModel.opacity === 0) return;
             
-            // Get the current hovered data
             const data = chart.data.datasets[0].data[tooltipModel.dataPoints[0].dataIndex];
             
             let breakdownHtml = '';
@@ -307,15 +300,15 @@ function renderBubbleChart(issuesData) {
 
             const tooltip = document.createElement('div');
             tooltip.id = 'bubble-tooltip';
-            // position: absolute is highly stable when placed at the end of the canvas
+            // USING position: fixed PREVENTS IT FROM BEING CLIPPED BY THE CARD
             tooltip.style.cssText = `
-                position: absolute; 
+                position: fixed; 
                 background: #1a1a2e; color: white; padding: 15px; 
                 border-radius: 12px; pointer-events: none; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
                 max-width: 280px; font-size: 0.9rem; z-index: 10000;
                 left: ${tooltipModel.caretX + 15}px; 
-                top: ${tooltipModel.caretY - 20}px;
-                transform: translateY(-100%);
+                top: ${tooltipModel.caretY + 15}px;
+                transform: none;
             `;
             
             tooltip.innerHTML = `
@@ -336,23 +329,7 @@ function renderBubbleChart(issuesData) {
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                // ALLOW CHART.JS TO PROCESS HOVER NATURALLY
-                tooltip: { 
-                    enabled: false // We handle it manually in afterDraw
-                },
-                // ADD LABELS TO THE BUBBLES
-                datalabels: {
-                    color: '#ffffff',
-                    font: { weight: 'bold', size: 11 },
-                    textShadowColor: 'rgba(0,0,0,0.7)',
-                    textShadowBlur: 4,
-                    display: function(context) {
-                        return context.dataset.data[context.dataIndex].r >= 18;
-                    },
-                    formatter: function(value) {
-                        return value.label;
-                    }
-                }
+                tooltip: { enabled: false }
             },
             scales: {
                 x: { display: false, min: -2, max: 25 },
@@ -400,14 +377,17 @@ function renderTop5List(issuesData) {
 }
 
 function exportIssues(issuesData) {
+    // UPDATED EXPORT: Includes SKU and exact remark for detailed audit
     let csvContent = "Issue,Category,SKU,Exact_Remark\n";
     
     issuesData.forEach(item => {
+        // Iterate through the stored sku_details for this issue
         if(item.sku_details && item.sku_details.length > 0) {
             item.sku_details.forEach(detail => {
                 csvContent += `"${item.label}","${detail.category}","${detail.sku}","${detail.remark}"\n`;
             });
         } else {
+            // Fallback if details are missing (just shows summary)
             csvContent += `"${item.label}","All/Unknown","N/A","N/A"\n`;
         }
     });
