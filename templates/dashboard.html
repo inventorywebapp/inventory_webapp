@@ -1,144 +1,355 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Dashboard</h2>
+<h2 class="mb-4">Executive Dashboard</h2>
 
-<div class="row mt-4">
-    <div class="col-md-4">
-        <div class="card text-white bg-primary mb-3">
-            <div class="card-body">
-                <h5 class="card-title">Total SKUs</h5>
-                <p class="card-text display-4">{{ total_skus }}</p>
+<!-- 1. KPI Cards -->
+<div class="row g-4 mb-4">
+    <div class="col-xl-3 col-md-6">
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-body d-flex align-items-center">
+                <div class="flex-shrink-0 bg-primary bg-opacity-10 rounded-circle p-3 me-3">
+                    <i class="bi bi-box-seam fs-3 text-primary"></i>
+                </div>
+                <div>
+                    <h6 class="text-muted mb-1">Total Active SKUs</h6>
+                    <h3 class="mb-0 fw-bold">{{ total_skus }}</h3>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card text-white bg-success mb-3">
-            <div class="card-body">
-                <h5 class="card-title">Active Counting Sessions</h5>
-                <p class="card-text display-4">{{ active_sessions_count }}</p>
-                {% if active_session_info %}
-                <small class="text-white">Started: {{ active_session_info.session_date }}</small>
-                {% endif %}
+    <div class="col-xl-3 col-md-6">
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-body d-flex align-items-center">
+                <div class="flex-shrink-0 bg-success bg-opacity-10 rounded-circle p-3 me-3">
+                    <i class="bi bi-arrow-repeat fs-3 text-success"></i>
+                </div>
+                <div>
+                    <h6 class="text-muted mb-1">Active Sessions</h6>
+                    <h3 class="mb-0 fw-bold">{{ active_sessions_count }}</h3>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card text-white bg-info mb-3">
+    <div class="col-xl-3 col-md-6">
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-body d-flex align-items-center">
+                <div class="flex-shrink-0 bg-warning bg-opacity-10 rounded-circle p-3 me-3">
+                    <i class="bi bi-clock-history fs-3 text-warning"></i>
+                </div>
+                <div>
+                    <h6 class="text-muted mb-1">Latest Session</h6>
+                    {% if active_session_info %}
+                        <h6 class="mb-0 fw-bold text-truncate" style="max-width: 150px;">{{ active_session_info.session_date }}</h6>
+                    {% else %}
+                        <span class="badge bg-light text-muted">None Active</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card h-100 shadow-sm border-0">
             <div class="card-body">
-                <h5 class="card-title">Quick Actions</h5>
-                <a href="{{ url_for('counting') }}" class="btn btn-light">Start New Counting</a>
-                {% if active_session_info %}
-                <a href="{{ url_for('continue_session', session_id=active_session_info.id) }}" class="btn btn-warning mt-2 d-block">Continue Active Session</a>
-                {% endif %}
+                <h6 class="text-muted mb-2">Quick Action</h6>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('counting') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle"></i> New Count</a>
+                    {% if active_session_info %}
+                        <a href="{{ url_for('continue_session', session_id=active_session_info.id) }}" class="btn btn-outline-warning btn-sm"><i class="bi bi-play-circle"></i> Continue</a>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Day Category Progress Section -->
-<div class="row mt-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h5>Counting Progress by Day Category</h5>
+<!-- 2. Week Progress Section (Your Existing Table, but modernized) -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-0 py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-calendar-week text-primary me-2"></i>Weekly Count Progress</h5>
+                </div>
             </div>
-            <div class="card-body">
-                {% if day_category_progress %}
+            <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-bordered">
+                    <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>Day Category</th>
+                                <th class="ps-4">Day</th>
                                 <th>Total SKUs</th>
-                                <th>Completed SKUs</th>
-                                <th>Progress</th>
-                                <th>Status</th>
+                                <th>Completed</th>
+                                <th style="width: 35%;">Progress</th>
+                                <th class="pe-4 text-end">Status</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for progress in day_category_progress %}
                             <tr>
-                                <td><strong>{{ progress.name }}</strong></td>
+                                <td class="ps-4 fw-bold">{{ progress.name }}</td>
                                 <td>{{ progress.total_skus }}</td>
-                                <td>{{ progress.completed_skus }}</div>
+                                <td>{{ progress.completed_skus }}</td>
                                 <td>
-                                    <div class="progress" style="height: 25px;">
+                                    <div class="progress" style="height: 8px; background-color: #e9ecef;">
                                         <div class="progress-bar {% if progress.percentage == 100 %}bg-success{% elif progress.percentage >= 50 %}bg-info{% else %}bg-warning{% endif %}" 
                                              role="progressbar" 
                                              style="width: {{ progress.percentage }}%;" 
                                              aria-valuenow="{{ progress.percentage }}" 
                                              aria-valuemin="0" 
                                              aria-valuemax="100">
-                                            {% if progress.percentage > 0 %}
-                                                {{ "%.2f"|format(progress.percentage) }}%
-                                            {% else %}
-                                                0%
-                                            {% endif %}
                                         </div>
                                     </div>
-                                </div>
-                                <td>
+                                    <small class="text-muted ms-2">{{ "%.1f"|format(progress.percentage) }}%</small>
+                                </td>
+                                <td class="pe-4 text-end">
                                     {% if progress.percentage == 100 %}
-                                        <span class="badge bg-success">Completed</span>
+                                        <span class="badge bg-success rounded-pill">Complete</span>
                                     {% elif progress.completed_skus > 0 %}
-                                        <span class="badge bg-info">In Progress ({{ "%.2f"|format(progress.percentage) }}%)</span>
+                                        <span class="badge bg-info rounded-pill text-white">Active</span>
                                     {% else %}
-                                        <span class="badge bg-secondary">Not Started</span>
+                                        <span class="badge bg-secondary rounded-pill">Pending</span>
                                     {% endif %}
-                                </div>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
-                {% else %}
-                <div class="alert alert-info">No day category data available. Please sync data from Google Drive.</div>
-                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
-<div class="row mt-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5>Available Warehouses</h5>
+<!-- 3. REMARKS BUBBLE MAP (The New Feature) -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-0 py-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap">
+                    <div>
+                        <h5 class="fw-bold mb-0"><i class="bi bi-chat-dots text-danger me-2"></i>Inventory Issue Hotspots</h5>
+                        <small class="text-muted">Hover over bubbles to see Item Category breakdown</small>
+                    </div>
+                    <div class="mt-2 mt-sm-0">
+                        <button id="exportRemarksBtn" class="btn btn-outline-danger btn-sm">
+                            <i class="bi bi-download"></i> Export Issues
+                        </button>
+                    </div>
+                </div>
             </div>
             <div class="card-body">
-                <ul class="list-group">
-                    {% for warehouse in warehouses %}
-                    <li class="list-group-item">{{ warehouse }}</li>
-                    {% endfor %}
-                </ul>
+                <div id="bubbleMapLoader" class="text-center py-5">
+                    <div class="spinner-border text-danger" role="status"></div>
+                    <p class="text-muted mt-2">Analyzing historic inventory remarks...</p>
+                </div>
+                <div id="bubbleMapContainer" style="height: 400px; display: none; position: relative;">
+                    <canvas id="remarksBubbleChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-6">
-    <div class="card">
-        <div class="card-header">
-            <h5>Categories</h5>
-        </div>
-        <div class="card-body">
-            <h6>Day Categories (Mon → Sat)</h6>
-            <ul class="list-group mb-3">
-                {% for cat in day_categories[:7] %}
-                <li class="list-group-item">{{ cat }}</li>
-                {% endfor %}
-            </ul>
-            <h6>Item Categories (A → Z)</h6>
-            <!-- Scrollable Item Categories - SHOW ALL -->
-            <div style="max-height: 250px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px;">
+</div>
+
+<!-- 4. Sidebar Info (Your Existing Lists, made clean) -->
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h6 class="fw-bold mb-0"><i class="bi bi-house-door me-2"></i>Warehouses</h6>
+            </div>
+            <div class="card-body">
                 <ul class="list-group list-group-flush">
-                    {% for cat in item_categories %}
-                    <li class="list-group-item">{{ cat }}</li>
+                    {% for warehouse in warehouses %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ warehouse }}
+                        <span class="badge bg-light text-dark rounded-pill">Active</span>
+                    </li>
                     {% endfor %}
                 </ul>
             </div>
-            <small class="text-muted">Total: {{ item_categories|length }} categories</small>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <div class="d-flex justify-content-between">
+                    <h6 class="fw-bold mb-0"><i class="bi bi-tags me-2"></i>Categories</h6>
+                    <small class="text-muted">{{ item_categories|length }} Items</small>
+                </div>
+            </div>
+            <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                <div class="row g-2">
+                    {% for cat in item_categories %}
+                    <div class="col-md-6 col-xl-4">
+                        <span class="badge bg-light text-dark border w-100 text-start py-2 px-3">{{ cat }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
     </div>
 </div>
-</div>
+
+<!-- IMPORT CHART.JS -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    fetchBubbleData();
+});
+
+function fetchBubbleData() {
+    fetch('/api/dashboard_remarks_analytics')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('bubbleMapLoader').style.display = 'none';
+            const container = document.getElementById('bubbleMapContainer');
+            container.style.display = 'block';
+            
+            if(!data.success || data.data.length === 0) {
+                container.innerHTML = `
+                    <div class="alert alert-light text-center py-5 border">
+                        <i class="bi bi-check-circle text-success fs-1"></i>
+                        <p class="mt-3 text-muted">No inventory issues reported yet! Everything is running smoothly.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            renderBubbleChart(data.data);
+            
+            // Setup Export Button
+            document.getElementById('exportRemarksBtn').onclick = function() {
+                exportIssues(data.data);
+            };
+        })
+        .catch(error => {
+            document.getElementById('bubbleMapLoader').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> Error loading analytics: ${error.message}
+                </div>
+            `;
+        });
+}
+
+function renderBubbleChart(issuesData) {
+    const ctx = document.getElementById('remarksBubbleChart').getContext('2d');
+    
+    // Bubble Chart expects data in format: {x, y, r, label, customData}
+    // We will use index as X, frequency as Y. 
+    // X spacing will be random-ish to prevent perfect vertical line.
+    
+    const datasets = [{
+        label: 'Inventory Issues',
+        data: issuesData.map((item, index) => ({
+            x: (index % 5) * 4 + (Math.random() * 1.5 - 0.75), // Spread horizontally
+            y: item.count,
+            r: item.radius,
+            label: item.label,
+            count: item.count,
+            breakdown: item.breakdown,
+            color: item.color
+        })),
+        backgroundColor: issuesData.map(item => item.color + '80'), // Add transparency
+        borderColor: issuesData.map(item => item.color),
+        borderWidth: 2,
+        hoverBackgroundColor: issuesData.map(item => item.color)
+    }];
+
+    // Custom Plugin for tooltips
+    const customTooltip = {
+        id: 'customTooltip',
+        beforeDraw: (chart) => {
+            // Clear custom tooltips on redraw
+            const tooltipEl = document.getElementById('bubble-tooltip');
+            if (tooltipEl) tooltipEl.remove();
+        },
+        afterEvent: (chart, args) => {
+            const tooltipEl = document.getElementById('bubble-tooltip');
+            if (tooltipEl) tooltipEl.remove();
+            
+            const elements = chart.getElementsAtEventForMode(args.event, 'nearest', { intersect: true });
+            if (elements.length === 0) return;
+
+            const element = elements[0];
+            const data = chart.data.datasets[0].data[element.index];
+            
+            // Build breakdown HTML
+            let breakdownHtml = '';
+            const sortedBreakdown = Object.entries(data.breakdown).sort((a,b) => b[1]-a[1]);
+            for(const [cat, count] of sortedBreakdown) {
+                const percent = ((count / data.count) * 100).toFixed(1);
+                breakdownHtml += `<div class="d-flex justify-content-between"><span>${cat}</span><span class="fw-bold">${count} (${percent}%)</span></div>`;
+            }
+
+            // Create Custom Tooltip
+            const tooltip = document.createElement('div');
+            tooltip.id = 'bubble-tooltip';
+            tooltip.style.cssText = `
+                position: absolute; background: #1a1a2e; color: white; padding: 15px; 
+                border-radius: 12px; pointer-events: none; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+                max-width: 280px; font-size: 0.9rem; z-index: 1000;
+                left: ${args.event.x + 10}px; top: ${args.event.y - 10}px;
+                transform: translateY(-100%);
+            `;
+            
+            tooltip.innerHTML = `
+                <div class="fw-bold text-warning fs-6 mb-2">${data.label}</div>
+                <div class="text-muted small mb-2 border-bottom border-secondary pb-2">Total Occurrences: <span class="text-white">${data.count}</span></div>
+                <div class="small">Breakdown by Category:</div>
+                ${breakdownHtml}
+            `;
+            chart.canvas.parentNode.appendChild(tooltip);
+        }
+    };
+
+    new Chart(ctx, {
+        type: 'bubble',
+        data: { datasets: datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { enabled: false } // Disable default tooltip
+            },
+            scales: {
+                x: {
+                    display: false, // Hide X axis
+                    min: -2,
+                    max: 25
+                },
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Frequency Count', color: '#6c757d' },
+                    grid: { color: '#f0f0f0' },
+                    ticks: { stepSize: 2 }
+                }
+            }
+        },
+        plugins: [customTooltip]
+    });
+}
+
+function exportIssues(issuesData) {
+    let csvContent = "Issue,Occurrences,Item_Category_Breakdown\n";
+    
+    issuesData.forEach(item => {
+        const breakdownStr = Object.entries(item.breakdown)
+            .map(([cat, count]) => `${cat}(${count})`)
+            .join(' | ');
+        csvContent += `"${item.label}",${item.count},"${breakdownStr}"\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `inventory_issues_analytics_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+</script>
 {% endblock %}
