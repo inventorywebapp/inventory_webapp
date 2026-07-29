@@ -327,10 +327,14 @@ def api_dashboard_remarks_analytics():
             
             # CRITICAL: Hardcoded Whitelist
             # ONLY keep these specific issues. If a user types something else, ignore it.
+            # CRITICAL: Hardcoded Whitelist
+            # ONLY keep these specific issues. If a user types something else, ignore it.
             ALLOWED_ISSUES = {
                 'damage', 'scratches', 'no screw', 'wrong embroidery', 
                 'wrong design', 'detached logo', 'no adhesive', 'no logo', 
-                'cracked', 'rusty', 'wobbly'
+                'cracked', 'rusty', 'wobbly',
+                'hold', 'BTI', 'transfer stock', 'fading', 
+                'loose/wrong fittings', 'dented'
             }
             
             # Filter out dynamic words that aren't in the hardcoded list
