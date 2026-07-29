@@ -283,7 +283,7 @@ function renderBubbleChart(issuesData) {
     }];
 
     // =========================================================
-    // NEW: EXTERNAL TOOLTIP (Standard Chart.js Approach)
+    // EXTERNAL TOOLTIP (Chart.js Standard)
     // =========================================================
     const externalTooltip = {
         id: 'externalTooltip',
@@ -333,7 +333,7 @@ function renderBubbleChart(issuesData) {
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                // ENABLE CHART.JS NATIVE TOOLTIP ENGINE
+                // ENABLE CHART.JS TOOLTIP ENGINE + HOOK OUR EXTERNAL FUNCTION
                 tooltip: { 
                     enabled: false,
                     external: externalTooltip.afterExternalDraw
@@ -343,15 +343,17 @@ function renderBubbleChart(issuesData) {
                     color: '#ffffff',
                     font: {
                         weight: 'bold',
-                        size: 12
+                        size: 11 // Slightly smaller to fit inside small bubbles
                     },
                     textShadowColor: 'rgba(0,0,0,0.7)',
                     textShadowBlur: 4,
                     display: function(context) {
-                        return context.dataset.data[context.dataIndex].r > 15;
+                        // Only show text if the bubble is big enough (Radius >= 18)
+                        return context.dataset.data[context.dataIndex].r >= 18;
                     },
                     formatter: function(value) {
-                        return value.label.length > 12 ? value.label.substring(0, 12) + '..' : value.label;
+                        // Show full label inside the bubble
+                        return value.label;
                     }
                 }
             },
@@ -401,17 +403,14 @@ function renderTop5List(issuesData) {
 }
 
 function exportIssues(issuesData) {
-    // UPDATED EXPORT: Includes SKU and exact remark for detailed audit
     let csvContent = "Issue,Category,SKU,Exact_Remark\n";
     
     issuesData.forEach(item => {
-        // Iterate through the stored sku_details for this issue
         if(item.sku_details && item.sku_details.length > 0) {
             item.sku_details.forEach(detail => {
                 csvContent += `"${item.label}","${detail.category}","${detail.sku}","${detail.remark}"\n`;
             });
         } else {
-            // Fallback if details are missing (just shows summary)
             csvContent += `"${item.label}","All/Unknown","N/A","N/A"\n`;
         }
     });
