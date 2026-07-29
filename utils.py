@@ -563,7 +563,7 @@ def parse_hybrid_remarks(remarks_text):
     mapping = {
         'damage': ['damage', 'damaged'],
         'scratches': ['scratches', 'scratch', 'scratched'],
-        'no screw': ['no screw', 'missing screw', 'screw missing'],
+        'no screw': ['no screw', 'missing screw', 'screw missing', 'no scews'],
         'wrong embroidery': ['wrong embroidery', 'embroidery wrong', 'embroid wrong'],
         'wrong design': ['wrong design', 'different design', 'design wrong'],
         'detached logo': ['detached logo', 'logo detached'],
@@ -571,7 +571,14 @@ def parse_hybrid_remarks(remarks_text):
         'no logo': ['no logo', 'logo missing', 'missing logo'],
         'cracked': ['cracked', 'crack'],
         'rusty': ['rusty', 'rust', 'corroded'],
-        'wobbly': ['wobbly', 'loose', 'unstable']
+        'wobbly': ['wobbly', 'loose', 'unstable'],
+        # ===== NEWLY ADDED =====
+        'hold': ['hold', 'holding', 'on hold'],
+        'BTI': ['bti', 'b.t.i'],
+        'transfer stock': ['transfer stock', 'stock transfer', 'transfer'],
+        'fading': ['fading', 'fade', 'color fade'],
+        'loose/wrong fittings': ['loose fittings', 'wrong fittings', 'fitting loose', 'loose/wrong'],
+        'dented': ['dented', 'dent', 'dents']
     }
     
     # Check for hardcoded matches
