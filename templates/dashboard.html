@@ -216,7 +216,7 @@
 // ============================================
 // REGISTER DATALABELS PLUGIN GLOBALLY
 // ============================================
-Chart.register(ChartDataLabels);
+//Chart.register(ChartDataLabels);
 
 document.addEventListener('DOMContentLoaded', function() {
     fetchBubbleData();
@@ -283,18 +283,20 @@ function renderBubbleChart(issuesData) {
     }];
 
     // =========================================================
-    // TOOLTIP (Chart.js Standard)
+    // NON-JITTERY TOOLTIP (Proven Logic)
     // =========================================================
-    const externalTooltip = {
-        id: 'externalTooltip',
+    const customTooltip = {
+        id: 'customTooltip',
         beforeDraw: (chart) => {
             const tooltipEl = document.getElementById('bubble-tooltip');
             if (tooltipEl) tooltipEl.remove();
         },
-        afterExternalDraw: (chart) => {
+        afterDraw: (chart) => {
             const tooltipModel = chart.tooltip;
+            // ONLY draw if hover is active and valid
             if (!tooltipModel || tooltipModel.opacity === 0) return;
             
+            // Get the current hovered data
             const data = chart.data.datasets[0].data[tooltipModel.dataPoints[0].dataIndex];
             
             let breakdownHtml = '';
@@ -305,14 +307,15 @@ function renderBubbleChart(issuesData) {
 
             const tooltip = document.createElement('div');
             tooltip.id = 'bubble-tooltip';
+            // position: absolute is highly stable when placed at the end of the canvas
             tooltip.style.cssText = `
-                position: fixed; 
+                position: absolute; 
                 background: #1a1a2e; color: white; padding: 15px; 
                 border-radius: 12px; pointer-events: none; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
                 max-width: 280px; font-size: 0.9rem; z-index: 10000;
                 left: ${tooltipModel.caretX + 15}px; 
-                top: ${tooltipModel.caretY + 15}px;
-                transform: none;
+                top: ${tooltipModel.caretY - 20}px;
+                transform: translateY(-100%);
             `;
             
             tooltip.innerHTML = `
@@ -325,9 +328,6 @@ function renderBubbleChart(issuesData) {
         }
     };
 
-    // =========================================================
-    // CHART CONFIGURATION (Clean, No conflicts)
-    // =========================================================
     new Chart(ctx, {
         type: 'bubble',
         data: { datasets: datasets },
@@ -336,12 +336,11 @@ function renderBubbleChart(issuesData) {
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                // Enable Tooltip via external function
+                // ALLOW CHART.JS TO PROCESS HOVER NATURALLY
                 tooltip: { 
-                    enabled: false,
-                    external: externalTooltip.afterExternalDraw
+                    enabled: false // We handle it manually in afterDraw
                 },
-                // Apply DataLabels LOCALLY within options ONLY
+                // ADD LABELS TO THE BUBBLES
                 datalabels: {
                     color: '#ffffff',
                     font: { weight: 'bold', size: 11 },
@@ -365,7 +364,7 @@ function renderBubbleChart(issuesData) {
                 }
             }
         },
-        plugins: [externalTooltip] // Only attach our custom plugin here
+        plugins: [customTooltip]
     });
 }
 
