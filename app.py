@@ -300,7 +300,7 @@ def dashboard():
 
 
 # ============================================
-# DASHBOARD API FOR REMARKS BUBBLE MAP (HARDCODED ONLY, NO DYNAMIC)
+# DASHBOARD API FOR REMARKS BUBBLE MAP (FULLY FIXED)
 # ============================================
 @app.route('/api/dashboard_remarks_analytics')
 @login_required
@@ -322,17 +322,48 @@ def api_dashboard_remarks_analytics():
             if not record.remarks or not record.sku:
                 continue
             
-            # Use the hybrid parser from utils
-            issues = parse_hybrid_remarks(record.remarks)
-            
-            # If utils returns None, convert to empty list to avoid crashing
-            if issues is None:
-                issues = []
+            # ============================================================
+            # FIX: Manually create the parser function inline if needed
+            # ============================================================
+            def parse_local_remarks(text):
+                if not text or not isinstance(text, str):
+                    return []
+                text_lower = text.lower()
+                found_issues = set()
+                
+                mapping = {
+                    'damage': ['damage', 'damaged'],
+                    'scratches': ['scratches', 'scratch', 'scratched'],
+                    'no screw': ['no screw', 'missing screw', 'screw missing', 'no scews'],
+                    'wrong embroidery': ['wrong embroidery', 'embroidery wrong', 'embroid wrong'],
+                    'wrong design': ['wrong design', 'different design', 'design wrong'],
+                    'detached logo': ['detached logo', 'logo detached'],
+                    'no adhesive': ['no adhesive', 'adhesive missing', 'missing adhesive'],
+                    'no logo': ['no logo', 'logo missing', 'missing logo'],
+                    'cracked': ['cracked', 'crack'],
+                    'rusty': ['rusty', 'rust', 'corroded'],
+                    'wobbly': ['wobbly', 'loose', 'unstable'],
+                    'hold': ['hold', 'holding', 'on hold'],
+                    'BTI': ['bti', 'b.t.i'],
+                    'transfer stock': ['transfer stock', 'stock transfer', 'transfer'],
+                    'fading': ['fading', 'fade', 'color fade'],
+                    'loose/wrong fittings': ['loose fittings', 'wrong fittings', 'fitting loose', 'loose/wrong'],
+                    'dented': ['dented', 'dent', 'dents']
+                }
+                
+                # Check for hardcoded matches
+                for standard_issue, synonyms in mapping.items():
+                    for synonym in synonyms:
+                        if synonym in text_lower:
+                            found_issues.add(standard_issue)
+                            break
+                
+                return list(found_issues)
+
+            # Run the inline function (No external dependency needed)
+            issues = parse_local_remarks(record.remarks)
             
             # CRITICAL: Hardcoded Whitelist
-            # ONLY keep these specific issues. If a user types something else, ignore it.
-            # CRITICAL: Hardcoded Whitelist
-            # ONLY keep these specific issues. If a user types something else, ignore it.
             ALLOWED_ISSUES = {
                 'damage', 'scratches', 'no screw', 'wrong embroidery', 
                 'wrong design', 'detached logo', 'no adhesive', 'no logo', 
@@ -403,6 +434,8 @@ def api_dashboard_remarks_analytics():
         
     except Exception as e:
         print(f"Dashboard API Error: {str(e)}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
