@@ -3,7 +3,7 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, SKU, CountingSession, CountRecord, AuditLog, get_ph_time
-from utils import check_recount_needed, sync_data_from_drive
+from utils import check_recount_needed, sync_data_from_drive, parse_hybrid_remarks
 from config import Config
 import pandas as pd
 from io import BytesIO
@@ -298,6 +298,79 @@ def dashboard():
                          warehouses=warehouses,
                          day_category_progress=day_category_progress)
 
+
+# ============================================
+# NEW: DASHBOARD API FOR REMARKS BUBBLE MAP (UPDATED)
+# ============================================
+@app.route('/api/dashboard_remarks_analytics')
+@login_required
+def api_dashboard_remarks_analytics():
+    """Returns analytics for the remark bubbles (Hardcoded + Dynamic)"""
+    try:
+        # 1. Fetch ALL count records that have remarks (In-Progress OR Completed)
+        records = db.session.query(CountRecord).filter(
+            CountRecord.remarks != None,
+            CountRecord.remarks != ''
+        ).all()
+
+        issue_counts = {}
+        issue_items = {}  # Store SKU breakdown per issue
+        
+        # 2. Loop through remarks and parse
+        for record in records:
+            if not record.remarks or not record.sku:
+                continue
+            
+            # Use the hybrid parser from utils
+            issues = parse_hybrid_remarks(record.remarks)
+            
+            sku_desc = record.sku.description or 'Uncategorized'
+            
+            for issue in issues:
+                if issue not in issue_counts:
+                    issue_counts[issue] = 0
+                    issue_items[issue] = {}
+                
+                issue_counts[issue] += 1
+                
+                # Track category breakdown
+                if sku_desc not in issue_items[issue]:
+                    issue_items[issue][sku_desc] = 0
+                issue_items[issue][sku_desc] += 1
+
+        # 3. Format data for the frontend Chart.js Bubble chart
+        bubble_data = []
+        for issue, count in issue_counts.items():
+            # Determine bubble size (cap at 80 to prevent huge bubbles)
+            radius = min(10 + (count * 2), 60)
+            
+            # Generate random but visually appealing color based on issue name
+            import hashlib
+            hash_val = int(hashlib.md5(issue.encode()).hexdigest()[:6], 16) % 0xFFFFFF
+            color = f"#{hash_val:06x}"
+            
+            bubble_data.append({
+                'label': issue,
+                'count': count,
+                'radius': radius,
+                'color': color,
+                'breakdown': issue_items[issue]
+            })
+        
+        # Sort by count descending (biggest problem first)
+        bubble_data.sort(key=lambda x: x['count'], reverse=True)
+        
+        return jsonify({
+            'success': True,
+            'data': bubble_data,
+            'total_records_analyzed': len(records)
+        })
+        
+    except Exception as e:
+        print(f"Dashboard API Error: {str(e)}", file=sys.stderr)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/get_skus')
 @login_required
 def get_skus():
@@ -404,87 +477,6 @@ def get_skus():
         })
     
     return jsonify(result)
-
-
-# ============================================
-# NEW: DASHBOARD API FOR REMARKS BUBBLE MAP
-# ============================================
-@app.route('/api/dashboard_remarks_analytics')
-@login_required
-def api_dashboard_remarks_analytics():
-    """Returns analytics for the remark bubbles (Hardcoded + Dynamic)"""
-    try:
-        # ================================================================
-        # FIX: Removed the 'CountingSession.is_completed == True' filter.
-        # It now analyzes ALL count records that have remarks.
-        # ================================================================
-        records = db.session.query(CountRecord).filter(
-            CountRecord.remarks != None,
-            CountRecord.remarks != ''
-        ).all()
-
-        issue_counts = {}
-        issue_items = {}  # Store SKU breakdown per issue
-        
-        # 2. Loop through remarks and parse
-        for record in records:
-            if not record.remarks or not record.sku:
-                continue
-            
-            # ================================================================
-            # FIX: Strip ALL numbers from the remark string BEFORE parsing.
-            # This ensures "7 damaged" becomes just "damaged", and "scratch 3" becomes "scratch".
-            # ================================================================
-            cleaned_remark = re.sub(r'\d+', '', record.remarks)
-            
-            # Use the hybrid parser from utils (on the cleaned remark)
-            issues = parse_hybrid_remarks(cleaned_remark)
-            
-            sku_desc = record.sku.description or 'Uncategorized'
-            
-            for issue in issues:
-                if issue not in issue_counts:
-                    issue_counts[issue] = 0
-                    issue_items[issue] = {}
-                
-                issue_counts[issue] += 1
-                
-                # Track category breakdown
-                if sku_desc not in issue_items[issue]:
-                    issue_items[issue][sku_desc] = 0
-                issue_items[issue][sku_desc] += 1
-
-        # 3. Format data for the frontend Chart.js Bubble chart
-        bubble_data = []
-        for issue, count in issue_counts.items():
-            # Determine bubble size (cap at 80 to prevent huge bubbles)
-            radius = min(10 + (count * 2), 60)
-            
-            # Generate random but visually appealing color based on issue name
-            import hashlib
-            hash_val = int(hashlib.md5(issue.encode()).hexdigest()[:6], 16) % 0xFFFFFF
-            color = f"#{hash_val:06x}"
-            
-            bubble_data.append({
-                'label': issue,
-                'count': count,
-                'radius': radius,
-                'color': color,
-                'breakdown': issue_items[issue]
-            })
-        
-        # Sort by count descending (biggest problem first)
-        bubble_data.sort(key=lambda x: x['count'], reverse=True)
-        
-        return jsonify({
-            'success': True,
-            'data': bubble_data,
-            'total_records_analyzed': len(records)
-        })
-        
-    except Exception as e:
-        print(f"Dashboard API Error: {str(e)}", file=sys.stderr)
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/search_suggestions')
