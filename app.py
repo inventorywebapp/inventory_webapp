@@ -3,7 +3,7 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, SKU, CountingSession, CountRecord, AuditLog, get_ph_time
-from utils import check_recount_needed, sync_data_from_drive, parse_hybrid_remarks
+from utils import check_recount_needed, sync_data_from_drive
 from config import Config
 import pandas as pd
 from io import BytesIO
@@ -322,8 +322,12 @@ def api_dashboard_remarks_analytics():
             if not record.remarks or not record.sku:
                 continue
             
-            # Use the hybrid parser from utils - BUT we will filter them below
+            # Use the hybrid parser from utils
             issues = parse_hybrid_remarks(record.remarks)
+            
+            # If utils returns None, convert to empty list to avoid crashing
+            if issues is None:
+                issues = []
             
             # CRITICAL: Hardcoded Whitelist
             # ONLY keep these specific issues. If a user types something else, ignore it.
