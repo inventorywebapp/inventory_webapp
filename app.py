@@ -361,14 +361,15 @@ def get_skus():
                 count_time_naive = None
             
             # ============================================================
-            # FIX: Properly handle recount count
-            # If recount was completed, use recount_count as final (even if 0)
+            # FIX: Properly handle count values (including 0)
+            # If recount was completed, use recount_count as final.
+            # Otherwise, use initial_count (even if it's 0).
             # ============================================================
             if latest_record.recount_completed:
+                # Use recount_count (could be 0)
                 final_count_value = latest_record.recount_count
-            elif latest_record.final_count is not None and latest_record.final_count != '':
-                final_count_value = latest_record.final_count
             else:
+                # Use initial_count (could be 0) - this is the "Previous Count"
                 final_count_value = latest_record.initial_count
             
             session = CountingSession.query.get(latest_record.session_id)
@@ -1303,11 +1304,13 @@ def get_in_progress_skus(session_id):
         ).order_by(CountRecord.version.desc()).first()
         
         if sku and latest_record:
-            if latest_record.recount_count and latest_record.recount_count > 0:
+            # ============================================================
+            # FIX: Correctly handle final count = 0
+            # ============================================================
+            if latest_record.recount_completed:
                 final_count = latest_record.recount_count
-            elif latest_record.final_count and latest_record.final_count > 0:
-                final_count = latest_record.final_count
             else:
+                # Use initial_count even if it's 0
                 final_count = latest_record.initial_count
             
             skus_data.append({
