@@ -129,7 +129,7 @@
                 <div class="d-flex justify-content-between align-items-center flex-wrap">
                     <div>
                         <h5 class="fw-bold mb-0"><i class="bi bi-chat-dots text-danger me-2"></i>Inventory Issue Hotspots</h5>
-                        <small class="text-muted">Hover over bubbles for detailed category breakdown</small>
+                        <small class="text-muted">Hover to analyze. <strong>Click</strong> a bubble to pin the breakdown.</small>
                     </div>
                     <div class="mt-2 mt-sm-0">
                         <button id="exportRemarksBtn" class="btn btn-outline-danger btn-sm">
@@ -155,9 +155,9 @@
                         
                         <!-- Right: Top 5 Breakdown Sidebar -->
                         <div class="col-lg-4 col-md-12 border-start-lg">
-                            <h6 class="fw-bold text-muted mb-3"><i class="bi bi-bar-chart-fill me-1"></i> Top 5 Contributing Categories</h6>
+                            <h6 class="fw-bold text-muted mb-3"><i class="bi bi-bar-chart-fill me-1"></i> Category Breakdown</h6>
                             <div id="issueBreakdownSidebar">
-                                <p class="text-muted small">Hover over a bubble on the left to see the breakdown here.</p>
+                                <p class="text-muted small">Hover over a bubble to preview.<br><strong>Click</strong> to pin the details here.</p>
                             </div>
                         </div>
                     </div>
@@ -167,7 +167,7 @@
     </div>
 </div>
 
-<!-- 4. Sidebar Info (Warehouses & Categories) -->
+<!-- 4. Sidebar Info -->
 <div class="row g-4">
     <div class="col-lg-6">
         <div class="card shadow-sm border-0 h-100">
@@ -238,7 +238,7 @@ function fetchBubbleData() {
             
             renderBubbleChart(data.data);
             
-            // Setup Export Button (Passes entire JSON for detailed export)
+            // Setup Export Button
             document.getElementById('exportRemarksBtn').onclick = function() {
                 exportDetailedIssues(data.data);
             };
@@ -260,6 +260,7 @@ function renderBubbleChart(issuesData) {
         bubbleChartInstance.destroy();
     }
     
+    // 1. Prepare Data
     const datasets = [{
         label: 'Inventory Issues',
         data: issuesData.map((item, index) => ({
@@ -278,30 +279,104 @@ function renderBubbleChart(issuesData) {
         hoverBackgroundColor: issuesData.map(item => item.color)
     }];
 
-    // Native Chart.js Tooltip Callback (Flicker-Free)
-    const tooltipCallbacks = {
-        title: function(items) {
-            return items[0].raw.label;
-        },
-        label: function(context) {
-            const raw = context.raw;
-            let label = `Total Occurrences: ${raw.count}`;
-            
-            // Add Top 5 Breakdown
-            if(raw.top_5 && raw.top_5.length > 0) {
-                label += `\n\nTop Categories:`;
-                raw.top_5.forEach(cat => {
-                    const percent = ((cat[1] / raw.count) * 100).toFixed(1);
-                    label += `\n  • ${cat[0]}: ${percent}%`;
+    // 2. Custom Plugin to Draw Labels INSIDE the Bubbles (Responsive)
+    const bubbleLabelPlugin = {
+        id: 'bubbleLabelPlugin',
+        afterDraw: (chart) => {
+            const ctx = chart.ctx;
+            chart.data.datasets.forEach((dataset) => {
+                const meta = chart.getDatasetMeta(dataset.label === 'Inventory Issues' ? 0 : 0);
+                meta.data.forEach((element, index) => {
+                    const data = dataset.data[index];
+                    const radius = element.options.radius;
+                    // Responsive font size: 10% of radius, but not less than 8px and not more than 20px
+                    const fontSize = Math.max(8, Math.min(20, radius * 0.35));
+                    
+                    ctx.font = `${fontSize}px 'Inter', sans-serif`;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.shadowColor = 'rgba(0,0,0,0.7)';
+                    ctx.shadowBlur = 6;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    // Wrap text if bubble is large enough
+                    const text = data.label;
+                    if (text.length > 6 && radius > 25) {
+                        const mid = Math.ceil(text.length / 2);
+                        ctx.fillText(text.substring(0, mid), element.x, element.y - 6);
+                        ctx.fillText(text.substring(mid), element.x, element.y + 6);
+                    } else {
+                        ctx.fillText(text, element.x, element.y);
+                    }
+                    ctx.shadowBlur = 0; // Reset shadow
                 });
-            }
-            return label;
-        },
-        afterBody: function(items) {
-            return 'Hover stable - Data accurate';
+            });
         }
     };
 
+    // 3. Sidebar Update Logic (Hover + Click)
+    let pinnedIssue = null;
+
+    function updateSidebar(data, isPinned = false) {
+        const sidebar = document.getElementById('issueBreakdownSidebar');
+        if(!data) {
+            sidebar.innerHTML = `<p class="text-muted small">Hover over a bubble to preview.<br><strong>Click</strong> to pin the details here.</p>`;
+            return;
+        }
+
+        let html = `<div class="alert alert-danger py-2 mb-2 d-flex justify-content-between align-items-center">
+            <strong>${data.label}</strong> <span class="badge bg-light text-dark">${data.count} Total</span>
+        </div>`;
+        
+        // Calculate percentages and break down
+        const sorted = Object.entries(data.breakdown).sort((a,b) => b[1]-a[1]);
+        const total = data.count;
+        let top5 = sorted.slice(0, 5);
+        let remainingCount = 0;
+        let remainingPercent = 0;
+
+        if (sorted.length > 5) {
+            const rest = sorted.slice(5);
+            remainingCount = rest.reduce((sum, [, count]) => sum + count, 0);
+            remainingPercent = ((remainingCount / total) * 100).toFixed(1);
+        }
+
+        html += `<ul class="list-group list-group-flush mt-2">`;
+        // Render Top 5
+        top5.forEach(([cat, count]) => {
+            const percent = ((count / total) * 100).toFixed(1);
+            html += `
+                <li class="list-group-item d-flex justify-content-between align-items-center px-0 border-0 py-1">
+                    <span class="small text-truncate" style="max-width: 140px;">${cat}</span>
+                    <span class="badge bg-primary rounded-pill">${percent}%</span>
+                </li>
+            `;
+        });
+
+        // Render "Others" if applicable
+        if (sorted.length > 5) {
+            html += `
+                <li class="list-group-item d-flex justify-content-between align-items-center px-0 border-0 py-1 text-muted">
+                    <span class="small text-truncate" style="max-width: 140px;">Others</span>
+                    <span class="badge bg-secondary rounded-pill">${remainingPercent}%</span>
+                </li>
+            `;
+        }
+        html += `</ul>`;
+        
+        if(isPinned) {
+            html += `<div class="text-end mt-1"><button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="unpinSidebar()">Unpin</button></div>`;
+        }
+        sidebar.innerHTML = html;
+    }
+
+    // Expose unpin function globally so HTML button can call it
+    window.unpinSidebar = function() {
+        pinnedIssue = null;
+        updateSidebar(null);
+    };
+
+    // 4. Chart Configuration
     bubbleChartInstance = new Chart(ctx, {
         type: 'bubble',
         data: { datasets: datasets },
@@ -312,14 +387,35 @@ function renderBubbleChart(issuesData) {
                 legend: { display: false },
                 tooltip: {
                     enabled: true,
-                    backgroundColor: 'rgba(26, 26, 46, 0.9)',
+                    backgroundColor: 'rgba(26, 26, 46, 0.95)',
                     titleColor: '#ffc107',
-                    bodyColor: '#ffffff',
+                    bodyColor: '#e9ecef',
                     borderColor: 'rgba(255,255,255,0.1)',
                     borderWidth: 1,
-                    padding: 12,
+                    padding: 10,
                     cornerRadius: 8,
-                    callbacks: tooltipCallbacks
+                    titleFont: { size: 14, weight: 'bold' },
+                    bodyFont: { size: 12 },
+                    callbacks: {
+                        title: function(items) {
+                            return items[0].raw.label;
+                        },
+                        label: function(context) {
+                            const raw = context.raw;
+                            return `Occurrences: ${raw.count}`;
+                        },
+                        afterBody: function(items) {
+                            const raw = items[0].raw;
+                            let text = "Top 5 Categories:";
+                            if(raw.top_5 && raw.top_5.length > 0) {
+                                raw.top_5.forEach(cat => {
+                                    const percent = ((cat[1] / raw.count) * 100).toFixed(1);
+                                    text += `\n  • ${cat[0]}: ${percent}%`;
+                                });
+                            }
+                            return text;
+                        }
+                    }
                 }
             },
             scales: {
@@ -335,37 +431,24 @@ function renderBubbleChart(issuesData) {
                     ticks: { stepSize: 2 }
                 }
             },
-            // Update right sidebar on hover
-            onHover: function(event, elements) {
-                const sidebar = document.getElementById('issueBreakdownSidebar');
+            // Handle Hover & Click
+            onClick: function(event, elements) {
                 if(elements.length > 0) {
                     const data = elements[0].element.$context.raw;
-                    let html = `<div class="alert alert-danger py-2 mb-0"><strong>${data.label}</strong> (${data.count} occurrences)</div>`;
-                    html += `<ul class="list-group list-group-flush mt-2">`;
-                    
-                    // Sort descending
-                    const sorted = Object.entries(data.breakdown).sort((a,b) => b[1]-a[1]);
-                    const top5 = sorted.slice(0,5);
-                    
-                    top5.forEach(([cat, count]) => {
-                        const percent = ((count / data.count) * 100).toFixed(1);
-                        html += `
-                            <li class="list-group-item d-flex justify-content-between align-items-center px-0 border-0">
-                                <span class="small text-truncate" style="max-width: 140px;">${cat}</span>
-                                <span class="badge bg-primary rounded-pill">${percent}%</span>
-                            </li>
-                        `;
-                    });
-                    if(sorted.length > 5) {
-                        html += `<li class="list-group-item text-muted small px-0 border-0">+ ${sorted.length - 5} more categories...</li>`;
-                    }
-                    html += `</ul>`;
-                    sidebar.innerHTML = html;
-                } else {
-                    sidebar.innerHTML = `<p class="text-muted small">Hover over a bubble on the left to see the breakdown here.</p>`;
+                    pinnedIssue = data;
+                    updateSidebar(data, true);
+                }
+            },
+            onHover: function(event, elements) {
+                if(elements.length > 0 && !pinnedIssue) {
+                    const data = elements[0].element.$context.raw;
+                    updateSidebar(data, false);
+                } else if (elements.length === 0 && !pinnedIssue) {
+                    updateSidebar(null);
                 }
             }
-        }
+        },
+        plugins: [bubbleLabelPlugin] // Add the label renderer
     });
 }
 
