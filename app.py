@@ -405,6 +405,83 @@ def get_skus():
     
     return jsonify(result)
 
+
+# ============================================
+# NEW: DASHBOARD API FOR REMARKS BUBBLE MAP
+# ============================================
+@app.route('/api/dashboard_remarks_analytics')
+@login_required
+def api_dashboard_remarks_analytics():
+    """Returns analytics for the remark bubbles (Hardcoded + Dynamic)"""
+    try:
+        # 1. Fetch ALL completed count records that have remarks
+        # Joining tables to ensure we only get SKUs belonging to completed sessions
+        records = db.session.query(CountRecord).join(
+            CountingSession
+        ).filter(
+            CountingSession.is_completed == True,
+            CountRecord.remarks != None,
+            CountRecord.remarks != ''
+        ).all()
+
+        issue_counts = {}
+        issue_items = {}  # Store SKU breakdown per issue
+        
+        # 2. Loop through remarks and parse
+        for record in records:
+            if not record.remarks or not record.sku:
+                continue
+            
+            # Use the hybrid parser from utils
+            issues = parse_hybrid_remarks(record.remarks)
+            
+            sku_desc = record.sku.description or 'Uncategorized'
+            
+            for issue in issues:
+                if issue not in issue_counts:
+                    issue_counts[issue] = 0
+                    issue_items[issue] = {}
+                
+                issue_counts[issue] += 1
+                
+                # Track category breakdown
+                if sku_desc not in issue_items[issue]:
+                    issue_items[issue][sku_desc] = 0
+                issue_items[issue][sku_desc] += 1
+
+        # 3. Format data for the frontend Chart.js Bubble chart
+        bubble_data = []
+        for issue, count in issue_counts.items():
+            # Determine bubble size (cap at 80 to prevent huge bubbles)
+            radius = min(10 + (count * 2), 60)
+            
+            # Generate random but visually appealing color based on issue name
+            import hashlib
+            hash_val = int(hashlib.md5(issue.encode()).hexdigest()[:6], 16) % 0xFFFFFF
+            color = f"#{hash_val:06x}"
+            
+            bubble_data.append({
+                'label': issue,
+                'count': count,
+                'radius': radius,
+                'color': color,
+                'breakdown': issue_items[issue]
+            })
+        
+        # Sort by count descending (biggest problem first)
+        bubble_data.sort(key=lambda x: x['count'], reverse=True)
+        
+        return jsonify({
+            'success': True,
+            'data': bubble_data,
+            'total_records_analyzed': len(records)
+        })
+        
+    except Exception as e:
+        print(f"Dashboard API Error: {str(e)}", file=sys.stderr)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/search_suggestions')
 @login_required
 def search_suggestions():
