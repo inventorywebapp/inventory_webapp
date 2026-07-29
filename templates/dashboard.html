@@ -278,7 +278,7 @@ function renderBubbleChart(issuesData) {
     }];
 
     // =========================================================
-    // FIX: BULLETPROOF TOOLTIP (No flicker, always on top)
+    // ULTIMATE BULLETPROOF TOOLTIP (Forces rendering on top)
     // =========================================================
     const customTooltip = {
         id: 'customTooltip',
@@ -298,16 +298,21 @@ function renderBubbleChart(issuesData) {
                 breakdownHtml += `<div class="d-flex justify-content-between"><span>${cat}</span><span class="fw-bold">${count} (${percent}%)</span></div>`;
             });
 
+            // Find chart position on screen to guarantee exact location
+            const rect = chart.canvas.getBoundingClientRect();
+            const x = rect.left + tooltipModel.caretX;
+            const y = rect.top + tooltipModel.caretY;
+
             const tooltip = document.createElement('div');
             tooltip.id = 'bubble-tooltip';
-            // USING position: fixed PREVENTS IT FROM BEING CLIPPED BY THE CARD
+            // Inject directly into the BODY, not the chart container, to bypass z-index restrictions
             tooltip.style.cssText = `
                 position: fixed; 
                 background: #1a1a2e; color: white; padding: 15px; 
                 border-radius: 12px; pointer-events: none; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-                max-width: 280px; font-size: 0.9rem; z-index: 10000;
-                left: ${tooltipModel.caretX + 15}px; 
-                top: ${tooltipModel.caretY + 15}px;
+                max-width: 280px; font-size: 0.9rem; z-index: 999999 !important;
+                left: ${x + 15}px; 
+                top: ${y + 15}px;
                 transform: none;
             `;
             
@@ -317,7 +322,7 @@ function renderBubbleChart(issuesData) {
                 <div class="small">Breakdown by Category:</div>
                 ${breakdownHtml}
             `;
-            chart.canvas.parentNode.appendChild(tooltip);
+            document.body.appendChild(tooltip);
         }
     };
 
