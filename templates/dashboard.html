@@ -63,7 +63,7 @@
     </div>
 </div>
 
-<!-- 2. Week Progress Section (Your Existing Table, but modernized) -->
+<!-- 2. Week Progress Section (Your Existing Table) -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="card shadow-sm border-0">
@@ -121,10 +121,10 @@
     </div>
 </div>
 
-<!-- 3. REMARKS BUBBLE MAP (The New Feature) -->
+<!-- 3. REMARKS BUBBLE MAP + TOP 5 PANEL -->
 <div class="row mb-4">
-    <div class="col-12">
-        <div class="card shadow-sm border-0">
+    <div class="col-lg-9">
+        <div class="card shadow-sm border-0 h-100">
             <div class="card-header bg-white border-0 py-3">
                 <div class="d-flex justify-content-between align-items-center flex-wrap">
                     <div>
@@ -149,9 +149,26 @@
             </div>
         </div>
     </div>
+    
+    <!-- Right Side: Top 5 Contributing Categories -->
+    <div class="col-lg-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h6 class="fw-bold mb-0"><i class="bi bi-bar-chart-fill text-danger me-2"></i>Top 5 Issue Categories</h6>
+            </div>
+            <div class="card-body">
+                <div id="top5Loader" class="text-center text-muted small py-3">
+                    <div class="spinner-border spinner-border-sm text-secondary" role="status"></div> Loading...
+                </div>
+                <div id="top5ListContainer" style="display: none;">
+                    <ul id="top5List" class="list-group list-group-flush"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<!-- 4. Sidebar Info (Your Existing Lists, made clean) -->
+<!-- 4. Sidebar Info (Your Existing Lists) -->
 <div class="row g-4">
     <div class="col-lg-6">
         <div class="card shadow-sm border-0 h-100">
@@ -205,8 +222,10 @@ function fetchBubbleData() {
         .then(response => response.json())
         .then(data => {
             document.getElementById('bubbleMapLoader').style.display = 'none';
+            document.getElementById('top5Loader').style.display = 'none';
+            
             const container = document.getElementById('bubbleMapContainer');
-            container.style.display = 'block';
+            const top5Container = document.getElementById('top5ListContainer');
             
             if(!data.success || data.data.length === 0) {
                 container.innerHTML = `
@@ -215,12 +234,16 @@ function fetchBubbleData() {
                         <p class="mt-3 text-muted">No inventory issues reported yet! Everything is running smoothly.</p>
                     </div>
                 `;
-                // HIDE EXPORT BUTTON IF NO DATA
+                top5Container.innerHTML = `<div class="text-muted text-center py-3 small">No data available</div>`;
                 document.getElementById('exportRemarksBtn').style.display = 'none';
                 return;
             }
             
+            container.style.display = 'block';
+            top5Container.style.display = 'block';
+            
             renderBubbleChart(data.data);
+            renderTop5List(data.data);
             
             // Setup Export Button
             document.getElementById('exportRemarksBtn').onclick = function() {
@@ -239,61 +262,47 @@ function fetchBubbleData() {
 function renderBubbleChart(issuesData) {
     const ctx = document.getElementById('remarksBubbleChart').getContext('2d');
     
-    // Bubble Chart expects data in format: {x, y, r, label, customData}
-    // We will use index as X, frequency as Y. 
-    // X spacing will be random-ish to prevent perfect vertical line.
-    
     const datasets = [{
         label: 'Inventory Issues',
         data: issuesData.map((item, index) => ({
-            x: (index % 5) * 4 + (Math.random() * 1.5 - 0.75), // Spread horizontally
+            x: (index % 5) * 4 + (Math.random() * 1.5 - 0.75),
             y: item.count,
             r: item.radius,
             label: item.label,
             count: item.count,
-            breakdown: item.breakdown,
-            color: item.color
+            sorted_breakdown: item.sorted_breakdown
         })),
-        backgroundColor: issuesData.map(item => item.color + '80'), // Add transparency
+        backgroundColor: issuesData.map(item => item.color + '80'),
         borderColor: issuesData.map(item => item.color),
-        borderWidth: 2,
-        hoverBackgroundColor: issuesData.map(item => item.color)
+        borderWidth: 2
     }];
 
-    // Custom Plugin for tooltips
+    // Stable Tooltip using 'external' mode (FIXES FLICKERING)
     const customTooltip = {
         id: 'customTooltip',
         beforeDraw: (chart) => {
-            // Clear custom tooltips on redraw
             const tooltipEl = document.getElementById('bubble-tooltip');
             if (tooltipEl) tooltipEl.remove();
         },
-        afterEvent: (chart, args) => {
-            const tooltipEl = document.getElementById('bubble-tooltip');
-            if (tooltipEl) tooltipEl.remove();
+        afterDraw: (chart) => {
+            const tooltipModel = chart.tooltip;
+            if (!tooltipModel || tooltipModel.opacity === 0) return;
             
-            const elements = chart.getElementsAtEventForMode(args.event, 'nearest', { intersect: true });
-            if (elements.length === 0) return;
-
-            const element = elements[0];
-            const data = chart.data.datasets[0].data[element.index];
+            const data = chart.data.datasets[0].data[tooltipModel.dataPoints[0].dataIndex];
             
-            // Build breakdown HTML
             let breakdownHtml = '';
-            const sortedBreakdown = Object.entries(data.breakdown).sort((a,b) => b[1]-a[1]);
-            for(const [cat, count] of sortedBreakdown) {
+            data.sorted_breakdown.forEach(([cat, count]) => {
                 const percent = ((count / data.count) * 100).toFixed(1);
                 breakdownHtml += `<div class="d-flex justify-content-between"><span>${cat}</span><span class="fw-bold">${count} (${percent}%)</span></div>`;
-            }
+            });
 
-            // Create Custom Tooltip
             const tooltip = document.createElement('div');
             tooltip.id = 'bubble-tooltip';
             tooltip.style.cssText = `
                 position: absolute; background: #1a1a2e; color: white; padding: 15px; 
                 border-radius: 12px; pointer-events: none; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
                 max-width: 280px; font-size: 0.9rem; z-index: 1000;
-                left: ${args.event.x + 10}px; top: ${args.event.y - 10}px;
+                left: ${tooltipModel.caretX + 10}px; top: ${tooltipModel.caretY - 10}px;
                 transform: translateY(-100%);
             `;
             
@@ -315,17 +324,13 @@ function renderBubbleChart(issuesData) {
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                tooltip: { enabled: false } // Disable default tooltip
+                tooltip: { enabled: false }
             },
             scales: {
-                x: {
-                    display: false, // Hide X axis
-                    min: -2,
-                    max: 25
-                },
-                y: {
-                    beginAtZero: true,
-                    title: { display: true, text: 'Frequency Count', color: '#6c757d' },
+                x: { display: false, min: -2, max: 25 },
+                y: { 
+                    beginAtZero: true, 
+                    title: { display: true, text: 'Frequency Count', color: '#6c757d' }, 
                     grid: { color: '#f0f0f0' },
                     ticks: { stepSize: 2 }
                 }
@@ -335,14 +340,51 @@ function renderBubbleChart(issuesData) {
     });
 }
 
+function renderTop5List(issuesData) {
+    const ul = document.getElementById('top5List');
+    ul.innerHTML = '';
+    
+    // We need to find the Top 5 Item Categories across ALL issues combined.
+    const categoryTotals = {};
+    issuesData.forEach(item => {
+        Object.entries(item.breakdown).forEach(([cat, count]) => {
+            if (!categoryTotals[cat]) categoryTotals[cat] = 0;
+            categoryTotals[cat] += count;
+        });
+    });
+    
+    const sortedCats = Object.entries(categoryTotals).sort((a,b) => b[1]-a[1]).slice(0, 5);
+    
+    if (sortedCats.length === 0) {
+        ul.innerHTML = `<li class="list-group-item text-muted text-center small">No data</li>`;
+        return;
+    }
+    
+    sortedCats.forEach(([cat, count]) => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex justify-content-between align-items-center border-0 ps-0 pe-0 py-2';
+        li.innerHTML = `
+            <span class="text-truncate" style="max-width: 70%;">${cat}</span>
+            <span class="badge bg-danger rounded-pill">${count}</span>
+        `;
+        ul.appendChild(li);
+    });
+}
+
 function exportIssues(issuesData) {
-    let csvContent = "Issue,Occurrences,Item_Category_Breakdown\n";
+    // UPDATED EXPORT: Includes SKU and exact remark for detailed audit
+    let csvContent = "Issue,Category,SKU,Exact_Remark\n";
     
     issuesData.forEach(item => {
-        const breakdownStr = Object.entries(item.breakdown)
-            .map(([cat, count]) => `${cat}(${count})`)
-            .join(' | ');
-        csvContent += `"${item.label}",${item.count},"${breakdownStr}"\n`;
+        // Iterate through the stored sku_details for this issue
+        if(item.sku_details && item.sku_details.length > 0) {
+            item.sku_details.forEach(detail => {
+                csvContent += `"${item.label}","${detail.category}","${detail.sku}","${detail.remark}"\n`;
+            });
+        } else {
+            // Fallback if details are missing (just shows summary)
+            csvContent += `"${item.label}","All/Unknown","N/A","N/A"\n`;
+        }
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
