@@ -283,7 +283,7 @@ function renderBubbleChart(issuesData) {
     }];
 
     // =========================================================
-    // EXTERNAL TOOLTIP (Chart.js Standard)
+    // TOOLTIP (Chart.js Standard)
     // =========================================================
     const externalTooltip = {
         id: 'externalTooltip',
@@ -325,6 +325,9 @@ function renderBubbleChart(issuesData) {
         }
     };
 
+    // =========================================================
+    // CHART CONFIGURATION (Clean, No conflicts)
+    // =========================================================
     new Chart(ctx, {
         type: 'bubble',
         data: { datasets: datasets },
@@ -333,23 +336,19 @@ function renderBubbleChart(issuesData) {
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                // ENABLE CHART.JS TOOLTIP ENGINE + HOOK OUR EXTERNAL FUNCTION
+                // Enable Tooltip via external function
                 tooltip: { 
                     enabled: false,
                     external: externalTooltip.afterExternalDraw
                 },
-                // ADD LABELS TO THE BUBBLES
+                // Apply DataLabels LOCALLY within options ONLY
                 datalabels: {
                     color: '#ffffff',
-                    font: {
-                        weight: 'bold',
-                        size: 11
-                    },
+                    font: { weight: 'bold', size: 11 },
                     textShadowColor: 'rgba(0,0,0,0.7)',
                     textShadowBlur: 4,
                     display: function(context) {
-                        // Only show text if the bubble is big enough (Radius >= 15)
-                        return context.dataset.data[context.dataIndex].r >= 15;
+                        return context.dataset.data[context.dataIndex].r >= 18;
                     },
                     formatter: function(value) {
                         return value.label;
@@ -366,7 +365,7 @@ function renderBubbleChart(issuesData) {
                 }
             }
         },
-        plugins: [externalTooltip]
+        plugins: [externalTooltip] // Only attach our custom plugin here
     });
 }
 
