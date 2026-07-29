@@ -216,7 +216,7 @@
 // ============================================
 // REGISTER DATALABELS PLUGIN GLOBALLY
 // ============================================
-//Chart.register(ChartDataLabels);
+Chart.register(ChartDataLabels);
 
 document.addEventListener('DOMContentLoaded', function() {
     fetchBubbleData();
@@ -343,16 +343,15 @@ function renderBubbleChart(issuesData) {
                     color: '#ffffff',
                     font: {
                         weight: 'bold',
-                        size: 11 // Slightly smaller to fit inside small bubbles
+                        size: 11
                     },
                     textShadowColor: 'rgba(0,0,0,0.7)',
                     textShadowBlur: 4,
                     display: function(context) {
-                        // Only show text if the bubble is big enough (Radius >= 18)
-                        return context.dataset.data[context.dataIndex].r >= 18;
+                        // Only show text if the bubble is big enough (Radius >= 15)
+                        return context.dataset.data[context.dataIndex].r >= 15;
                     },
                     formatter: function(value) {
-                        // Show full label inside the bubble
                         return value.label;
                     }
                 }
