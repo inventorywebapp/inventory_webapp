@@ -539,3 +539,64 @@ def get_sync_status():
         }
     except:
         return {'active_skus': 0, 'inactive_skus': 0, 'total_skus': 0, 'last_sync': 'Never', 'status': 'error'}
+
+
+# ============================================
+# NEW: DASHBOARD REMARK ANALYTICS ENGINE
+# ============================================
+
+def parse_hybrid_remarks(remarks_text):
+    """
+    Parse remarks text and return detected issue keywords based on a hybrid approach:
+    1. Hardcoded synonyms mapped to standard categories.
+    2. Any text not matching hardcoded lists is added dynamically as-is.
+    """
+    if not remarks_text or not isinstance(remarks_text, str):
+        return []
+    
+    # 1. Hardcoded Issue Categories (The "Standard" List you provided)
+    # Lowercase everything for matching
+    text_lower = remarks_text.lower()
+    found_issues = set()
+    
+    # The Master Mapping List
+    mapping = {
+        'damage': ['damage', 'damaged'],
+        'scratches': ['scratches', 'scratch', 'scratched'],
+        'no screw': ['no screw', 'missing screw', 'screw missing'],
+        'wrong embroidery': ['wrong embroidery', 'embroidery wrong', 'embroid wrong'],
+        'wrong design': ['wrong design', 'different design', 'design wrong'],
+        'detached logo': ['detached logo', 'logo detached'],
+        'no adhesive': ['no adhesive', 'adhesive missing', 'missing adhesive'],
+        'no logo': ['no logo', 'logo missing', 'missing logo'],
+        'cracked': ['cracked', 'crack'],
+        'rusty': ['rusty', 'rust', 'corroded'],
+        'wobbly': ['wobbly', 'loose', 'unstable']
+    }
+    
+    # Check for hardcoded matches
+    for standard_issue, synonyms in mapping.items():
+        for synonym in synonyms:
+            if synonym in text_lower:
+                found_issues.add(standard_issue)
+                break
+    
+    # 2. Dynamic Fallback (If a word exists but didn't match a hardcoded category)
+    # Remove common stopwords and punctuation
+    import re
+    words = re.findall(r'\b[a-zA-Z]+\b', text_lower)
+    stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'for', 'nor', 'on', 'at', 'to', 'by', 'with', 'without', 'of'}
+    
+    for word in words:
+        if word not in stopwords and len(word) > 2:  # Ignore tiny words
+            # Check if it already exists in the standard set
+            already_covered = False
+            for standard_issue in found_issues:
+                # If the dynamic word is already a substring of a standard issue, skip it
+                if word in standard_issue or standard_issue in word:
+                    already_covered = True
+                    break
+            if not already_covered:
+                found_issues.add(word) # Dynamically add new word
+    
+    return list(found_issues)
