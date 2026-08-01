@@ -216,6 +216,14 @@
 <!-- IMPORT CHART.JS -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
+<style>
+/* High z-index to ensure tooltips render ABOVE everything cleanly */
+#remarksBubbleChart {
+    z-index: 1;
+    position: relative;
+}
+</style>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     fetchBubbleData();
@@ -283,7 +291,7 @@ function renderBubbleChart(issuesData) {
         hoverBackgroundColor: issuesData.map(item => item.color)
     }];
 
-    // 2. Custom Plugin: Smart Contrast Text Renderer
+    // 2. Custom Plugin: Smart Contrast Text Renderer (Enhanced Shadow for Readability)
     const bubbleLabelPlugin = {
         id: 'bubbleLabelPlugin',
         afterDraw: (chart) => {
@@ -303,12 +311,12 @@ function renderBubbleChart(issuesData) {
                     const brightness = (r * 0.299) + (g * 0.587) + (b * 0.114);
                     
                     const textColor = brightness > 160 ? '#1a1a2e' : '#ffffff';
-                    const shadowColor = brightness > 160 ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)';
+                    const shadowColor = brightness > 160 ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.9)';
                     
                     ctx.font = `${fontSize}px 'Inter', -apple-system, sans-serif`;
                     ctx.fillStyle = textColor;
                     ctx.shadowColor = shadowColor;
-                    ctx.shadowBlur = 4;
+                    ctx.shadowBlur = 8; // UPDATED: Increased from 4 to 8 for superior contrast
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     
