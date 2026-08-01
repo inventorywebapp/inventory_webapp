@@ -64,6 +64,7 @@
                     <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="final_expected" checked> Final Expected</label></li>
                     <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="kenneth" checked> Kenneth's Inv</label></li>
                     <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="current_count" checked> Current Count</label></li>
+                    <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="remarks" checked> Remarks</label></li>
                     <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="last_counted_date" checked> Last Counted Date</label></li>
                     <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="previous_count" checked> Previous Count</label></li>
                     <li><label class="dropdown-item"><input type="checkbox" class="col-toggle" data-col="status" checked> Status</label></li>
@@ -316,6 +317,7 @@ const COLUMN_DEFINITIONS = [
     { key: 'final_expected', label: 'Final Expected', default: true },
     { key: 'kenneth', label: "Kenneth's Inv", default: true },
     { key: 'current_count', label: 'Current Count', default: true },
+    { key: 'remarks', label: 'Remarks', default: true }, // Added Remarks
     { key: 'last_counted_date', label: 'Last Counted Date', default: true },
     { key: 'previous_count', label: 'Previous Count', default: true },
     { key: 'status', label: 'Status', default: true }
@@ -1102,10 +1104,15 @@ function loadExistingCountsForSkus() {
         .then(latestCounts => {
             for (let skuId in latestCounts) {
                 let countInput = document.querySelector(`.initial-count[data-sku-id="${skuId}"]`);
+                let remarkInput = document.querySelector(`.initial-remark[data-sku-id="${skuId}"]`);
                 let lastCountedSpan = document.getElementById(`last-counted-${skuId}`);
                 let lastCountValueSpan = document.getElementById(`last-count-value-${skuId}`);
                 if (countInput && latestCounts[skuId]) {
                     countInput.value = latestCounts[skuId].initial_count;
+                    // If the backend returns remarks, populate them
+                    if (remarkInput && latestCounts[skuId].remarks) {
+                        remarkInput.value = latestCounts[skuId].remarks;
+                    }
                     if (lastCountedSpan) {
                         lastCountedSpan.innerHTML = latestCounts[skuId].count_time;
                     }
@@ -1149,6 +1156,7 @@ function displaySkus(skus) {
         { key: 'final_expected', label: 'Final Expected' },
         { key: 'kenneth', label: "Kenneth's Inv" },
         { key: 'current_count', label: 'Current Count' },
+        { key: 'remarks', label: 'Remarks' },
         { key: 'last_counted_date', label: 'Last Counted Date' },
         { key: 'previous_count', label: 'Previous Count' },
         { key: 'status', label: 'Status' }
@@ -1228,6 +1236,9 @@ function displaySkus(skus) {
         }
         html += '>';
         html += '</td>';
+        html += `<td class="col-remarks">`;
+        html += `<input type="text" class="form-control initial-remark" data-sku-id="${sku.id}" style="min-width: 150px;" placeholder="Optional remarks..." inputmode="text">`;
+        html += '</td>';
         html += `<td class="col-last_counted_date">`;
             if (existingCountTime && !isExpired) {
                 html += `<span id="last-counted-${sku.id}" style="color: #0d6efd; font-weight: bold;">${existingCountTime}</span>`;
@@ -1278,10 +1289,10 @@ function displaySkus(skus) {
         skusListDiv.innerHTML = html;
     }
     setTimeout(function() {
-        document.querySelectorAll('.initial-count').forEach(function(input) {
+        document.querySelectorAll('.initial-count, .initial-remark').forEach(function(input) {
             if (input) {
                 input.addEventListener('blur', function() {
-                    if (this.value !== '' && this.value !== null) {
+                    if (this.value !== '' && this.value !== null && this.classList.contains('initial-count')) {
                         validateCountInput(this);
                     }
                     highlightSkusStatus();
@@ -1292,7 +1303,7 @@ function displaySkus(skus) {
                         this.blur();
                         return;
                     }
-                    if (!/[\d]/.test(e.key) && 
+                    if (this.classList.contains('initial-count') && !/[\d]/.test(e.key) && 
                         e.key !== 'Backspace' && 
                         e.key !== 'Delete' && 
                         e.key !== 'Tab' && 
@@ -1411,8 +1422,11 @@ function saveAllCounts() {
         let input = countInputs[i];
         let skuId = input.getAttribute('data-sku-id');
         let count = input.value;
+        let remarkInput = document.querySelector(`.initial-remark[data-sku-id="${skuId}"]`);
+        let remark = remarkInput ? remarkInput.value.trim() : '';
         if (count && count !== '') {
-            counts[skuId] = {initial_count: parseInt(count, 10)};
+            // UPDATED: Send Remarks along with the count
+            counts[skuId] = {initial_count: parseInt(count, 10), remarks: remark};
         }
     }
     if (Object.keys(counts).length === 0) {
