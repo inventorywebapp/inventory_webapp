@@ -539,6 +539,7 @@ def counting():
                 continue
                 
             initial_count = float(count_data.get('initial_count', 0))
+            initial_remarks = count_data.get('remarks', '')  # UPDATED: Grab remarks from frontend
             
             pending_recount = CountRecord.query.filter_by(
                 session_id=session_obj.id,
@@ -582,6 +583,7 @@ def counting():
                     session_id=session_obj.id,
                     sku_id=int(sku_id),
                     initial_count=initial_count,
+                    remarks=initial_remarks,  # UPDATED: Saves initial remarks to DB!
                     is_recount_needed=recount_needed,
                     count_time=get_ph_time(),
                     version=new_version
@@ -684,7 +686,9 @@ def save_recount():
         if record:
             record.recount_count = float(recount_data.get('recount_count', 0))
             record.final_count = record.recount_count
-            record.remarks = recount_data.get('remarks', '')
+            # IMPORTANT: Recount remarks OVERWRITE the initial remark in the same column.
+            # This is the Enterprise Best Practice: The final decision replaces the observation.
+            record.remarks = recount_data.get('remarks', '') 
             record.recount_completed = True
             record.is_recount_needed = False
             
